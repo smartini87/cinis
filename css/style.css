@@ -164,3 +164,64 @@ html, body {
   .hp-panel { bottom: auto; top: 64px; left: auto; right: 10px; width: 150px; }
   .hint { bottom: 150px; }
 }
+
+/* ---------------------------------------------------------------- Steuerknöpfe */
+.ctl-panel { top: 10px; right: 10px; display: flex; gap: 4px; padding: 4px; pointer-events: auto; }
+.cbtn {
+  font: inherit; font-size: 15px; min-width: 34px; height: 30px; background: #2a231d; color: #efe6d2;
+  border: 1px solid #4a3c28; border-radius: 3px; cursor: pointer;
+}
+.cbtn:hover { border-color: #b08a4a; }
+.cbtn.off { color: #8a7a68; }
+
+/* ---------------------------------------------------------------- Overlays */
+.overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 8, 14, 0.55); pointer-events: auto; padding: 16px;
+}
+.overlay[hidden] { display: none; }
+.overlay.menu { background: radial-gradient(ellipse at center, rgba(10, 8, 6, 0.35), rgba(5, 5, 10, 0.85)); }
+.card {
+  background: linear-gradient(#2a221b, #1d1814); border: 2px solid #8a6a3a; border-radius: 6px;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.6), 0 10px 40px rgba(0, 0, 0, 0.7);
+  padding: 22px 28px; max-width: 560px; width: 100%; text-align: center; max-height: 100%; overflow: auto;
+  animation: cardIn 0.25s ease-out;
+}
+@keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+.card h2 { margin: 0 0 10px; color: #ffd36a; font-weight: normal; letter-spacing: 2px; }
+.card p { line-height: 1.5; color: #e6dcc6; }
+.title {
+  font-size: clamp(48px, 12vw, 84px); letter-spacing: 0.3em; color: #f0a53a; padding-left: 0.3em;
+  text-shadow: 0 0 18px rgba(240, 120, 40, 0.6), 0 3px 0 #5a2a10;
+}
+.title.small { font-size: clamp(30px, 8vw, 46px); letter-spacing: 0.15em; padding-left: 0.15em; }
+.subtitle { font-size: 20px; letter-spacing: 0.4em; color: #d9cba8; margin-top: -6px; text-transform: uppercase; }
+.lore { font-style: italic; font-size: 15px; margin: 18px 0; }
+.btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; align-items: center; }
+.mbtn {
+  font: inherit; font-size: 17px; width: min(300px, 100%); padding: 9px 14px; cursor: pointer;
+  background: #352b22; color: #efe6d2; border: 2px solid #6b5533; border-radius: 4px;
+}
+.mbtn small { display: block; font-size: 12px; color: #b9a988; }
+.mbtn:hover, .mbtn:focus-visible { border-color: #ffd36a; background: #4a3a24; outline: none; }
+.mbtn.primary { background: #6b3a1a; border-color: #c08a4a; }
+.mbtn.primary:hover, .mbtn.primary:focus-visible { background: #8a4a20; border-color: #ffd36a; }
+.mbtn.danger { background: #6a1c18; }
+.tut-step { font-size: 12px; color: #b9a988; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+.dots { display: flex; justify-content: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #4a3c28; }
+.dot.on { background: #ffd36a; }
+.keys, .stats { margin: 8px auto; border-collapse: collapse; text-align: left; font-size: 14px; }
+.keys td, .stats td { padding: 4px 10px; border-bottom: 1px solid #3a2f24; }
+.keys td:first-child { color: #ffd36a; font-family: monospace; white-space: nowrap; }
+.stats td:last-child { text-align: right; color: #ffd36a; font-weight: bold; }
+.end.victory .card { border-color: #d9b25a; }
+.end.defeat .card { border-color: #8a2a1c; }
+.end.defeat .title { color: #c0402a; }
+.hud[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .ctl-panel { top: auto; bottom: 150px; right: 6px; flex-direction: column; }
+  .card { padding: 16px; }
+  .lore { font-size: 13px; }
+}

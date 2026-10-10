@@ -10,13 +10,15 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
+- `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt).
+- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt 30 Nächte im Schnelldurchlauf (~15 s) und gibt den Verlauf pro Nacht aus.
 - `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
 - Eingabe-Flanken (`wasPressed`, `mouse.clicked`) nur in `Game.handleFrameInput()` auswerten – sie gelten genau einen Frame.
 
 ## Architektur (js/)
 | Modul | Verantwortung |
 |---|---|
-| `main.js` | `Game`: Game Loop mit festem Zeitschritt (60 Hz), Zustandswechsel, Render-Reihenfolge |
+| `main.js` | `Game`: Game Loop mit festem Zeitschritt (60 Hz, Tempo 1–3×), Zustände `menu/tutorial/playing/paused/over`, Spielereignisse, Render-Reihenfolge |
 | `config.js` | Konstanten + Balancing |
 | `util.js` | Mathe, Seed-Zufall (mulberry32), Rauschen, MinHeap |
 | `input.js` | Tastatur/Maus/Touch, Flanken pro Frame (`pressed`, `mouse.clicked`) |
@@ -29,8 +31,9 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `enemies.js` | Gegnertypen, Wellenplanung `waveFor(n)`, Gegner-KI (Flussfeld → Flamme, Gebäude/Einheiten angreifen), Sonnenbrand, Randindikatoren |
 | `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
+| `save.js` | Spielstand in localStorage (`cinis.save.v1`): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
 | `particles.js` | Partikel + schwebende Texte (`game.effects`) |
-| `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`) |
+| `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
 
 ## Konventionen
 - Welteinheiten: 1 Kachel = `TILE` (16) Weltpixel; Entitäten haben `x,y` = Fußpunkt in Welteinheiten.

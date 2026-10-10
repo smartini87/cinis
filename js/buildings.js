@@ -12,7 +12,7 @@ export const BUILDING_DEFS = {
   farm: { name: 'Farm', size: 2, hp: 120, cost: { wood: 14, water: 6 }, key: '2', desc: 'Ein Siedler baut hier tagsüber Nahrung an.' },
   well: { name: 'Brunnen', size: 1, hp: 150, cost: { stone: 12, wood: 4 }, key: '3', desc: 'Fördert stetig Wasser ins Lager.' },
   wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
-  tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 16, stone: 14 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
+  tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
 };
 export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower'];
 
@@ -277,7 +277,12 @@ export class Buildings {
       case 'center': {
         const spr = Sprites.center;
         ctx.drawImage(spr, Math.round(x + s / 2 - spr.width / 2), bottom - spr.height + 6);
-        drawFlame(ctx, x + s / 2, bottom - 32, 7, time);
+        if (b.hp > 0) drawFlame(ctx, x + s / 2, bottom - 32, 7, time);
+        else {
+          // Erloschen: nur noch Rauch
+          ctx.fillStyle = 'rgba(90,84,80,0.6)';
+          for (let i = 0; i < 4; i++) ctx.fillRect(Math.round(x + s / 2 - 2 + Math.sin(time * 2 + i) * 2), Math.round(bottom - 34 - i * 4 - ((time * 8) % 4)), 4, 3);
+        }
         break;
       }
       case 'hut':

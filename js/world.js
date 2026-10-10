@@ -203,6 +203,25 @@ export class World {
     return node;
   }
 
+  /**
+   * Die Ruinen zerfallen weiter: auf zufälligen Pflasterflächen abseits der Flamme entstehen neue
+   * Säulentrümmer (verhindert, dass Stein dauerhaft ausgeht). Liefert die Anzahl neuer Knoten.
+   */
+  crumbleRuins(count, minDist = 9) {
+    let made = 0;
+    for (let tries = 0; tries < count * 40 && made < count; tries++) {
+      const x = 1 + Math.floor(Math.random() * (this.w - 2)), y = 1 + Math.floor(Math.random() * (this.h - 2));
+      if (this.tileAt(x, y) !== T.PAVE || x === this.cx || y === this.cy) continue;
+      if (Math.hypot(x - this.cx, y - this.cy) < minDist) continue;
+      if (this.buildingAt[this.idx(x, y)]) continue;
+      const old = this.nodeAtTile(x, y);
+      if (old && !old.removed) continue;
+      this.addNode('rock', x, y);
+      made++;
+    }
+    return made;
+  }
+
   nodeAtTile(tx, ty) {
     if (!this.inBounds(tx, ty)) return null;
     const id = this.nodeAt[ty * this.w + tx];

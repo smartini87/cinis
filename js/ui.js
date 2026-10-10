@@ -1,4 +1,5 @@
-// ui.js – DOM-HUD über dem Canvas: Ressourcen, Traglast, Hinweise, Meldungen.
+// ui.js – DOM-Oberfläche über dem Canvas: HUD (Ressourcen, Tag/Nacht, LP, Bauleiste, Hinweise, Meldungen)
+// sowie Overlays (Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage).
 
 import { RES, RES_KEYS } from './config.js';
 import { iconURL, buildingPreviewURL } from './sprites.js';
@@ -7,6 +8,29 @@ import { FOCI } from './settlers.js';
 import { SETTLER, WIN_NIGHTS } from './config.js';
 import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
+import { peekSave } from './save.js';
+
+const TUTORIAL = [
+  ['Die letzte Flamme', 'Rom liegt in Asche. Im Zentrum der Ruinen brennt die <b>Ewige Flamme</b>. Erlischt sie, ist alles verloren. Halte sie <b>30 Nächte</b> lang am Leben.'],
+  ['Sammeln', 'Bewege dich mit <b>WASD</b>. Halte <b>Leertaste</b> oder die <b>linke Maustaste</b> an Bäumen, Trümmern, Feigensträuchern oder am Wasser, um Holz, Stein, Nahrung und Wasser zu sammeln. Du trägst bis zu 30 Einheiten – an der Flamme lieferst du automatisch ab.'],
+  ['Bauen', 'Wähle Gebäude mit <b>1–5</b> oder über die Bauleiste und setze sie per Klick. <b>Hütten</b> bieten Platz für neue Siedler, <b>Farmen</b> und <b>Brunnen</b> versorgen sie, <b>Mauern</b> und <b>Türme</b> schützen die Flamme.'],
+  ['Siedler', 'Siedler arbeiten selbstständig. Sie brauchen <b>Nahrung</b> und <b>Wasser</b> aus dem Lager. Jeden Morgen kommen neue hinzu, wenn Platz und Nahrung vorhanden sind. Links wählst du, was sie bevorzugt sammeln.'],
+  ['Die Nacht', 'Bei Einbruch der Nacht kriechen <b>Aschgänger</b> aus den Ruinen – jede Nacht mehr. Rote Pfeile am Rand zeigen, woher sie kommen. Kämpfe mit dem Gladius, baue Türme hinter Mauern. Das erste Sonnenlicht verbrennt sie.'],
+];
+
+const HELP = `
+<table class="keys">
+<tr><td>WASD / Pfeile</td><td>Bewegen</td></tr>
+<tr><td>Leertaste / E / Linksklick</td><td>Sammeln &amp; angreifen (gedrückt halten)</td></tr>
+<tr><td>1 – 5 / Bauleiste</td><td>Gebäude wählen, Klick setzt es</td></tr>
+<tr><td>Rechtsklick / Esc</td><td>Bauen abbrechen</td></tr>
+<tr><td>X</td><td>Abriss (50 % Rückerstattung)</td></tr>
+<tr><td>F</td><td>Tempo 1× / 2× / 3×</td></tr>
+<tr><td>P / Esc</td><td>Pause</td></tr>
+<tr><td>Mausrad</td><td>Zoom</td></tr>
+<tr><td>H</td><td>Diese Hilfe</td></tr>
+<tr><td>Touch</td><td>Links ziehen = laufen, tippen = Aktion/Bauen</td></tr>
+</table>`;
 
 /** Kurzhelfer zum Erzeugen von DOM-Elementen. */
 function el(tag, cls, parent, html) {
@@ -127,9 +151,123 @@ export class UI {
       });
       this.buildBtns[type] = btn;
     }
+    // Steuerknöpfe (oben rechts)
+    const ctl = el('div', 'panel ctl-panel', hud);
+    this.speedBtn = el('button', 'cbtn', ctl, '1×');
+    this.speedBtn.title = 'Spieltempo (F)';
+    this.speedBtn.addEventListener('click', () => this.game.cycleSpeed());
+    const pauseBtn = el('button', 'cbtn', ctl, 'Ⅱ');
+    pauseBtn.title = 'Pause (P)';
+    pauseBtn.addEventListener('click', () => this.game.pause());
+    const helpBtn = el('button', 'cbtn', ctl, '?');
+    helpBtn.title = 'Steuerung (H)';
+    helpBtn.addEventListener('click', () => this.game.showHelp());
+    for (const b of ctl.children) b.type = 'button';
     // Hinweiszeile + Meldungen
     this.hint = el('div', 'hint', hud);
-    this.toasts = el('div', 'toasts', hud);
+    this.toasts = el('div', 'toasts', this.root);
+    // Overlay-Ebene für Menüs
+    this.overlay = el('div', 'overlay', this.root);
+    this.overlay.hidden = true;
+  }
+
+  setHudVisible(v) {
+    this.hud.hidden = !v;
+  }
+
+  // ---------------------------------------------------------------- Overlays
+  /** Overlay mit Karte anzeigen; buttons: [{ label, cls, onClick }] */
+  showOverlay(cls, html, buttons = []) {
+    const o = this.overlay;
+    o.innerHTML = '';
+    o.className = 'overlay ' + cls;
+    const card = el('div', 'card', o, html);
+    const row = el('div', 'btn-row', card);
+    for (const b of buttons) {
+      const btn = el('button', 'mbtn ' + (b.cls || ''), row, b.label);
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        this.game.audio?.play('click');
+        b.onClick();
+      });
+    }
+    o.hidden = false;
+    const first = row.querySelector('.mbtn.primary') || row.querySelector('.mbtn');
+    if (first) first.focus({ preventScroll: true });
+    return card;
+  }
+
+  hideOverlay() {
+    this.overlay.hidden = true;
+    this.overlay.innerHTML = '';
+  }
+
+  get overlayOpen() {
+    return !this.overlay.hidden;
+  }
+
+  showMainMenu() {
+    const g = this.game;
+    const info = peekSave();
+    const btns = [];
+    if (info) btns.push({ label: `Fortsetzen <small>Tag ${info.day} · ${info.settlers} Siedler</small>`, cls: 'primary', onClick: () => g.continueGame() });
+    btns.push({ label: 'Neues Spiel', cls: info ? '' : 'primary', onClick: () => (info ? this.confirmNew() : g.startNewGame()) });
+    btns.push({ label: 'Steuerung', onClick: () => this.showHelp(() => this.showMainMenu()) });
+    this.showOverlay('menu', `
+      <div class="title">CINIS</div>
+      <div class="subtitle">Die letzte Flamme</div>
+      <p class="lore">Rom ist gefallen. Asche bedeckt die sieben Hügel, und nachts kriecht sie als Gestalt aus den Ruinen.
+      Nur die Ewige Flamme hält sie fern. Sammle die Überlebenden, baue auf, verteidige das Licht – 30 Nächte lang.</p>`, btns);
+  }
+
+  confirmNew() {
+    this.showOverlay('menu', `<h2>Neues Spiel?</h2><p>Der bisherige Spielstand wird überschrieben.</p>`, [
+      { label: 'Ja, neu beginnen', cls: 'primary danger', onClick: () => this.game.startNewGame() },
+      { label: 'Zurück', onClick: () => this.showMainMenu() },
+    ]);
+  }
+
+  showPause() {
+    const g = this.game;
+    this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.list.length} Siedler · ${g.stats.kills} Feinde besiegt</p>`, [
+      { label: 'Weiter', cls: 'primary', onClick: () => g.resume() },
+      { label: 'Steuerung', onClick: () => this.showHelp(() => this.showPause()) },
+      { label: 'Speichern &amp; Hauptmenü', onClick: () => g.toMainMenu() },
+    ]);
+  }
+
+  showHelp(back) {
+    this.showOverlay('help', `<h2>Steuerung</h2>${HELP}`, [{ label: 'Zurück', cls: 'primary', onClick: back }]);
+  }
+
+  /** Mehrseitiges Tutorial; onDone wird nach der letzten Seite oder beim Überspringen aufgerufen. */
+  showTutorial(onDone, page = 0) {
+    const [title, text] = TUTORIAL[page];
+    const last = page === TUTORIAL.length - 1;
+    const dots = TUTORIAL.map((_, i) => `<span class="dot${i === page ? ' on' : ''}"></span>`).join('');
+    this.showOverlay('tutorial', `<div class="tut-step">Einführung ${page + 1}/${TUTORIAL.length}</div><h2>${title}</h2><p>${text}</p><div class="dots">${dots}</div>`, [
+      { label: last ? 'Los geht\'s!' : 'Weiter', cls: 'primary', onClick: () => (last ? onDone() : this.showTutorial(onDone, page + 1)) },
+      ...(last ? [] : [{ label: 'Überspringen', onClick: onDone }]),
+    ]);
+  }
+
+  showEnd(result) {
+    const g = this.game, st = g.stats;
+    const win = result === 'victory';
+    const nights = win ? WIN_NIGHTS : Math.max(0, g.cycle.day - 1);
+    this.showOverlay(win ? 'end victory' : 'end defeat', `
+      <div class="title small">${win ? 'Sieg' : 'Die Flamme erlischt'}</div>
+      <p>${win ? 'Dreißig Nächte hat das Licht der Asche getrotzt. Aus der Ruine wird wieder eine Stadt.' : 'Die Asche hat das letzte Licht Roms verschlungen.'}</p>
+      <table class="stats">
+        <tr><td>Überstandene Nächte</td><td>${nights} / ${WIN_NIGHTS}</td></tr>
+        <tr><td>Besiegte Feinde</td><td>${st.kills}</td></tr>
+        <tr><td>Errichtete Gebäude</td><td>${st.built}</td></tr>
+        <tr><td>Siedler am Ende</td><td>${g.settlers.list.length}</td></tr>
+        <tr><td>Verlorene Siedler</td><td>${st.lost || 0}</td></tr>
+      </table>`, [
+      { label: 'Neues Spiel', cls: 'primary', onClick: () => g.startNewGame() },
+      { label: 'Hauptmenü', onClick: () => g.toMainMenu() },
+    ]);
   }
 
   /** Text nur bei Änderung setzen. */
@@ -168,6 +306,7 @@ export class UI {
     // Spieler-LP
     this.set('hpW', this.hpBar.style, `${(p.hp / p.maxHp) * 100}%`, 'width');
     this.set('hpT', this.hpTxt, p.dead ? 'gefallen' : `${Math.ceil(p.hp)}`);
+    this.set('speed', this.speedBtn, `${g.speed}×`);
     const st = g.settlers;
     this.set('pop', this.popEl, `${st.list.length}/${st.capacity(g)}`);
     const needy = st.list.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;

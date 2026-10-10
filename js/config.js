@@ -36,13 +36,13 @@ export const SETTLER = {
   needAt: 45,              // ab hier gehen Siedler essen/trinken
   gain: 35,                // Sättigung pro Einheit Nahrung/Wasser
   carry: 5,                // Traglast
-  workTime: 1.1,           // Sekunden pro gesammelter Einheit
+  workTime: 1.5,           // Sekunden pro gesammelter Einheit
   starveDamage: 1,         // LP pro Sekunde bei leerem Magen/Durst
 };
 export const START_SETTLERS = 3;
 export const SETTLER_ARRIVAL_COST = 8;   // Nahrung pro neuem Siedler
-export const FARM_GROW_TIME = 36;        // Sekunden Arbeit bis zur Ernte
-export const FARM_YIELD = 5;             // Nahrung pro Ernte
+export const FARM_GROW_TIME = 42;        // Sekunden Arbeit bis zur Ernte
+export const FARM_YIELD = 4;             // Nahrung pro Ernte
 
 // Kampf
 export const PLAYER_HP = 100;
@@ -50,7 +50,8 @@ export const PLAYER_DAMAGE = 20;
 export const PLAYER_ATTACK_RANGE = 22;
 export const PLAYER_ATTACK_TIME = 0.42;
 export const PLAYER_RESPAWN = 8;
-export const TOWER = { range: 6 * TILE, damage: 16, cooldown: 0.9, boltSpeed: 300 };
+export const TOWER = { range: 6 * TILE, damage: 14, cooldown: 1.0, boltSpeed: 300 };
 export const WIN_NIGHTS = 30;            // so viele Nächte überleben
 export const REPAIR_RATE = 0.01;          // Anteil max. LP pro Sekunde (tagsüber)
 export const SUN_BURN = 30;               // Schaden pro Sekunde an Gegnern im Tageslicht
+export const RUBBLE_PER_DAY = 5;          // neue Säulentrümmer pro Morgen (Ruinen zerfallen)

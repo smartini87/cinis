@@ -114,7 +114,9 @@ export class Lighting {
     };
     const flick = 1 + Math.sin(game.time * 13) * 0.03 + Math.sin(game.time * 7.3) * 0.03;
     for (const b of game.buildings.list) {
-      if (b.type === 'center') light(b.x, b.y - 8, 150 * flick, 1);
+      if (b.type === 'center') {
+        if (b.hp > 0) light(b.x, b.y - 8, 150 * flick, 1);
+      }
       else if (b.type === 'hut') light(b.x, b.y, 44 * flick, 0.75);
       else if (b.type === 'tower') light(b.x, b.y - 14, 58 * flick, 0.8);
     }
@@ -128,7 +130,7 @@ export class Lighting {
     ctx.imageSmoothingEnabled = false;
     // Feuerschein der Flamme
     const c = game.buildings.center;
-    if (c) {
+    if (c && c.hp > 0) {
       const s = camera.worldToScreen(c.x, c.y - 10);
       const r = 110 * camera.zoom * flick;
       const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);

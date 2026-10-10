@@ -255,8 +255,8 @@ export class Settlers {
       if (n.removed || n.amount <= 0) continue;
       if (type && n.type !== type) continue;
       if ((this.claims.get(n.id) || 0) >= 2) continue;
-      // Siedler entfernen sich nicht zu weit von der Flamme
-      if (dist(n.x, n.y, c.x, c.y) > 26 * TILE) continue;
+      // Siedler entfernen sich nicht zu weit von der Flamme (Stein ist knapper → größerer Radius)
+      if (dist(n.x, n.y, c.x, c.y) > (n.type === 'rock' ? 40 : 26) * TILE) continue;
       const d = dist(n.x, n.y, s.x, s.y);
       if (d < bd) {
         bd = d;

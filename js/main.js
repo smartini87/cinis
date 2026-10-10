@@ -1,7 +1,7 @@
 // main.js – Einstiegspunkt: Spielzustand, fester Zeitschritt (Game Loop), Spielereignisse
 // (Dämmerung/Nacht/Morgen, Sieg/Niederlage) und Render-Reihenfolge.
 
-import { TILE, STEP, START_STOCK, START_SETTLERS, WIN_NIGHTS } from './config.js';
+import { TILE, STEP, START_STOCK, START_SETTLERS, WIN_NIGHTS, RUBBLE_PER_DAY } from './config.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
@@ -13,6 +13,7 @@ import { Enemies } from './enemies.js';
 import { Combat } from './combat.js';
 import { DayCycle, Lighting } from './time.js';
 import { UI } from './ui.js';
+import { saveGame, loadGame, deleteSave } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
 
 class Game {
@@ -27,6 +28,9 @@ class Game {
     this.fps = 60;
     this.showFps = false;
     this.over = null;     // null | 'defeat' | 'victory'
+    this.state = 'menu';  // menu | tutorial | playing | paused | over
+    this.speed = 1;       // Spieltempo (1×, 2×, 3×)
+    this.saveT = 0;
     buildSprites();
     this.effects = new Effects();
     this.combat = new Combat();
@@ -35,10 +39,103 @@ class Game {
     this.ui = new UI(this);
     window.addEventListener('resize', () => this.resize());
     this.resize();
-    // ?seed=123 erzwingt eine bestimmte Welt (reproduzierbare Tests)
-    const qs = new URLSearchParams(location.search).get('seed');
-    this.newGame(qs ? Number(qs) >>> 0 : (Math.random() * 1e9) | 0);
+    // ?seed=123 erzwingt eine bestimmte Welt (reproduzierbare Tests), ?play überspringt das Menü
+    const qs = new URLSearchParams(location.search);
+    this.fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
+    this.newGame(this.randomSeed());
+    if (qs.has('play')) this.setState('playing');
+    else this.toMainMenu();
+    // Beim Verlassen/Verstecken der Seite speichern
+    const persist = () => {
+      if (this.state === 'playing' || this.state === 'paused') saveGame(this);
+    };
+    window.addEventListener('pagehide', persist);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        persist();
+        if (this.state === 'playing') this.pause();
+      }
+    });
     requestAnimationFrame((t) => this.frame(t));
+  }
+
+  randomSeed() {
+    return this.fixedSeed ?? ((Math.random() * 1e9) | 0);
+  }
+
+  // ---------------------------------------------------------------- Zustände
+  setState(st) {
+    this.state = st;
+    this.ui.setHudVisible(st !== 'menu');
+    if (st === 'playing') this.ui.hideOverlay();
+    this.last = performance.now();
+    this.acc = 0;
+  }
+
+  toMainMenu() {
+    if (this.state === 'playing' || this.state === 'paused') saveGame(this);
+    this.buildings.select(null);
+    // Hintergrund: eine frische Welt, über die die Kamera langsam schwenkt
+    this.newGame(this.randomSeed());
+    this.setState('menu');
+    this.ui.showMainMenu();
+  }
+
+  startNewGame() {
+    deleteSave();
+    this.newGame(this.randomSeed());
+    let done = false;
+    try {
+      done = localStorage.getItem('cinis.tutorialDone') === '1';
+    } catch {
+      done = false;
+    }
+    const begin = () => {
+      try {
+        localStorage.setItem('cinis.tutorialDone', '1');
+      } catch {
+        /* Speicher nicht verfügbar: Tutorial erscheint beim nächsten Mal erneut */
+      }
+      this.setState('playing');
+      this.ui.toast('Sammle Holz und Stein und baue eine Hütte. Die erste Nacht kommt bald.', 'info');
+      saveGame(this);
+    };
+    if (done) begin();
+    else {
+      this.setState('tutorial');
+      this.ui.showTutorial(begin);
+    }
+  }
+
+  continueGame() {
+    if (loadGame(this)) {
+      this.setState('playing');
+      this.ui.toast(`Willkommen zurück – Tag ${this.cycle.day}.`, 'good');
+    } else {
+      this.ui.toast('Spielstand konnte nicht geladen werden.', 'danger');
+      this.startNewGame();
+    }
+  }
+
+  pause() {
+    if (this.state !== 'playing') return;
+    this.buildings.select(null);
+    this.setState('paused');
+    this.ui.showPause();
+  }
+
+  resume() {
+    if (this.state === 'paused') this.setState('playing');
+  }
+
+  showHelp() {
+    if (this.state !== 'playing') return;
+    this.setState('paused');
+    this.ui.showHelp(() => this.resume());
+  }
+
+  cycleSpeed() {
+    this.speed = this.speed >= 3 ? 1 : this.speed + 1;
   }
 
   resize() {
@@ -50,7 +147,8 @@ class Game {
     this.camera.resize(this.canvas.width, this.canvas.height);
   }
 
-  newGame(seed) {
+  /** Neue Welt aufbauen. opts.empty: keine Start-Siedler (beim Laden). */
+  newGame(seed, opts = {}) {
     this.seed = seed;
     this.world = new World(seed);
     this.world.renderTerrain();
@@ -63,7 +161,7 @@ class Game {
     this.enemies.clear();
     this.cycle = new DayCycle();
     this.settlers = new Settlers();
-    for (let i = 0; i < START_SETTLERS; i++) {
+    for (let i = 0; i < (opts.empty ? 0 : START_SETTLERS); i++) {
       const c = this.buildings.center;
       this.settlers.spawn(c.x - 16 + i * 16, c.y + 28);
     }
@@ -71,6 +169,8 @@ class Game {
     this.player = new Player(cx, cy);
     this.camera.snap(cx, cy);
     this.over = null;
+    this.time = 0;
+    this.saveT = 0;
   }
 
   /** Haupt-Frame: Eingaben, feste Simulationsschritte, Rendering. */
@@ -79,15 +179,23 @@ class Game {
     this.last = ts;
     this.fps += (1 / Math.max(frameDt, 0.001) - this.fps) * 0.05;
     this.handleFrameInput();
-    if (!this.over) {
-      this.acc += frameDt;
+    if (this.state === 'playing') {
+      this.acc += frameDt * this.speed;
+      const maxSteps = 8 * this.speed;
       let steps = 0;
-      while (this.acc >= STEP && steps < 8) {
+      while (this.acc >= STEP && steps < maxSteps) {
         this.update(STEP);
         this.acc -= STEP;
         steps++;
+        if (this.state !== 'playing') break;
       }
-      if (steps >= 8) this.acc = 0; // Spirale des Todes vermeiden
+      if (steps >= maxSteps) this.acc = 0; // Spirale des Todes vermeiden
+    } else if (this.state === 'menu') {
+      // Langsamer Kameraschwenk im Hauptmenü
+      this.time += frameDt;
+      const c = this.buildings.center;
+      this.camera.snap(c.x + Math.cos(this.time * 0.05) * 160, c.y + Math.sin(this.time * 0.07) * 110);
+      this.effects.update(frameDt);
     }
     this.input.endFrame(); // Flanken werden ausschließlich in handleFrameInput ausgewertet
     this.render();
@@ -97,13 +205,27 @@ class Game {
   /** Eingaben mit Flanken (Tastendruck/Klick) – genau einmal pro Frame ausgewertet. */
   handleFrameInput() {
     const inp = this.input;
+    if (this.state === 'paused' && inp.wasPressed('Escape', 'KeyP')) {
+      this.resume();
+      return;
+    }
+    if (this.state !== 'playing') return;
+    if (inp.wasPressed('KeyP') || (inp.wasPressed('Escape') && !this.buildings.selected)) {
+      this.pause();
+      return;
+    }
+    if (inp.wasPressed('KeyF')) this.cycleSpeed();
+    if (inp.wasPressed('KeyH')) {
+      this.showHelp();
+      return;
+    }
     // Abbrechen zuerst auswerten, damit Esc + neue Auswahl im selben Frame korrekt sind
     if ((inp.wasPressed('Escape') || inp.mouse.rightClicked) && this.buildings.selected) this.buildings.select(null);
     BUILDABLE.forEach((type, i) => {
       if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1))) this.buildings.select(type);
     });
     if (inp.wasPressed('KeyX')) this.buildings.select('demolish');
-    if (!this.over && !this.player.dead) this.buildings.updateBuildMode(this);
+    if (!this.player.dead) this.buildings.updateBuildMode(this);
     if (inp.mouse.wheel) {
       this.camera.addZoom(-inp.mouse.wheel);
       inp.mouse.wheel = 0;
@@ -131,6 +253,12 @@ class Game {
     this.combat.update(dt, this);
     this.effects.update(dt);
     this.camera.follow(this.player.x, this.player.y - 8, dt);
+    // Autospeichern alle 30 Spielsekunden
+    this.saveT += dt;
+    if (this.saveT >= 30) {
+      this.saveT = 0;
+      saveGame(this);
+    }
   }
 
   // ---------------------------------------------------------------- Spielereignisse
@@ -152,7 +280,9 @@ class Game {
     }
     this.ui.toast(`Tag ${day} von ${WIN_NIGHTS}. Die Asche weicht dem Licht.`, 'good');
     this.audio?.play('bell');
-    this.settlers.tryArrival(this, 2);
+    this.settlers.tryArrival(this, 1);
+    this.world.crumbleRuins(RUBBLE_PER_DAY);
+    if (saveGame(this)) this.ui.toast('Spielstand gesichert.', 'info', 'saved');
   }
 
   onCenterDestroyed() {
@@ -163,8 +293,11 @@ class Game {
     if (this.over) return;
     this.over = result;
     this.buildings.select(null);
-    if (result === 'victory') this.ui.toast(`Sieg! ${WIN_NIGHTS} Nächte überstanden – die Flamme brennt weiter.`, 'good');
-    else this.ui.toast('Die Ewige Flamme ist erloschen. Rom ist verloren.', 'danger');
+    deleteSave();
+    this.setState('over');
+    this.audio?.play(result === 'victory' ? 'victory' : 'defeat');
+    // Kurz verzögert, damit der Einsturz bzw. der Morgen noch sichtbar ist
+    setTimeout(() => this.ui.showEnd(result), 1200);
   }
 
   // ---------------------------------------------------------------- Rendering
@@ -204,7 +337,7 @@ class Game {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
-    this.enemies.drawIndicators(ctx, camera);
+    if (this.state !== 'menu') this.enemies.drawIndicators(ctx, camera);
     this.ui.update(1 / 60);
     if (this.showFps) {
       ctx.fillStyle = '#fff';

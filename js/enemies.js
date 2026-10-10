@@ -11,7 +11,7 @@ export const ENEMY_DEFS = {
   walker: { name: 'Aschgänger', hp: 40, speed: 26, dmg: 8, cd: 1.0, r: 4, bld: 1, aggro: 4 * TILE },
   dog: { name: 'Ruinenhund', hp: 24, speed: 52, dmg: 5, cd: 0.6, r: 3, bld: 0.5, aggro: 6 * TILE },
   brute: { name: 'Aschkoloss', hp: 170, speed: 17, dmg: 22, cd: 1.6, r: 6, bld: 2, aggro: 3 * TILE },
-  boss: { name: 'Prätor der Asche', hp: 800, speed: 19, dmg: 40, cd: 1.5, r: 8, bld: 2.5, aggro: 5 * TILE },
+  boss: { name: 'Prätor der Asche', hp: 700, speed: 19, dmg: 32, cd: 1.5, r: 8, bld: 1.5, aggro: 5 * TILE },
 };
 
 const EDGE_NAMES = { n: 'Norden', s: 'Süden', w: 'Westen', e: 'Osten' };
@@ -19,12 +19,12 @@ const EDGE_NAMES = { n: 'Norden', s: 'Süden', w: 'Westen', e: 'Osten' };
 /** Zusammensetzung der Welle in Nacht n. */
 export function waveFor(n) {
   return {
-    walker: 2 + Math.floor(n * 1.3),
-    dog: n >= 3 ? Math.floor((n - 1) * 0.7) : 0,
-    brute: n >= 6 ? Math.floor((n - 3) / 2.5) : 0,
-    boss: n % 10 === 0 ? n / 10 : 0,
-    hpMul: 1 + (n - 1) * 0.06,
-    dmgMul: 1 + (n - 1) * 0.03,
+    walker: 3 + Math.floor(n * 1.6),
+    dog: n >= 3 ? Math.floor((n - 1) * 0.9) : 0,
+    brute: n >= 5 ? Math.floor((n - 2) / 1.8) : 0,
+    boss: n % 10 === 0 ? n / 10 : n === 25 ? 1 : 0,
+    hpMul: 1 + (n - 1) * 0.09,
+    dmgMul: 1 + (n - 1) * 0.05,
     edges: n >= 18 ? 3 : n >= 8 ? 2 : 1,
   };
 }
