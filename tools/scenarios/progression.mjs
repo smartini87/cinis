@@ -1,6 +1,6 @@
 // Szenario Einstieg: Anfangs nur Lebenspunkte und Ziel-Banner; Questschritte (Bewegen, Holz, Stein, Abliefern,
-// Hütte) per Simulation erfüllen; Bauleiste zeigt zunächst nur die Hütte; Uhr steht bis zur ersten Nacht;
-// Fortschritt übersteht Speichern und Laden.
+// Hütte, Überlebende finden und heimbringen) per Simulation erfüllen; Bauleiste zeigt zunächst nur die Hütte;
+// Uhr steht bis zur ersten Nacht; Fortschritt übersteht Speichern und Laden.
 export default async function (page) {
   const vis = () => page.evaluate(() => {
     const u = window.__game.ui;
@@ -65,9 +65,31 @@ export default async function (page) {
       if (!ok && g.buildings.canPlace('hut', w.cx + dx, w.cy + dy).ok) ok = !!g.buildings.place(g, 'hut', w.cx + dx, w.cy + dy);
     }
     for (let i = 0; i < 30; i++) g.update(1 / 60);
-    return { quest: g.progress.quest, farm: g.progress.has('b:farm') };
+    const out = { afterHut: g.progress.quest, target: !!g.progress.target() };
+    // Überlebenden im nächsten Lager ansprechen (E) und zur Siedlung bringen
+    const s = g.settlers.list.filter((o) => o.mode === 'waiting' && !o.wander).sort((a, b) => Math.hypot(a.x - g.player.x, a.y - g.player.y) - Math.hypot(b.x - g.player.x, b.y - g.player.y))[0];
+    const p = g.player;
+    p.x = s.x + 14; p.y = s.y; p.vx = p.vy = 0;
+    for (let i = 0; i < 6; i++) g.update(1 / 60);
+    g.input.keys.add('KeyE');
+    for (let i = 0; i < 10; i++) g.update(1 / 60);
+    g.input.keys.delete('KeyE');
+    out.following = s.mode === 'follow';
+    for (let i = 0; i < 10; i++) g.update(1 / 60);
+    out.afterFind = g.progress.quest;
+    const c = g.buildings.center;
+    p.x = c.x; p.y = c.y + 30; s.x = c.x + 20; s.y = c.y + 40;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    out.joined = !s.mode;
+    out.quest = g.progress.quest;
+    out.farm = g.progress.has('b:farm');
+    return out;
   });
-  if (!hut.farm) throw new Error('Farm nach der Hütte nicht freigeschaltet');
+  console.log('Siedler', JSON.stringify(hut));
+  if (!hut.target) throw new Error('Kein Marker zum Lager');
+  if (!hut.following) throw new Error('Siedler folgt nicht');
+  if (!hut.joined) throw new Error('Siedler nicht in der Siedlung angekommen');
+  if (!hut.farm) throw new Error('Farm nach dem Heimbringen nicht freigeschaltet');
   await page.evaluate(() => { const g = window.__game; g.pause(); });
   await page.getByRole('button', { name: /Speichern/ }).click();
   const url = page.url().replace(/[?&]play/, '');

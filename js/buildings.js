@@ -8,7 +8,7 @@ import { Sprites, drawFlame, drawCrops, drawBallista, drawGate } from './sprites
 
 export const BUILDING_DEFS = {
   center: { name: 'Ewige Flamme', size: 3, hp: 1200, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
-  hut: { name: 'Hütte', size: 2, hp: 180, cost: { wood: 20, stone: 5 }, key: '1', beds: 2, desc: '+2 Siedlerplätze. Siedler schlafen hier geschützt.' },
+  hut: { name: 'Hütte', size: 2, hp: 180, cost: { wood: 20, stone: 5 }, key: '1', beds: 4, desc: '+4 Siedlerplätze. Siedler schlafen hier geschützt.' },
   farm: { name: 'Farm', size: 2, hp: 120, cost: { wood: 14, water: 6 }, key: '2', desc: 'Ein Siedler baut hier tagsüber Nahrung an.' },
   well: { name: 'Brunnen', size: 1, hp: 150, cost: { stone: 12, wood: 4 }, key: '3', desc: 'Fördert stetig Wasser ins Lager.' },
   wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
@@ -18,8 +18,8 @@ export const BUILDING_DEFS = {
 export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate'];
 
 export const WELL_INTERVAL = 9;    // Sekunden pro Wasser
-export const CENTER_BEDS = 3;      // Schlafplätze/Siedlerplätze der Flamme
-const TERRITORY_CENTER = 12;       // Bauradius um die Flamme (Kacheln)
+export const CENTER_BEDS = 0;      // Die Flamme selbst bietet keine Wohnplätze (nachts aber Schutz)
+export const TERRITORY_CENTER = 12; // Bauradius um die Flamme (Kacheln)
 const TERRITORY_BUILDING = 6;      // Bauradius um jedes andere Gebäude
 
 let nextId = 1;
@@ -154,6 +154,7 @@ export class Buildings {
         if (!w.inBounds(x, y)) return { ok: false, reason: 'Außerhalb der Karte' };
         const t = w.tileAt(x, y);
         if (t === T.WATER || t === T.SHALLOW) return { ok: false, reason: 'Nicht im Wasser bauen' };
+        if (w.props[w.idx(x, y)]) return { ok: false, reason: 'Platz ist belegt' };
         const occ = w.buildingAt[w.idx(x, y)];
         if (occ && !(type === 'gate' && occ.type === 'wall')) return { ok: false, reason: 'Platz ist belegt' };
         const n = w.nodeAtTile(x, y);

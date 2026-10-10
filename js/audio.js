@@ -204,6 +204,14 @@ export class SoundEngine {
         // Windböe
         this.noise(2.2, { vol: v(0.14), freq: 300, type: 'bandpass', q: 0.7, slide: 700, attack: 0.8 });
         break;
+      case 'discover':
+        this.tone(523, 0.18, { type: 'sine', vol: v(0.07) });
+        this.tone(659, 0.25, { type: 'sine', vol: v(0.07), delay: 0.12 });
+        break;
+      case 'crate':
+        this.noise(0.12, { vol: v(0.2), freq: 900, type: 'bandpass', q: 1.5 });
+        this.tone(330, 0.1, { type: 'triangle', vol: v(0.08), delay: 0.08, slide: 420 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

@@ -45,7 +45,7 @@ export function peekSave() {
     if (!raw) return null;
     const d = JSON.parse(raw);
     if (d.v !== VERSION) return null;
-    return { day: d.cycle.day, savedAt: d.savedAt, settlers: d.settlers.length };
+    return { day: d.cycle.day, savedAt: d.savedAt, settlers: d.settlers.filter((x) => !x.mode).length };
   } catch {
     return null;
   }
@@ -53,6 +53,21 @@ export function peekSave() {
 
 export function deleteSave() {
   storage()?.removeItem(KEY);
+}
+
+/** Bitfeld (Uint8Array mit 0/1) kompakt als Base64. */
+function packBits(arr) {
+  const bytes = new Uint8Array(Math.ceil(arr.length / 8));
+  for (let i = 0; i < arr.length; i++) if (arr[i]) bytes[i >> 3] |= 1 << (i & 7);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function unpackBits(str, out) {
+  if (!str) return;
+  const bin = atob(str);
+  for (let i = 0; i < out.length; i++) out[i] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1;
 }
 
 /** Aktuellen Spielstand speichern. Liefert true bei Erfolg. */
@@ -74,12 +89,15 @@ export function saveGame(game) {
     // Knoten kompakt: [Menge, Timer, entfernt]
     nodes: game.world.nodes.map((n) => [n.amount, Math.round(n.timer * 10) / 10, n.removed ? 1 : 0]),
     buildings: game.buildings.list.map((b) => ({ type: b.type, tx: b.tx, ty: b.ty, hp: b.hp, timer: b.timer, growth: b.growth })),
-    settlers: game.settlers.list.map((st) => ({
-      name: st.name, x: st.x, y: st.y, hp: st.hp, hunger: st.hunger, thirst: st.thirst,
+    settlers: game.settlers.list.filter((st) => !st.wander).map((st) => ({
+      name: st.name, x: st.x, y: st.y, hp: st.hp, maxHp: st.maxHp, hunger: st.hunger, thirst: st.thirst,
       hidden: !!st.hidden, home: st.home ? bIndex.get(st.home) ?? -1 : -1,
       farm: st.farm ? bIndex.get(st.farm) ?? -1 : -1, carry: st.carry, tunic: st.tunic, hair: st.hair,
+      trait: st.trait, mode: st.mode, poi: st.poi ? st.poi.id : -1,
     })),
-    enemies: game.enemies.list.map((e) => ({ type: e.type, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, dmg: e.dmg, speed: e.speed })),
+    enemies: game.enemies.list.map((e) => ({ type: e.type, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, dmg: e.dmg, speed: e.speed, guard: e.guard || null, elite: !!e.elite, raider: !!e.raider })),
+    pois: game.pois.serialize(),
+    explored: packBits(game.world.explored),
     loot: game.loot.serialize(),
     progress: game.progress.serialize(),
     queue: game.enemies.queue,
@@ -135,9 +153,13 @@ export function loadGame(game) {
   // Siedler
   const st = game.settlers;
   st.focus = d.focus || 'auto';
+  game.pois.restore(game, d.pois);
+  unpackBits(d.explored, game.world.explored);
+  game.world.exploredVersion++;
   for (const sd of d.settlers) {
-    const p = st.spawn(sd.x, sd.y);
-    Object.assign(p, { name: sd.name, hp: sd.hp, hunger: sd.hunger, thirst: sd.thirst, carry: sd.carry, tunic: sd.tunic, hair: sd.hair });
+    const p = st.spawn(sd.x, sd.y, sd.trait || 'none');
+    Object.assign(p, { name: sd.name, hp: sd.hp, maxHp: sd.maxHp || p.maxHp, hunger: sd.hunger, thirst: sd.thirst, carry: sd.carry, tunic: sd.tunic, hair: sd.hair, mode: sd.mode || null });
+    if (sd.poi >= 0) p.poi = game.pois.byId(sd.poi);
     const farm = blds[sd.farm];
     if (farm && farm.type === 'farm') {
       p.job = 'farm';
@@ -163,7 +185,8 @@ export function loadGame(game) {
   const en = game.enemies;
   for (const ed of d.enemies) {
     const e = en.spawn(ed.type, ed.x, ed.y);
-    Object.assign(e, { hp: ed.hp, maxHp: ed.maxHp, dmg: ed.dmg, speed: ed.speed });
+    Object.assign(e, { hp: ed.hp, maxHp: ed.maxHp, dmg: ed.dmg, speed: ed.speed, elite: ed.elite, raider: ed.raider });
+    if (ed.guard) e.guard = ed.guard;
   }
   game.loot.restore(d.loot);
   game.progress.restore(d.progress);

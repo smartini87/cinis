@@ -22,7 +22,7 @@ export default async function (page) {
     g.progress.unlock('hud.clock', true); // Uhr laufen lassen
     for (let i = 0; i < 60 * 60; i++) g.update(1 / 60);
     g.pause();
-    return { day: g.cycle.day, t: Math.round(g.cycle.t), b: g.buildings.list.length, s: g.settlers.list.length };
+    return { day: g.cycle.day, t: Math.round(g.cycle.t), b: g.buildings.list.length, s: g.settlers.list.filter((x) => !x.wander).length };
   });
   await page.screenshot({ path: 'tools/out/pause.png' });
   await page.getByRole('button', { name: /Speichern/ }).click();
@@ -31,7 +31,7 @@ export default async function (page) {
   await page.getByRole('button', { name: /Fortsetzen/ }).click();
   const after = await page.evaluate(() => {
     const g = window.__game;
-    return { day: g.cycle.day, t: Math.round(g.cycle.t), b: g.buildings.list.length, s: g.settlers.list.length, state: g.state, clock: g.progress.has('hud.clock'), quest: g.progress.quest };
+    return { day: g.cycle.day, t: Math.round(g.cycle.t), b: g.buildings.list.length, s: g.settlers.list.filter((x) => !x.wander).length, state: g.state, clock: g.progress.has('hud.clock'), quest: g.progress.quest };
   });
   console.log('vorher', JSON.stringify(before), 'nachher', JSON.stringify(after));
   if (after.b !== before.b || after.s !== before.s || Math.abs(after.t - before.t) > 1 || after.state !== 'playing' || !after.clock) throw new Error('Laden stimmt nicht');

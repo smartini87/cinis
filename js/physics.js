@@ -53,6 +53,10 @@ export function resolve(world, e, r, mask) {
           moved = pushRect(e, r, tx * TILE, ty * TILE, TILE, TILE) || moved;
           continue;
         }
+        if (world.props[ty * world.w + tx]) {
+          moved = pushRect(e, r, tx * TILE, ty * TILE, TILE, TILE) || moved;
+          continue;
+        }
         const b = world.buildingAt[ty * world.w + tx];
         if (b && !b.dead && !buildingPassable(b, mask)) {
           const [rx, ry, rw, rh] = buildingTileRect(b, tx, ty);
@@ -131,7 +135,7 @@ export function overlaps(world, x, y, r, mask, tol = 0.5) {
 export function tilePassable(world, tx, ty, mask) {
   if (!world.inBounds(tx, ty)) return false;
   const i = ty * world.w + tx;
-  if (world.tiles[i] === WATER) return false;
+  if (world.tiles[i] === WATER || world.props[i]) return false;
   const b = world.buildingAt[i];
   if (b && !b.dead && !buildingPassable(b, mask)) return false;
   const id = world.nodeAt[i];

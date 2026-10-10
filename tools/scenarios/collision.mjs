@@ -65,8 +65,8 @@ export default async function (page) {
     g.enemies.queue = [];
     sim(22, () => { checkSettlers(); g.enemies.queue.length = 0; });
     out.settlerInside = inside;
-    out.sheltered = g.settlers.list.filter((s) => s.hidden).length;
-    out.settlers = g.settlers.list.length;
+    out.sheltered = g.settlers.colony.filter((s) => s.hidden).length;
+    out.settlers = g.settlers.colony.length;
 
     // 3) Mauerring mit Toren: Siedler kommen durch, Gegner nicht
     g.cycle.t = 20;

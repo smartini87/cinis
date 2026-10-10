@@ -36,6 +36,9 @@ export class World {
     this.nodes = [];
     this.nodeAt = new Int32Array(n).fill(-1);
     this.buildingAt = new Array(n).fill(null);
+    this.props = new Uint8Array(n);     // feste Requisiten der Orte (Lagerhütte, Zelte, Wagen …): 1 = blockiert
+    this.explored = new Uint8Array(n);  // erkundete Kacheln (Minikarte)
+    this.exploredVersion = 0;
     this.cx = this.w >> 1; // Zentrum (Ewige Flamme)
     this.cy = this.h >> 1;
     this.fords = [];
@@ -226,6 +229,25 @@ export class World {
       made++;
     }
     return made;
+  }
+
+  /** Kacheln im Umkreis r (Kacheln) als erkundet markieren. Liefert true, wenn neu aufgedeckt wurde. */
+  reveal(tx, ty, r) {
+    let changed = false;
+    for (let y = Math.max(0, ty - r); y <= Math.min(this.h - 1, ty + r); y++) {
+      for (let x = Math.max(0, tx - r); x <= Math.min(this.w - 1, tx + r); x++) {
+        const i = y * this.w + x;
+        if (this.explored[i] || (x - tx) ** 2 + (y - ty) ** 2 > r * r) continue;
+        this.explored[i] = 1;
+        changed = true;
+      }
+    }
+    if (changed) this.exploredVersion++;
+    return changed;
+  }
+
+  isExplored(tx, ty) {
+    return this.inBounds(tx, ty) && this.explored[ty * this.w + tx] === 1;
   }
 
   nodeAtTile(tx, ty) {
@@ -476,7 +498,7 @@ export class World {
     }
     const nodeAt = this.nodeAt, nodes = this.nodes;
     const solidNode = (i) => nodeAt[i] >= 0 && !!nodeSolid(nodes[nodeAt[i]]);
-    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x] && !solidNode(y * W + x);
+    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x] && !solidNode(y * W + x) && !this.props[y * W + x];
     while (heap.size) {
       const cur = heap.pop();
       if (closed[cur]) continue;
@@ -488,7 +510,7 @@ export class World {
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
           const ni = ny * W + nx;
-          if (closed[ni] || tiles[ni] === T.WATER || solidNode(ni)) continue;
+          if (closed[ni] || tiles[ni] === T.WATER || solidNode(ni) || this.props[ni]) continue;
           if (dx && dy && (!free(cx + dx, cy) || !free(cx, cy + dy))) continue;
           let c = tiles[ni] === T.SHALLOW ? 1.8 : 1;
           const b = ba[ni];

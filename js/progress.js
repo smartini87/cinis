@@ -61,6 +61,21 @@ export const QUESTS = [
     finish: ['hud.settlers', 'hud.minimap'],
   },
   {
+    id: 'find',
+    text: () => 'Finde Überlebende – folge dem goldenen Pfeil',
+    done: (g) => g.settlers.list.some((s) => s.mode === 'follow') || g.settlers.colony.length > 0,
+    target: (g) => nearestCamp(g),
+  },
+  {
+    id: 'bring',
+    text: (g) => {
+      const s = g.settlers.list.find((o) => o.mode === 'follow');
+      return s ? `Bring ${s.name} zur Siedlung – sie folgt dir` : 'Bring die Überlebenden zur Siedlung';
+    },
+    done: (g) => g.settlers.colony.length > 0,
+    target: (g) => (g.settlers.list.some((o) => o.mode === 'follow') ? g.buildings.center : nearestCamp(g)),
+  },
+  {
     id: 'farm',
     start: ['b:farm'],
     text: () => 'Baue eine Farm – sie ernährt deine Siedler',
@@ -84,6 +99,21 @@ export const QUESTS = [
     target: (g) => g.buildings.center,
   },
 ];
+
+/** Nächstes Lager mit wartenden Siedlern (Ziel des Markers). */
+function nearestCamp(g) {
+  const p = g.player;
+  let best = null, bd = Infinity;
+  for (const s of g.settlers.list) {
+    if (s.mode !== 'waiting' || !s.poi) continue;
+    const d = Math.hypot(s.x - p.x, s.y - p.y);
+    if (d < bd) {
+      bd = d;
+      best = s.poi;
+    }
+  }
+  return best ? { x: best.x, y: best.y, type: 'camp' } : null;
+}
 
 function nearestNode(g, type) {
   const p = g.player;
@@ -110,6 +140,14 @@ export class Progress {
     this.done = false;       // Einstieg abgeschlossen (oder übersprungen)
     this.state = this.fresh();
     this.started = -1;       // Schritt, dessen start-Freischaltungen schon liefen
+    this.blueprints = new Set(); // gefundene Baupläne (aus Feindlagern)
+  }
+
+  /** Bauplan aufnehmen; liefert true, wenn er neu ist. */
+  addBlueprint(key) {
+    if (this.blueprints.has(key)) return false;
+    this.blueprints.add(key);
+    return true;
   }
 
   /** Zähler des aktuellen Schritts. */
@@ -203,12 +241,12 @@ export class Progress {
     if (!q || !q.target) return null;
     const t = q.target(this.game);
     if (!t) return null;
-    const h = t.type === 'center' ? 52 : t.type === 'tree' ? 30 : t.tx !== undefined && t.size ? t.size * TILE + 10 : 16;
+    const h = t.type === 'center' ? 52 : t.type === 'tree' ? 30 : t.type === 'camp' ? 34 : t.tx !== undefined && t.size ? t.size * TILE + 10 : 16;
     return { x: t.x, y: t.y, h };
   }
 
   serialize() {
-    return { unlocked: [...this.unlocked], quest: this.quest, done: this.done, state: this.state };
+    return { unlocked: [...this.unlocked], quest: this.quest, done: this.done, state: this.state, blueprints: [...this.blueprints] };
   }
 
   restore(d) {
@@ -220,6 +258,7 @@ export class Progress {
     this.quest = d.quest || 0;
     this.done = !!d.done;
     this.state = { ...this.fresh(), ...(d.state || {}) };
+    this.blueprints = new Set(d.blueprints || []);
     this.started = this.quest;
   }
 }

@@ -195,6 +195,160 @@ function makeBush(withFruit) {
   return c;
 }
 
+// ------------------------------------------------------------------ Orte in der Wildnis (POIs)
+function makeRuinHut() {
+  // Verlassene Hütte: eingefallenes Dach, Bretter vor dem Fenster (32 x 30)
+  const [c, g] = canvas(32, 30);
+  px(g, 3, 12, 26, 16, '#a89878');
+  for (let y = 14; y < 28; y += 4) px(g, 3, y, 26, 1, '#8a7a5c');
+  px(g, 3, 27, 26, 1, '#5a5040');
+  px(g, 12, 18, 7, 10, '#2a2018');
+  px(g, 5, 16, 4, 4, '#2a2420');
+  px(g, 4, 17, 6, 1, '#7a5233');
+  px(g, 22, 16, 4, 4, '#2a2420');
+  // halbes Dach
+  for (let y = 0; y < 10; y++) {
+    const w = 5 + y * 1.2;
+    px(g, Math.round(14 - w), 3 + y, Math.round(w * 1.5), 1, y % 3 === 0 ? '#6a3a20' : '#8a4a2a');
+  }
+  px(g, 20, 10, 9, 2, '#6b4a2a');
+  px(g, 24, 8, 2, 4, '#6b4a2a');
+  px(g, 28, 24, 3, 4, '#8e8a80');
+  return c;
+}
+
+function makeTent(dark) {
+  // Zelt: Settler = helles Leinen, Feindlager = zerrissene dunkle Planen (32 x 24)
+  const [c, g] = canvas(32, 24);
+  const [a, b, d] = dark ? ['#4a2a28', '#3a1c1a', '#2a1412'] : ['#c8b48a', '#a8946a', '#8a7650'];
+  for (let y = 0; y < 20; y++) {
+    const w = Math.round(2 + y * 0.7);
+    px(g, 16 - w, 3 + y, w, 1, a);
+    px(g, 16, 3 + y, w, 1, b);
+  }
+  px(g, 13, 13, 6, 10, d);
+  px(g, 15, 1, 2, 4, '#5b3f2a');
+  if (dark) {
+    px(g, 6, 18, 3, 2, '#1d1712');
+    px(g, 23, 16, 2, 3, '#1d1712');
+    px(g, 16, 0, 5, 3, '#8a1c18');
+  }
+  px(g, 2, 22, 28, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
+function makeShrine() {
+  // Kleiner Schrein mit Quelle: Statue auf Sockel, Wasserschale (20 x 30)
+  const [c, g] = canvas(20, 30);
+  px(g, 2, 22, 16, 7, '#8e8a80');
+  px(g, 2, 22, 16, 1, '#c3beb2');
+  px(g, 4, 24, 12, 3, '#3f86c0');
+  px(g, 5, 24, 4, 1, '#9fd0f0');
+  px(g, 7, 6, 6, 16, '#d8d4ca');
+  px(g, 8, 2, 4, 4, '#e6e2d8');
+  px(g, 6, 9, 1, 6, '#c3beb2');
+  px(g, 13, 9, 1, 6, '#c3beb2');
+  px(g, 9, 3, 2, 1, '#b8a04a');
+  return c;
+}
+
+function makeWatchtower() {
+  // Alter Wachturm mit Feuerkorb (18 x 46)
+  const [c, g] = canvas(18, 46);
+  px(g, 3, 12, 12, 33, '#8a857a');
+  for (let y = 14; y < 45; y += 4) px(g, 3, y, 12, 1, '#6f6b63');
+  px(g, 3, 12, 2, 33, '#a8a498');
+  px(g, 7, 30, 4, 7, '#2a2420');
+  px(g, 1, 8, 16, 4, '#9a958a');
+  px(g, 1, 8, 16, 1, '#c3beb2');
+  px(g, 5, 4, 8, 4, '#5a4a3a');
+  px(g, 6, 3, 6, 1, '#3b3634');
+  px(g, 13, 20, 3, 4, '#2a2420');
+  return c;
+}
+
+function makeWagon() {
+  // Umgestürzter Karren mit verstreuter Ladung (32 x 20)
+  const [c, g] = canvas(32, 20);
+  px(g, 2, 6, 22, 10, '#7a5233');
+  for (let x = 4; x < 24; x += 5) px(g, x, 6, 1, 10, '#5b3f2a');
+  px(g, 2, 6, 22, 1, '#a07c52');
+  blob(g, 26, 10, 5, 5, '#5b3f2a');
+  blob(g, 26, 10, 3, 3, '#3b2a1a');
+  px(g, 25, 9, 2, 2, '#8a8580');
+  px(g, 6, 16, 4, 3, '#b9a98a');
+  px(g, 14, 17, 5, 2, '#8a6a46');
+  return c;
+}
+
+function makeCrate(open) {
+  const [c, g] = canvas(12, 11);
+  px(g, 1, 3, 10, 7, '#8a6240');
+  px(g, 1, 3, 10, 1, '#b08458');
+  px(g, 1, 6, 10, 1, '#5b3f2a');
+  px(g, 5, 3, 2, 7, '#5b3f2a');
+  if (open) {
+    px(g, 2, 4, 8, 2, '#2a2018');
+    px(g, 0, 0, 12, 3, '#9a7048');
+    px(g, 0, 0, 12, 1, '#c09468');
+  } else px(g, 1, 2, 10, 1, '#c09468');
+  px(g, 1, 10, 10, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
+function makeChest(open) {
+  // Belohnungstruhe mit Eisenbeschlag
+  const [c, g] = canvas(14, 12);
+  px(g, 1, 4, 12, 7, '#7a4a28');
+  px(g, 1, 7, 12, 1, '#9aa0a6');
+  px(g, 6, 6, 2, 3, '#e0b84a');
+  if (open) {
+    px(g, 2, 5, 10, 2, '#ffd36a');
+    px(g, 0, 0, 14, 4, '#8a5a32');
+  } else {
+    px(g, 1, 1, 12, 3, '#8a5a32');
+    px(g, 1, 1, 12, 1, '#b07a4a');
+  }
+  px(g, 1, 11, 12, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
+function makeMilestone() {
+  const [c, g] = canvas(7, 13);
+  px(g, 1, 2, 5, 10, '#b9b4a8');
+  px(g, 1, 2, 5, 1, '#e6e2d8');
+  px(g, 2, 5, 3, 1, '#8e8a80');
+  px(g, 2, 7, 3, 1, '#8e8a80');
+  px(g, 0, 12, 7, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
+/** Lagerfeuer: Steinkreis, darüber Flamme (an) bzw. Glut/Asche (aus). */
+export function drawCampfire(ctx, x, y, lit, t, hostile = false) {
+  x = Math.round(x);
+  y = Math.round(y);
+  ctx.fillStyle = '#6f6b63';
+  for (const [dx, dy] of [[-5, 0], [-3, 2], [0, 3], [3, 2], [5, 0], [3, -2], [-3, -2]]) ctx.fillRect(x + dx - 1, y + dy - 1, 3, 2);
+  ctx.fillStyle = '#3b2a1a';
+  ctx.fillRect(x - 3, y - 1, 6, 2);
+  if (lit) {
+    if (hostile) {
+      // Feuer der Aschgänger: dunkelrot
+      ctx.fillStyle = '#5a1c14';
+      ctx.fillRect(x - 2, y - 4, 4, 3);
+      ctx.fillStyle = (t * 6) % 2 < 1 ? '#c0402a' : '#e8742a';
+      ctx.fillRect(x - 1, y - 6 - Math.round(Math.sin(t * 9)), 2, 3);
+    } else drawFlame(ctx, x, y - 1, 3, t);
+  } else {
+    ctx.fillStyle = '#5a5450';
+    ctx.fillRect(x - 2, y - 2, 4, 1);
+    if (Math.sin(t * 2 + x) > 0.6) {
+      ctx.fillStyle = '#b8401c';
+      ctx.fillRect(x, y - 1, 1, 1);
+    }
+  }
+}
+
 function makeSack() {
   // Beutesack mit Schnur
   const [c, g] = canvas(12, 11);
@@ -416,6 +570,17 @@ export function buildSprites() {
   Sprites.tower = inkSprite(makeTower());
   Sprites.farm = inkSprite(makeFarm(), { edge: 0.3 });
   Sprites.sack = inkSprite(makeSack());
+  Sprites.ruinHut = inkSprite(makeRuinHut());
+  Sprites.tent = inkSprite(makeTent(false));
+  Sprites.tentDark = inkSprite(makeTent(true));
+  Sprites.shrine = inkSprite(makeShrine());
+  Sprites.watchtower = inkSprite(makeWatchtower());
+  Sprites.wagon = inkSprite(makeWagon());
+  Sprites.crate = inkSprite(makeCrate(false));
+  Sprites.crateOpen = inkSprite(makeCrate(true));
+  Sprites.chest = inkSprite(makeChest(false));
+  Sprites.chestOpen = inkSprite(makeChest(true));
+  Sprites.milestone = inkSprite(makeMilestone(), { edge: 0.35 });
   Sprites.icons = {};
   for (const k of ['wood', 'stone', 'food', 'water', 'hide', 'people', 'heart', 'flame', 'energy']) Sprites.icons[k] = makeIcon(k);
 }
@@ -602,6 +767,9 @@ export function drawItem(ctx, x, y, a, item, sil = null) {
   } else if (item === 'bucket') {
     P(1, -1, '#5b3f2a', 3);
     P(1, 1, '#3f86c0', 2);
+  } else if (item === 'staff') {
+    for (let i = -6; i <= 6; i++) P(i, 0, '#6b4a2a');
+    P(7, 0, '#8a6a46');
   } else if (item === 'torch') {
     for (let i = -1; i <= 6; i++) P(i, 0, '#7a5233');
     P(7, 0, '#ffd36a', 2);

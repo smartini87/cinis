@@ -135,8 +135,9 @@ export class Enemies {
         e.kvy *= k;
       }
       e.prep = 0;
-      e.burn = sunny;
-      if (sunny) {
+      // Wächter in den Lagern stehen im Rauch ihrer Feuer und verbrennen nicht
+      e.burn = sunny && !(e.guard && e.guard.shade);
+      if (e.burn) {
         // Im Sonnenlicht zerfallen sie zu Asche
         e.hp -= SUN_BURN * dt;
         if (Math.random() < dt * 10) game.effects.burst(e.x, e.y - 8, { n: 1, color: ['#e8742a', '#5a5450'], speed: 10, life: 0.6, up: 30, gravity: -20 });
@@ -149,9 +150,9 @@ export class Enemies {
   }
 
   /** Nächstes lebendes Ziel (Spieler/Siedler) im Aggro-Radius. */
-  findUnitTarget(e, game) {
+  findUnitTarget(e, game, range = null) {
     const def = ENEMY_DEFS[e.type];
-    let best = null, bd = def.aggro;
+    let best = null, bd = range ?? def.aggro;
     const p = game.player;
     if (!p.dead) {
       const d = dist(e.x, e.y, p.x, p.y);
@@ -171,7 +172,56 @@ export class Enemies {
     return best;
   }
 
+  /** Elite: deutlich zäher und stärker, glühende Aura. */
+  makeElite(e) {
+    e.elite = true;
+    e.hp *= 2.5;
+    e.maxHp *= 2.5;
+    e.dmg *= 1.5;
+  }
+
+  /**
+   * Wächter eines Lagers: patrouillieren um das Feuer, greifen an, wer zu nah kommt,
+   * und kehren zurück, wenn das Ziel die Leine (guard.r) verlässt.
+   */
+  updateGuard(e, dt, game) {
+    const def = ENEMY_DEFS[e.type], g = e.guard;
+    e.cd -= dt;
+    e.retarget -= dt;
+    if (e.retarget <= 0) {
+      e.retarget = 0.35;
+      const t = this.findUnitTarget(e, game, e.raider ? 6 * TILE : def.aggro * 1.2);
+      e.target = t && dist(t.x, t.y, g.x, g.y) < g.r * 1.3 ? t : null;
+    }
+    const t = e.target;
+    if (t && !t.dead && !t.hidden && dist(t.x, t.y, g.x, g.y) < g.r * 1.5) {
+      const d = dist(e.x, e.y, t.x, t.y);
+      if (d <= e.r + 8) {
+        this.tryAttack(e, def, game, () => damageUnit(game, t, e.dmg, ((t.x - e.x) / (d || 1)) * 4, ((t.y - e.y) / (d || 1)) * 4), t.x);
+        return;
+      }
+      this.step(e, t.x - e.x, t.y - e.y, dt, game.world);
+      return;
+    }
+    e.target = null;
+    // Patrouille: zufällige Punkte rund ums Lager, gemächlich
+    e.patrolT = (e.patrolT || 0) - dt;
+    if (!e.patrol || e.patrolT <= 0 || dist(e.x, e.y, e.patrol.x, e.patrol.y) < 3) {
+      const a = Math.random() * Math.PI * 2, r = 12 + Math.random() * 30;
+      e.patrol = { x: g.x + Math.cos(a) * r, y: g.y + Math.sin(a) * r * 0.7 };
+      e.patrolT = 3 + Math.random() * 4;
+    }
+    const sp = e.speed;
+    e.speed = sp * 0.45;
+    if (this.step(e, e.patrol.x - e.x, e.patrol.y - e.y, dt, game.world)) e.patrolT = 0;
+    e.speed = sp;
+  }
+
   updateEnemy(e, dt, game) {
+    if (e.guard) {
+      this.updateGuard(e, dt, game);
+      return;
+    }
     const { world, buildings } = game;
     const def = ENEMY_DEFS[e.type];
     e.cd -= dt;
@@ -301,7 +351,15 @@ export class Enemies {
   }
 
   drawOne(ctx, e, time) {
-    drawEnemy(ctx, e, time, null, OUTLINE.enemy);
+    if (e.elite) {
+      // Glut-Aura der Elite
+      const r = 9 + Math.sin(time * 5) * 1.5;
+      ctx.fillStyle = 'rgba(255,110,40,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(Math.round(e.x), Math.round(e.y - 2), r * 1.4, r * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    drawEnemy(ctx, e, time, null, e.elite ? '#ff7a2a' : OUTLINE.enemy);
     if (e.hp < e.maxHp) {
       const w = e.type === 'boss' ? 20 : e.type === 'brute' ? 14 : 10;
       const top = e.type === 'boss' ? 36 : e.type === 'brute' ? 28 : 21;
@@ -317,6 +375,7 @@ export class Enemies {
     let n = 0;
     for (const e of this.list) {
       if (n > 12) break;
+      if (e.guard && !e.target) continue; // Lagerwächter nur, wenn sie dich verfolgen
       if (drawEdgeArrow(ctx, cam, e.x, e.y - 8, e.type === 'boss' ? { color: 'rgba(255,90,40,0.95)', size: 1.6 } : { color: 'rgba(208,64,42,0.85)' })) n++;
     }
   }

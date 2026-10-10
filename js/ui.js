@@ -9,6 +9,7 @@ import { SETTLER, WIN_NIGHTS, TILE } from './config.js';
 import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
 import { peekSave } from './save.js';
+import { POI_TYPES } from './pois.js';
 
 const HELP = `
 <table class="keys">
@@ -115,7 +116,7 @@ export class UI {
     pimg.alt = 'Siedler';
     this.popEl = el('span', 'val', pop, '0');
     this.popLbl = el('span', 'lbl', pop, 'Siedler');
-    pop.title = 'Siedler / Plätze. Neue Siedler kommen, wenn Platz (Hütten) und Nahrung da sind.';
+    pop.title = 'Siedler / Plätze. Überlebende findest du in Lagern in der Wildnis – jede Hütte bietet 4 Plätze.';
     // Arbeitsschwerpunkt der Sammler
     const focus = (this.focusPanel = el('div', 'panel focus-panel', hud));
     el('div', 'lbl', focus, 'Siedler sammeln');
@@ -275,9 +276,45 @@ export class UI {
       m.fillRect(Math.floor(b.tx * k), Math.floor(b.ty * k), Math.ceil(b.size * k), Math.ceil(b.size * k));
     }
     m.fillStyle = '#9fe0ff';
-    for (const s of g.settlers.list) if (!s.hidden) m.fillRect(Math.floor((s.x / TILE) * k) - 1, Math.floor((s.y / TILE) * k) - 1, 2, 2);
+    for (const s of g.settlers.list) if (!s.hidden && !s.mode) m.fillRect(Math.floor((s.x / TILE) * k) - 1, Math.floor((s.y / TILE) * k) - 1, 2, 2);
+    // Nebel über Unerkundetem
+    if (this.fogVersion !== w.exploredVersion || this.fogWorld !== w) {
+      this.fogVersion = w.exploredVersion;
+      this.fogWorld = w;
+      if (!this.fog) {
+        this.fog = document.createElement('canvas');
+        this.fog.width = w.w;
+        this.fog.height = w.h;
+      }
+      const fc = this.fog.getContext('2d'), img = fc.createImageData(w.w, w.h);
+      for (let i = 0; i < w.w * w.h; i++) {
+        img.data[i * 4] = 14;
+        img.data[i * 4 + 1] = 12;
+        img.data[i * 4 + 2] = 10;
+        img.data[i * 4 + 3] = w.explored[i] ? 0 : 215;
+      }
+      fc.putImageData(img, 0, 0);
+    }
+    m.imageSmoothingEnabled = true;
+    m.drawImage(this.fog, 0, 0, S, S);
+    m.imageSmoothingEnabled = false;
+    // Entdeckte Orte
+    m.font = 'bold 11px Georgia, serif';
+    m.textAlign = 'center';
+    m.textBaseline = 'middle';
+    for (const o of g.pois.list) {
+      if (!o.discovered) continue;
+      const t = POI_TYPES[o.type], ox = (o.x / TILE) * k, oy = (o.y / TILE) * k;
+      const live = g.pois.interesting(o, g);
+      m.fillStyle = 'rgba(0,0,0,0.7)';
+      m.fillRect(ox - 4, oy - 4, 9, 9);
+      m.fillStyle = live ? t.color : 'rgba(160,150,140,0.7)';
+      m.fillText(t.icon, ox + 0.5, oy + 1);
+    }
+    m.textAlign = 'left';
     m.fillStyle = '#ff4030';
     for (const e of g.enemies.list) {
+      if (e.guard && !w.isExplored(Math.floor(e.x / TILE), Math.floor(e.y / TILE))) continue;
       const r = e.type === 'boss' ? 4 : 3;
       m.fillRect(Math.floor((e.x / TILE) * k) - r / 2, Math.floor((e.y / TILE) * k) - r / 2, r, r);
     }
@@ -392,7 +429,7 @@ export class UI {
 
   showPause() {
     const g = this.game;
-    this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.list.length} Siedler · ${g.stats.kills} Feinde besiegt</p>`, [
+    this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.colony.length} Siedler · ${g.stats.kills} Feinde besiegt</p>`, [
       { label: 'Weiter', cls: 'primary', onClick: () => g.resume() },
       { label: 'Steuerung', onClick: () => this.showHelp(() => this.showPause()) },
       { label: `Ton: ${g.audio.muted ? 'aus' : 'an'}`, onClick: () => { g.toggleSound(); this.showPause(); } },
@@ -415,7 +452,7 @@ export class UI {
         <tr><td>Überstandene Nächte</td><td>${nights} / ${WIN_NIGHTS}</td></tr>
         <tr><td>Besiegte Feinde</td><td>${st.kills}</td></tr>
         <tr><td>Errichtete Gebäude</td><td>${st.built}</td></tr>
-        <tr><td>Siedler am Ende</td><td>${g.settlers.list.length}</td></tr>
+        <tr><td>Siedler am Ende</td><td>${g.settlers.colony.length}</td></tr>
         <tr><td>Verlorene Siedler</td><td>${st.lost || 0}</td></tr>
       </table>`, [
       { label: 'Neues Spiel', cls: 'primary', onClick: () => g.startNewGame() },
@@ -453,7 +490,7 @@ export class UI {
     const cy = g.cycle;
     this.set('day', this.dayEl, `Tag ${Math.min(cy.day, WIN_NIGHTS)} / ${WIN_NIGHTS}`);
     let phase;
-    if (cy.isNight) phase = `Nacht · Morgengrauen in ${fmtTime(cy.timeToDawn)} · ${g.enemies.list.length + g.enemies.queue.length} Feinde`;
+    if (cy.isNight) phase = `Nacht · Morgengrauen in ${fmtTime(cy.timeToDawn)} · ${g.enemies.list.filter((e) => !e.guard).length + g.enemies.queue.length} Feinde`;
     else if (cy.isEvening) phase = `Dämmerung · Nacht in ${fmtTime(cy.timeToNight)}`;
     else phase = `Tag · Nacht in ${fmtTime(cy.timeToNight)}`;
     this.set('phase', this.phaseEl, phase);
@@ -475,9 +512,10 @@ export class UI {
     this.set('sound', this.soundBtn, g.audio.muted ? '✕' : '♪');
     this.set('soundCls', this.soundBtn, g.audio.muted ? 'cbtn off' : 'cbtn', 'className');
     const st = g.settlers;
-    this.set('pop', this.popEl, `${st.list.length}/${st.capacity(g)}`);
-    const needy = st.list.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;
-    const hungry = st.list.filter((s) => s.hunger < SETTLER.needAt || s.thirst < SETTLER.needAt).length;
+    const colony = st.colony;
+    this.set('pop', this.popEl, `${colony.length}/${st.capacity(g)}`);
+    const needy = colony.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;
+    const hungry = colony.filter((s) => s.hunger < SETTLER.needAt || s.thirst < SETTLER.needAt).length;
     this.set('popLbl', this.popLbl, needy ? `Siedler · ${needy} leiden!` : hungry ? `Siedler · ${hungry} bedürftig` : 'Siedler');
     this.set('popCls', this.popLbl, needy ? 'lbl danger' : 'lbl', 'className');
     for (const f of FOCI) this.set('f' + f.id, this.focusBtns[f.id], st.focus === f.id ? 'fbtn active' : 'fbtn', 'className');

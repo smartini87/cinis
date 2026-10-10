@@ -22,6 +22,7 @@ import { Loot } from './loot.js';
 import { Wildlife } from './wildlife.js';
 import { Progress } from './progress.js';
 import { Intro } from './intro.js';
+import { Pois, POI_TYPES } from './pois.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -52,7 +53,10 @@ class Game {
     this.loot = new Loot();
     this.wildlife = new Wildlife();
     this.noises = [];     // Kampflärm { x, y, r, t } – schreckt Tiere auf
+    this.pois = new Pois();
     this.interact.addProvider(this.loot.provider);
+    this.interact.addProvider((g, out) => g.settlers.provider(g, out));
+    this.interact.addProvider((g, out) => g.pois.provider(g, out));
     this.interact.addProvider((g, out) => {
       // Jagdbare Tiere in Reichweite: Glow + „Jagen“
       const p = g.player;
@@ -217,6 +221,9 @@ class Game {
     const cx = (this.world.cx + 0.5) * TILE, cy = (this.world.cy + 2.5) * TILE;
     this.player = new Player(cx, cy);
     this.camera.snap(cx, cy);
+    // Orte in der Wildnis (beim Laden ohne Siedler/Wächter – die kommen aus dem Spielstand)
+    this.pois.generate(this, !opts.empty);
+    this.world.reveal(this.world.cx, this.world.cy, 13);
     this.over = null;
     this.time = 0;
     this.saveT = 0;
@@ -342,7 +349,7 @@ class Game {
 
   /** Feste Lichtquellen (für lightAt und Wildlife); zwischengespeichert bis zur nächsten Belegungsänderung. */
   lightSources() {
-    const c = this.buildings.center, key = this.buildings.version * 2 + (c && c.hp > 0 ? 1 : 0);
+    const c = this.buildings.center, key = `${this.buildings.version}/${c && c.hp > 0 ? 1 : 0}/${this.pois.version}`;
     if (this._lights && this._lightsKey === key) return this._lights;
     const out = [];
     for (const b of this.buildings.list) {
@@ -350,6 +357,7 @@ class Game {
       else if (b.type === 'hut') out.push({ x: b.x, y: b.y, r: 44, k: 0.75 });
       else if (b.type === 'tower') out.push({ x: b.x, y: b.y - 14, r: 58, k: 0.8 });
     }
+    for (const l of this.pois.lights()) out.push(l);
     this._lights = out;
     this._lightsKey = key;
     return out;
@@ -387,6 +395,7 @@ class Game {
     this.settlers.update(dt, this);
     this.enemies.update(dt, this);
     this.wildlife.update(dt, this);
+    this.pois.update(dt, this);
     for (let i = this.noises.length - 1; i >= 0; i--) if ((this.noises[i].t -= dt) <= 0) this.noises.splice(i, 1);
     this.combat.update(dt, this);
     this.separateAll();
@@ -447,12 +456,14 @@ class Game {
         fx.burst(p.x, p.y, { n: 2, color: ['rgba(160,140,110,0.7)'], speed: 10, life: 0.4, up: 6, gravity: 10 });
       }
     }
+    this.pois.ambient(dt, this);
     this.audio.setAmbience(this.cycle.darkness);
   }
 
   // ---------------------------------------------------------------- Spielereignisse
   onDusk(day) {
     this.enemies.planNight(day, this);
+    this.pois.onDusk(day, this);
     this.ui.toast(`Die Dämmerung naht. Nacht ${day}: ${this.enemies.describePlan()}`, 'warn');
     this.audio.play('horn');
   }
@@ -469,8 +480,8 @@ class Game {
     }
     this.ui.toast(`Tag ${day} von ${WIN_NIGHTS}. Die Asche weicht dem Licht.`, 'good');
     this.audio.play('bell');
-    this.settlers.tryArrival(this, 1);
     this.world.crumbleRuins(RUBBLE_PER_DAY);
+    this.pois.onDawn(day, this);
     if (saveGame(this)) this.ui.toast('Spielstand gesichert.', 'info', 'saved');
   }
 
@@ -510,9 +521,10 @@ class Game {
       }
     }
     this.buildings.collectDrawables(list, ctx, camera, this.time);
-    this.settlers.collectDrawables(list, ctx, camera, this.time);
+    this.settlers.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
     this.enemies.collectDrawables(list, ctx, camera, this.time);
     this.wildlife.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
+    this.pois.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
     const p = this.player;
     if (!p.dead) list.push({ y: p.y, draw: () => p.draw(ctx, null, this.time), unit: [p.x - 5, p.y - 19, 10, 19], sil: () => p.draw(ctx, '#fff3c4', this.time) });
     this.loot.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
@@ -637,6 +649,18 @@ class Game {
     const qt = this.progress.target();
     if (qt && qt !== c && !(c && qt.x === c.x && qt.y === c.y)) drawEdgeArrow(ctx, this.camera, qt.x, qt.y - 8, { color: 'rgba(255,230,140,0.95)', outline: 'rgba(60,30,10,0.8)', size: 1.2, icon: '!', pulse: true });
     if (c && c.hp > 0) drawEdgeArrow(ctx, this.camera, c.x, c.y - 8, { color: 'rgba(255,200,90,0.95)', outline: 'rgba(60,30,10,0.8)', size: 1.3, icon: '♨', pulse: true });
+    // Entdeckte Orte in der Nähe, die noch etwas bieten (höchstens vier, die nächsten zuerst)
+    const p = this.player, near = [];
+    for (const o of this.pois.list) {
+      if (!o.discovered || !this.pois.interesting(o, this)) continue;
+      const d = Math.hypot(o.x - p.x, o.y - p.y);
+      if (d < 30 * TILE) near.push([d, o]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    for (const [, o] of near.slice(0, 4)) {
+      const t = POI_TYPES[o.type];
+      drawEdgeArrow(this.ctx, this.camera, o.x, o.y - 8, { color: t.color, outline: 'rgba(20,10,5,0.8)', size: 0.95, icon: t.icon });
+    }
   }
 
   /** Goldener, wippender Pfeil über dem aktuellen Questziel. */

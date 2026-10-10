@@ -48,9 +48,11 @@ Ein neues Spiel beginnt mit fast leerem Bildschirm: Lebenspunkte und ein Ziel-Ba
 3. Stein brechen
 4. An der Flamme abliefern
 5. Hütte bauen
-6. Farm bauen
-7. Erste Nacht überstehen (vorher kommen Dash und Kampf)
-8. Turm bauen
+6. Überlebende finden
+7. Sie zur Siedlung bringen
+8. Farm bauen
+9. Erste Nacht überstehen (vorher kommen Dash und Kampf)
+10. Turm bauen
 
 HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, jeweils mit kurzer Einblendung und einem Satz Erklärung („Neu: Mauer“). Bis zum Nacht-Ziel bleibt es heller Tag. Die ersten drei Nächte sind Lernnächte mit wenigen, langsamen Gegnern. Im Hauptmenü startet „Neues Spiel – Tutorial überspringen“ mit allem freigeschaltet.
 
@@ -70,7 +72,7 @@ Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lag
 ### Gebäude
 | Taste | Gebäude | Kosten | Wirkung |
 |---|---|---|---|
-| 1 | Hütte (2×2) | 20 Holz, 5 Stein | +2 Siedlerplätze, nachts Schutz für 2 Siedler |
+| 1 | Hütte (2×2) | 20 Holz, 5 Stein | +4 Siedlerplätze, nachts Schutz für 4 Siedler |
 | 2 | Farm (2×2) | 14 Holz, 6 Wasser | Ein Siedler baut Nahrung an (4 pro Ernte) |
 | 3 | Brunnen | 4 Holz, 12 Stein | +1 Wasser alle 9 s |
 | 4 | Mauer | 4 Stein | 320 LP, blockiert alle – Gegner, Siedler und dich |
@@ -95,8 +97,24 @@ Erlegte Tiere geben ihre Beute direkt in dein Inventar. Jagbare Tiere in Reichwe
 ### Energie und Dash
 Die Energieleiste steht unter deinen Lebenspunkten. Ein Dash kostet 30 Energie, ein Sprint verbraucht Energie, solange du ihn hältst. Nach einer kurzen Pause lädt sich die Leiste wieder auf. Reicht die Energie nicht, blinkt die Leiste und der Dash bleibt aus. Auch beim Dash blockieren Mauern, Tore dagegen nicht.
 
+### Orte in der Wildnis
+Die Welt um die Flamme ist in drei Ringe geteilt: Je weiter draußen, desto gefährlicher und lohnender. Entdeckte Orte erscheinen auf der Minikarte (Unerkundetes liegt im Nebel). Liegen sie in der Nähe, aber außerhalb der Sicht, zeigt ein Pfeil am Bildschirmrand dorthin.
+
+| Ort | Was dich erwartet |
+|---|---|
+| Lager von Überlebenden ⌂ | 1–2 wartende Siedler mit Namen und Gabe. Manche Lager sind nachts bedroht. |
+| Aschgänger-Lager ☠ | 3–8 Wächter, die patrouillieren und angreifen, wer zu nah kommt; außen mit Elite-Anführer. Besiegt: Truhe mit Beute und einem **Bauplan**. Das Lager wird sicher, und nach einem Tag wartet dort ein Überlebender. |
+| Verlies ◆ | Ruinenmauern, 2–3 Kisten, 1–3 Wächter |
+| Schrein ✚ | Einmal pro Tag: volle Heilung und 90 s Segen (schneller laufen oder schnellere Energie) |
+| Signalfeuer ▲ | Für 5 Holz entzündet: deckt die Karte im weiten Umkreis auf und leuchtet nachts |
+| Umgestürzter Wagen ✦ | Beutekiste, aber Vorsicht: Hinterhalt |
+
+Dazu kommen Wanderer auf den Straßen (manche wollen sich anschließen), Rauchsäulen über Lagern, Krähenschwärme über Gefahrenzonen, Lagerfeuer als Lichtpunkte in der Nacht und Meilensteine an den Straßen. Jeden zweiten Morgen schlagen neue Überlebende irgendwo ein Lager auf, jeden dritten entsteht ein neues, stärkeres Aschgänger-Lager.
+
 ### Siedler
-- Du startest mit 3 Siedlern. Jeden Morgen kommt ein neuer hinzu, wenn ein Platz frei ist (Flamme: 3, jede Hütte: +2) und 8 Nahrung im Lager liegen.
+- Du beginnst **allein**. Siedler findest du in Lagern in der Wildnis. Sprich sie mit E an, dann folgen sie dir. In der Siedlung angekommen, gehören sie dazu.
+- Mitnehmen geht nur mit freiem Wohnplatz: Jede Hütte bietet 4 Plätze. Fehlt einer, heißt es „Du brauchst eine weitere Hütte“.
+- Jeder Siedler hat eine Gabe: Bauer (Farmen +35 %), Holzfäller, Steinmetz, Jäger (Nahrung sammeln +35 %), Baumeister, Läufer (+20 % Tempo), Zäh (+50 % LP) oder Arbeiter (ohne Bonus).
 - Siedler haben **Hunger** und **Durst**. Sie essen und trinken selbstständig aus dem Lager. Fehlt beides zu lange, verlieren sie Leben und sterben.
 - Farmen bekommen automatisch einen Arbeiter. Alle anderen sammeln. Links im HUD legst du den **Arbeitsschwerpunkt** fest (Auto, Holz, Stein, Nahrung, Wasser). „Auto“ sammelt, was gerade am knappsten ist.
 - Nachts und wenn Gegner in der Nähe sind, flüchten Siedler in Hütten oder zur Flamme. Wird ihre Hütte zerstört, fliehen sie ins Freie.
@@ -132,7 +150,9 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 - **Kollision:** Alle Figuren haben kreisförmige Hitboxen und gleiten an Hindernissen entlang. Gebäude, Mauern, Baumstämme und Felsen blockieren jeden – auch den Spieler und die Siedler. Nur **Tore** lassen eigene Leute durch, Gegner nicht. Siedler arbeiten, liefern und schlafen an einem Zugangspunkt am Gebäuderand und betreten Gebäude nie. Wer hinter einem Gebäude oder Baum steht, scheint als Silhouette durch.
 - **Sofortbau:** Gebäude stehen sofort, ohne Bauphase. Reparatur ist als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s).
 - **Nur Siedler essen und trinken.** Die Spielfigur hat keine Bedürfnisse, regeneriert aber Leben, wenn sie eine Weile nicht getroffen wurde.
-- **Siedler-Zuzug:** höchstens ein neuer Siedler pro Morgen, gegen Nahrung und nur bei freiem Platz.
+- **Siedler-Zuzug:** Neue Siedler kommen nur durch Rettung aus Lagern und von Wanderern. Ohne Retten wächst die Siedlung nicht. Die Lager entstehen aus dem Seed, neue kommen im Lauf der Zeit hinzu.
+- **Feindlager-Wächter** stehen im Rauch ihrer Feuer und verbrennen nicht im Sonnenlicht. Wer bedrohte Lager nachts überfällt, verbrennt dagegen wie alle Aschgänger.
+- **Baupläne** aus Feindlagern (Fallen, Feuerschale, Eisenschmiede) werden gespeichert und schalten die Gebäude frei, sobald die passende Flammenstufe erreicht ist.
 - **Stein wächst nach:** Ohne Nachschub ginge der Stein ab etwa Nacht 19 aus (im Balancing-Bot beobachtet). Deshalb erzeugen zerfallende Ruinen jeden Morgen 5 neue Trümmer.
 - **Gegner sterben bei Tagesanbruch** (Sonnenbrand). Es geht ums Durchhalten, nicht ums vollständige Aufräumen.
 - **Schwierigkeit:** Ein Bot mit festen Bauregeln gewinnt mit etwa 48 Türmen knapp. Die Nächte 2–3 und die Bossnächte sind am gefährlichsten. Feinjustierung über `js/config.js` und `waveFor()` in `js/enemies.js`.

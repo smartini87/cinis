@@ -120,6 +120,8 @@ export class Lighting {
       else if (b.type === 'hut') light(b.x, b.y, 44 * flick, 0.75);
       else if (b.type === 'tower') light(b.x, b.y - 14, 58 * flick, 0.8);
     }
+    // Lagerfeuer und Signalfeuer der Orte in der Wildnis
+    for (const l of game.pois.lights()) light(l.x, l.y, l.r * flick, l.k);
     const p = game.player;
     if (!p.dead) light(p.x, p.y - 8, 64, 0.85);
     for (const pr of game.combat.projectiles) light(pr.x, pr.y, 14, 0.6);

@@ -48,8 +48,7 @@ export const SETTLER = {
   workTime: 1.5,           // Sekunden pro gesammelter Einheit
   starveDamage: 1,         // LP pro Sekunde bei leerem Magen/Durst
 };
-export const START_SETTLERS = 3;
-export const SETTLER_ARRIVAL_COST = 8;   // Nahrung pro neuem Siedler
+export const START_SETTLERS = 0;      // man beginnt allein; Siedler warten in Lagern in der Wildnis
 export const FARM_GROW_TIME = 42;        // Sekunden Arbeit bis zur Ernte
 export const FARM_YIELD = 4;             // Nahrung pro Ernte
 

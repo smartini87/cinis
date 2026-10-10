@@ -1,10 +1,11 @@
-// Balancing-Lauf: ein einfacher Bot spielt 30 Nächte im Schnelldurchlauf.
-// Er baut morgens nach festen Regeln (Hütten, Versorgung, Türme, Mauerring) und bleibt kämpfend an der Flamme.
+// Balancing-Lauf: ein Bot spielt im Schnelldurchlauf (bis Nacht 30).
+// Er startet allein: holt Holz für die erste Hütte, rettet tagsüber per Autopilot (A*) Überlebende aus den Lagern,
+// baut morgens nach festen Regeln (Hütten, Versorgung, Türme, Mauerring mit Toren) und kämpft nachts an der Flamme.
 // Ausgabe: Verlauf pro Nacht. Aufruf: node tools/smoke-test.mjs tools/scenarios/balance.mjs
-export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
+export const query = 'skiptut';
 export default async function (page) {
   const log = await page.evaluate(() => {
-    const g = window.__game, w = g.world, B = g.buildings;
+    const g = window.__game, w = g.world, B = g.buildings, p = g.player, TILE = 16;
     const cx = w.cx, cy = w.cy;
     const ring = (r0, r1) => {
       const out = [];
@@ -30,39 +31,123 @@ export default async function (page) {
     const wallSpots = ring(9, 9);
     const gateSpots = wallSpots.filter(([x, y]) => x === cx || y === cy);
     const homeSpots = ring(2, 4);
-    const bot = () => {
-      const pop = g.settlers.list.length;
-      while (g.settlers.capacity(g) < pop + 2 && B.count('hut') < 12 && tryPlace('hut', homeSpots.concat(ring(5, 8)))) {}
-      while (B.count('farm') < Math.max(1, Math.ceil(pop / 6)) && tryPlace('farm', ring(3, 8))) {}
-      while (B.count('well') < Math.max(1, Math.ceil(pop / 7)) && tryPlace('well', ring(3, 8))) {}
+    const build = () => {
+      const pop = g.settlers.colony.length;
+      while (g.settlers.capacity(g) < pop + 3 && B.count('hut') < 10 && tryPlace('hut', homeSpots.concat(ring(5, 8)))) {}
+      if (!pop) return;
+      while (B.count('farm') < Math.max(1, Math.ceil(pop / 5)) && tryPlace('farm', ring(3, 8))) {}
+      while (B.count('well') < Math.max(1, Math.ceil(pop / 6)) && tryPlace('well', ring(3, 8))) {}
       while (g.stock.wood > 40 && g.stock.stone > 30 && tryPlace('tower', towerSpots)) {}
       while (g.stock.stone > 20 && tryPlace('gate', gateSpots)) {}
       while (g.stock.stone > 20 && tryPlace('wall', wallSpots)) {}
     };
+
+    // ---------------------------------------------------------------- Autopilot-Ausflüge
+    let trip = null;
+    const pathTo = (tx, ty) => w.findPath(p.tx, p.ty, tx, ty, 9000);
+    const home = () => B.accessPoint(B.center, p.x, p.y);
+    const startTrip = (kind, tx, ty, data) => {
+      const path = pathTo(tx, ty);
+      if (!path) return false;
+      trip = { kind, phase: 'go', path, i: 0, t: 0, data };
+      return true;
+    };
+    const steer = () => {
+      if (trip.i >= trip.path.length) return true;
+      const [tx, ty] = trip.path[trip.i];
+      const dx = (tx + 0.5) * TILE - p.x, dy = (ty + 0.5) * TILE - p.y, d = Math.hypot(dx, dy);
+      if (d < 5) {
+        trip.i++;
+        return trip.i >= trip.path.length;
+      }
+      p.botMove = { x: dx / d, y: dy / d };
+      return false;
+    };
+    const backHome = () => {
+      const h = home();
+      trip.phase = 'back';
+      trip.path = h ? pathTo(h[0], h[1]) || [] : [];
+      trip.i = 0;
+    };
+    const endTrip = () => { trip = null; p.botMove = null; };
+    const planTrip = () => {
+      const c = g.cycle;
+      if (c.isNight || c.isEvening || c.t < 15 || p.dead) return;
+      // 1) Allein und zu wenig Holz für die erste Hütte: selbst Holz holen
+      if (!g.settlers.colony.length && !B.canAfford(g, { wood: 20, stone: 5 })) {
+        const res = g.stock.wood + p.inv.wood < 20 ? 'tree' : 'rock';
+        const n = w.nodes.filter((x) => x.type === res && !x.removed && x.amount > 0).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+        const ap = n && w.accessTile(n.tx, n.ty, p.x, p.y);
+        if (ap) startTrip('gather', ap[0], ap[1], n);
+        return;
+      }
+      // 2) Freie Betten: nächstes Lager mit Wartenden
+      if (g.settlers.freeBeds(g) <= 0) return;
+      const waiting = g.settlers.list.filter((s) => s.mode === 'waiting' && s.poi && !s.wander);
+      waiting.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+      for (const s of waiting.slice(0, 3)) {
+        const ap = w.accessTile(s.tx, s.ty, p.x, p.y) || [s.tx, s.ty + 1];
+        if (startTrip('rescue', ap[0], ap[1], s.poi)) return;
+      }
+    };
+    const runTrip = (dt) => {
+      trip.t += dt;
+      if (p.dead || trip.t > 120 || (g.cycle.isNight && trip.phase === 'go')) {
+        if (!p.dead) { p.x = B.center.x; p.y = B.center.y + 30; }
+        endTrip();
+        return;
+      }
+      if (trip.phase === 'work') {
+        p.botMove = null;
+        g.input.keys.add('KeyE');
+        if (p.carried >= 12 || trip.data.amount <= 0 || trip.t > trip.workEnd) {
+          g.input.keys.delete('KeyE');
+          backHome();
+        }
+        return;
+      }
+      if (!steer()) return;
+      p.botMove = null;
+      if (trip.phase === 'back') { endTrip(); return; }
+      if (trip.kind === 'gather') {
+        trip.phase = 'work';
+        trip.workEnd = trip.t + 15;
+        p.faceTowards(trip.data.x, trip.data.y);
+      } else {
+        for (const s of g.settlers.list) if (s.mode === 'waiting' && s.poi === trip.data && g.settlers.freeBeds(g) > 0) g.settlers.recruit(s, g);
+        backHome();
+      }
+    };
+
     // Bot klinkt sich in die Ereignisse ein
     const origDawn = g.onDawn.bind(g);
     const rows = [];
     let minCenter = 1e9;
     g.onDawn = (day) => {
-      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.list.length, huts: B.count('hut'), towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), kills: g.stats.kills, lost: g.stats.lost });
+      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
       minCenter = 1e9;
       origDawn(day);
-      bot();
+      build();
     };
-    g.input.keys.add('Space'); // Spieler kämpft dauerhaft an der Flamme
-    bot();
-    const rocks = w.nodes.filter((n) => n.type === 'rock' && !n.removed).length;
-    console.log('Steinvorrat auf der Karte: ' + rocks * 16);
+    build();
     const t0 = performance.now();
     for (let i = 0; i < 31 * 225 * 60 && !g.over; i++) {
-      g.update(1 / 60);
+      const dt = 1 / 60;
+      if (trip) runTrip(dt);
+      else {
+        if (i % 30 === 0) planTrip();
+        if (!trip) g.input.keys.add('Space'); // an der Flamme kämpfen
+      }
+      if (trip) g.input.keys.delete('Space');
+      g.update(dt);
       const c = B.center;
       if (c.hp < minCenter) minCenter = c.hp;
-      if (g.cycle.t > 60 && g.cycle.t < 61 && !g.cycle.isNight) bot();
-      // Spieler zurück zur Flamme, falls abgedrängt
-      if (Math.hypot(g.player.x - c.x, g.player.y - c.y) > 40) { g.player.x = c.x; g.player.y = c.y + 30; }
+      if (g.cycle.t > 60 && g.cycle.t < 61 && !g.cycle.isNight) build();
+      // ohne Ausflug: Spieler zurück zur Flamme, falls abgedrängt
+      if (!trip && Math.hypot(p.x - c.x, p.y - c.y) > 40) { p.x = c.x; p.y = c.y + 30; }
     }
     g.input.keys.delete('Space');
+    g.input.keys.delete('KeyE');
     return { rows, over: g.over, day: g.cycle.day, ms: Math.round(performance.now() - t0) };
   });
   for (const r of log.rows) console.log(JSON.stringify(r));

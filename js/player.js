@@ -69,6 +69,8 @@ export class Player {
     this.sprinting = false;
     this.emptyFlash = 0;  // Energieleiste blinkt (zu wenig für einen Dash)
     this.ghosts = [];     // Nachbilder des Dashs
+    this.buffs = { speed: 0, regen: 0 };   // Segen (Schrein): Restdauer in Sekunden
+    this.botMove = null;  // Autopilot-Richtung { x, y } (nur für den Balancing-Bot)
     this.standT = 0;      // Aufstehen nach Respawn/Intro
     this.dead = false;
     this.deathT = 0;
@@ -106,11 +108,12 @@ export class Player {
       return;
     }
     if (this.invuln > 0) this.invuln -= dt;
+    for (const k in this.buffs) if (this.buffs[k] > 0) this.buffs[k] -= dt;
     // Langsame Heilung, wenn eine Weile kein Treffer kam
     if (game.time - this.lastHit > 5) this.hp = Math.min(this.maxHp, this.hp + 3 * dt);
 
-    // Bewegung (während des Aufstehens keine Steuerung, beim Schlag gebremst)
-    let ax = input.axis();
+    // Bewegung (während des Aufstehens keine Steuerung, beim Schlag gebremst); botMove = Autopilot (Balancing-Bot)
+    let ax = this.botMove || input.axis();
     if (this.standT > 0) {
       this.standT -= dt;
       ax = { x: 0, y: 0 };
@@ -122,7 +125,7 @@ export class Player {
       this.target = game.interact.update(game);
       return;
     }
-    const slow = this.atk ? 0.55 : this.gatherT > 0 ? 0.8 : this.sprinting ? ENERGY.sprintMul : 1;
+    const slow = (this.atk ? 0.55 : this.gatherT > 0 ? 0.8 : this.sprinting ? ENERGY.sprintMul : 1) * (this.buffs.speed > 0 ? 1.2 : 1);
     this.accelerate(ax.x * this.speed * slow, ax.y * this.speed * slow, steering ? PLAYER_ACCEL : PLAYER_DECEL, dt);
     const sp = Math.hypot(this.vx, this.vy);
     this.moving = sp > 8;
@@ -169,7 +172,7 @@ export class Player {
     if (this.emptyFlash > 0) this.emptyFlash -= dt;
     this.dashCd -= dt;
     this.regenDelay -= dt;
-    if (this.regenDelay <= 0) this.energy = Math.min(this.maxEnergy, this.energy + ENERGY.regen * this.energyMods.regen * dt);
+    if (this.regenDelay <= 0) this.energy = Math.min(this.maxEnergy, this.energy + ENERGY.regen * this.energyMods.regen * (this.buffs.regen > 0 ? 1.5 : 1) * dt);
     if (this.requestDash) {
       this.requestDash = false;
       this.tryDash(game, ax, steering);
@@ -279,7 +282,8 @@ export class Player {
       this.startAttack(game);
       return;
     }
-    const t = this.target;
+    // Ziel beim Auslösen frisch bestimmen (das gedrosselte Ziel kann einen Moment alt sein)
+    const t = (this.target = game.interact.update(game));
     if (!t) {
       this.resetGather();
       return;
