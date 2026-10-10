@@ -1,7 +1,7 @@
 // settlers.js – Siedler: Bedürfnisse (Hunger/Durst), Jobvergabe (Farm/Sammeln), Aufgaben-Zustandsautomat,
 // Wegfolgen und Zeichnen. Siedler arbeiten vollautomatisch; der Spieler setzt nur den Arbeitsschwerpunkt.
 
-import { TILE, RES, RES_KEYS, SETTLER, FARM_GROW_TIME, FARM_YIELD, SETTLER_ARRIVAL_COST } from './config.js';
+import { TILE, RES, GATHER_KEYS, SETTLER, FARM_GROW_TIME, FARM_YIELD, SETTLER_ARRIVAL_COST } from './config.js';
 import { NODE_DEFS, T } from './world.js';
 import { CENTER_BEDS, BUILDING_DEFS } from './buildings.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
@@ -205,7 +205,7 @@ export class Settlers {
     if (game.buildings.count('farm') > 0) want.food *= 0.5;
     if (game.buildings.count('well') > 0) want.water *= 0.5;
     let best = 'wood', bs = Infinity;
-    for (const k of RES_KEYS) {
+    for (const k of GATHER_KEYS) {
       const sc = game.stock[k] / want[k];
       if (sc < bs) {
         bs = sc;
@@ -353,7 +353,7 @@ export class Settlers {
 
   enemyNear(x, y, game, r) {
     for (const e of game.enemies.list) if (!e.dead && Math.abs(e.x - x) < r && Math.abs(e.y - y) < r && dist(e.x, e.y, x, y) < r) return true;
-    return false;
+    return game.wildlife.hostileNear(x, y, r);
   }
 
   /** Nächste Hütte mit freiem Bett, sonst die Ewige Flamme. */

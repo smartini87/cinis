@@ -153,8 +153,21 @@ html, body {
 .flame-bar .fill.low { animation: pulse 0.8s infinite; }
 .flame-txt, .hp-txt { font-size: 12px; min-width: 38px; text-align: right; }
 .icon.small { width: 16px; height: 16px; }
-.hp-panel { left: 10px; bottom: 82px; width: 220px; display: flex; align-items: center; gap: 6px; }
+.hp-panel { left: 10px; bottom: 82px; width: 220px; display: flex; flex-direction: column; gap: 4px; }
+.stat-row { display: flex; align-items: center; gap: 6px; }
+.stat-row .bar { flex: 1; margin: 0; height: 9px; }
 .hp-bar .fill { background: linear-gradient(#e0604a, #8a1c1c); }
+.en-bar .fill { background: linear-gradient(#ffe08a, #c08a20); transition: width 0.08s; }
+.en-row.sprint .en-bar .fill { background: linear-gradient(#fff3c4, #e0b040); }
+.en-row.empty .en-bar { animation: blink 0.2s steps(2) infinite; border-color: #c0402a; }
+@keyframes blink { 50% { background: #6a1c18; } }
+.dash-btn {
+  display: none; position: absolute; right: 18px; bottom: 120px; width: 72px; height: 72px; border-radius: 50%;
+  font: inherit; font-size: 16px; color: #fff3c4; background: rgba(60, 40, 20, 0.75); border: 2px solid #c08a4a;
+  pointer-events: auto; touch-action: none;
+}
+.touch .dash-btn { display: block; }
+.dash-btn:active { background: rgba(140, 90, 30, 0.85); }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
 @media (max-width: 640px) {

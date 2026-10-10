@@ -154,13 +154,33 @@ export class UI {
     fimg.alt = 'Flamme';
     this.flameBar = el('div', 'fill', el('div', 'bar flame-bar', flame));
     this.flameTxt = el('span', 'flame-txt', flame);
-    // Lebenspunkte des Spielers
-    const hp = el('div', 'panel hp-panel', hud);
+    // Lebenspunkte und Energie des Spielers
+    const hpPanel = (this.hpPanel = el('div', 'panel hp-panel', hud));
+    const hp = el('div', 'stat-row', hpPanel);
     const himg = el('img', 'icon small', hp);
     himg.src = iconURL('heart');
     himg.alt = 'Leben';
     this.hpBar = el('div', 'fill', el('div', 'bar hp-bar', hp));
     this.hpTxt = el('span', 'hp-txt', hp);
+    const en = (this.enRow = el('div', 'stat-row en-row', hpPanel));
+    en.title = 'Energie: Shift = Dash (kurzer Sprint mit Ausweichen), Shift halten = Sprinten';
+    const eimg = el('img', 'icon small', en);
+    eimg.src = iconURL('energy');
+    eimg.alt = 'Energie';
+    this.enBar = el('div', 'fill', el('div', 'bar en-bar', en));
+    this.enTxt = el('span', 'hp-txt', en);
+    // Dash-Knopf für Touch
+    this.dashBtn = el('button', 'dash-btn', hud, 'Dash');
+    this.dashBtn.type = 'button';
+    this.dashBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.game.player.requestDash = true;
+      this.game.input.sprintHeld = true;
+    });
+    const up = () => (this.game.input.sprintHeld = false);
+    this.dashBtn.addEventListener('pointerup', up);
+    this.dashBtn.addEventListener('pointercancel', up);
+    this.dashBtn.addEventListener('pointerleave', up);
     // Traglast
     const carry = el('div', 'panel carry-panel', hud);
     el('div', 'lbl', carry, 'Getragen');
@@ -421,6 +441,10 @@ export class UI {
     // Spieler-LP
     this.set('hpW', this.hpBar.style, `${(p.hp / p.maxHp) * 100}%`, 'width');
     this.set('hpT', this.hpTxt, p.dead ? 'gefallen' : `${Math.ceil(p.hp)}`);
+    this.set('enW', this.enBar.style, `${(p.energy / p.maxEnergy) * 100}%`, 'width');
+    this.set('enT', this.enTxt, `${Math.floor(p.energy)}`);
+    this.set('enCls', this.enRow, 'stat-row en-row' + (p.emptyFlash > 0 ? ' empty' : '') + (p.sprinting ? ' sprint' : ''), 'className');
+    this.set('touch', this.root, g.input.usingTouch ? 'touch' : '', 'className');
     this.set('speed', this.speedBtn, `${g.speed}×`);
     this.set('sound', this.soundBtn, g.audio.muted ? '✕' : '♪');
     this.set('soundCls', this.soundBtn, g.audio.muted ? 'cbtn off' : 'cbtn', 'className');

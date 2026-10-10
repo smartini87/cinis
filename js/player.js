@@ -4,6 +4,7 @@
 import {
   TILE, RES, RES_KEYS, PLAYER_CAPACITY, DEPOSIT_RANGE, GATHER_TIME,
   PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
+  DASH, ENERGY,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
@@ -41,7 +42,7 @@ export class Player {
     this.moving = false;
     this.aimX = 1;        // Blickrichtung (normiert)
     this.aimY = 0;
-    this.inv = { wood: 0, stone: 0, food: 0, water: 0 };
+    this.inv = { wood: 0, stone: 0, food: 0, water: 0, hide: 0 };
     this.capacity = PLAYER_CAPACITY;
     this.actionT = 0;     // Abklingzeit bis zur nächsten Aktion
     this.atk = null;      // laufender Angriff { t, base, side, hit }
@@ -54,7 +55,20 @@ export class Player {
     this.maxHp = PLAYER_HP;
     this.hurt = 0;
     this.lastHit = -99;
-    this.invuln = 0;      // Unverwundbarkeit (Respawn, später Dash)
+    this.invuln = 0;      // Unverwundbarkeit (Respawn, Dash)
+    this.invulnBlink = false;
+    this.energy = ENERGY.max;
+    this.energyMods = { max: 0, regen: 1 };   // Ausrüstung (z. B. Stiefel) verbessert Energie
+    this.regenDelay = 0;
+    this.dashT = 0;       // laufender Dash (Restdauer)
+    this.dashCd = 0;
+    this.dashX = 1;
+    this.dashY = 0;
+    this.requestDash = false;
+    this.shiftT = 0;      // wie lange Shift gehalten wird (Sprint)
+    this.sprinting = false;
+    this.emptyFlash = 0;  // Energieleiste blinkt (zu wenig für einen Dash)
+    this.ghosts = [];     // Nachbilder des Dashs
     this.standT = 0;      // Aufstehen nach Respawn/Intro
     this.dead = false;
     this.deathT = 0;
@@ -70,6 +84,9 @@ export class Player {
   }
   get carried() {
     return RES_KEYS.reduce((s, k) => s + this.inv[k], 0);
+  }
+  get maxEnergy() {
+    return ENERGY.max + this.energyMods.max;
   }
 
   update(dt, game) {
@@ -99,7 +116,13 @@ export class Player {
       ax = { x: 0, y: 0 };
     }
     const steering = ax.x !== 0 || ax.y !== 0;
-    const slow = this.atk ? 0.55 : this.gatherT > 0 ? 0.8 : 1;
+    this.updateEnergy(dt, game, ax, steering);
+    if (this.dashT > 0) {
+      this.updateDash(dt, game);
+      this.target = game.interact.update(game);
+      return;
+    }
+    const slow = this.atk ? 0.55 : this.gatherT > 0 ? 0.8 : this.sprinting ? ENERGY.sprintMul : 1;
     this.accelerate(ax.x * this.speed * slow, ax.y * this.speed * slow, steering ? PLAYER_ACCEL : PLAYER_DECEL, dt);
     const sp = Math.hypot(this.vx, this.vy);
     this.moving = sp > 8;
@@ -120,7 +143,12 @@ export class Player {
     if (this.moving) this.walk += dt * 12 * Math.min(1, sp / this.speed);
     else this.walk = 0;
 
-    this.target = game.interact.update(game);
+    // Interaktionsziel mit 20 Hz neu bestimmen (genügt und spart Rechenzeit)
+    this.targetT = (this.targetT || 0) - dt;
+    if (this.targetT <= 0 || (this.target && (this.target.obj?.dead || this.target.obj?.removed))) {
+      this.targetT = 0.05;
+      this.target = game.interact.update(game);
+    }
     this.actionT -= dt;
     if (this.atk) this.updateAttack(dt, game);
     const mouseAct = input.mouse.down && game.mouseActionAllowed();
@@ -132,6 +160,78 @@ export class Player {
     // Automatisch an der Ewigen Flamme abliefern
     const center = game.buildings.center;
     if (center && this.carried > 0 && game.buildings.distTo(center, this.x, this.y) < DEPOSIT_RANGE) this.deposit(game);
+  }
+
+  // ---------------------------------------------------------------- Energie, Dash, Sprint
+  updateEnergy(dt, game, ax, steering) {
+    const input = game.input;
+    if (this.emptyFlash > 0) this.emptyFlash -= dt;
+    this.dashCd -= dt;
+    this.regenDelay -= dt;
+    if (this.regenDelay <= 0) this.energy = Math.min(this.maxEnergy, this.energy + ENERGY.regen * this.energyMods.regen * dt);
+    if (this.requestDash) {
+      this.requestDash = false;
+      this.tryDash(game, ax, steering);
+    }
+    // Shift halten = Sprint (nach dem Dash bzw. ab 0,25 s)
+    if (input.isDown('ShiftLeft', 'ShiftRight') || input.sprintHeld) this.shiftT += dt;
+    else this.shiftT = 0;
+    this.sprinting = this.shiftT > ENERGY.sprintAfter && steering && this.dashT <= 0 && this.energy > 0 && !this.atk;
+    if (this.sprinting) {
+      this.energy = Math.max(0, this.energy - ENERGY.sprintCost * dt);
+      this.regenDelay = ENERGY.delay;
+      if (this.energy <= 0) this.emptyFlash = 0.8;
+    }
+  }
+
+  tryDash(game, ax, steering) {
+    if (this.dead || this.standT > 0 || this.dashT > 0 || this.dashCd > 0) return;
+    if (this.energy < DASH.cost) {
+      this.emptyFlash = 0.8;
+      game.audio.play('error', 0.4);
+      return;
+    }
+    let dx = steering ? ax.x : this.aimX, dy = steering ? ax.y : this.aimY;
+    const l = Math.hypot(dx, dy) || 1;
+    dx /= l;
+    dy /= l;
+    this.dashX = dx;
+    this.dashY = dy;
+    this.dashT = DASH.time;
+    this.dashCd = DASH.time + DASH.cooldown;
+    this.energy -= DASH.cost;
+    this.regenDelay = ENERGY.delay;
+    if (this.invuln < DASH.iframes) {
+      this.invuln = DASH.iframes;
+      this.invulnBlink = false;
+    }
+    this.atk = null;
+    this.resetGather();
+    this.ghostT = 0;
+    if (Math.abs(dx) > 0.1) this.flip = dx < 0;
+    this.aimX = dx;
+    this.aimY = dy;
+    game.camera.addShake(1, 0.1);
+    game.effects.burst(this.x, this.y, { n: 8, color: ['rgba(170,150,120,0.8)', 'rgba(120,105,85,0.8)'], speed: 30, life: 0.4, up: 8, gravity: 20 });
+    game.audio.play('dash', 0.6);
+  }
+
+  /** Dash: fester Schub in Substeps (Kollision greift, Tore lassen durch), Nachbilder und Staub. */
+  updateDash(dt, game) {
+    this.dashT -= dt;
+    const sp = DASH.speed;
+    game.world.moveEntity(this, this.dashX * sp * dt, this.dashY * sp * dt, this.r, 'friendly');
+    this.vx = this.dashX * this.speed;
+    this.vy = this.dashY * this.speed;
+    this.moving = true;
+    this.walk += dt * 20;
+    this.ghostT -= dt;
+    if (this.ghostT <= 0) {
+      this.ghostT = 0.04;
+      this.ghosts.push({ x: this.x, y: this.y, flip: this.flip, t: game.time, walk: this.walk });
+      if (this.ghosts.length > 6) this.ghosts.shift();
+      game.effects.burst(this.x, this.y, { n: 1, color: ['rgba(170,150,120,0.7)'], speed: 12, life: 0.35, up: 6, gravity: 10 });
+    }
   }
 
   /** Geschwindigkeit mit begrenzter Beschleunigung an den Sollwert annähern. */
@@ -152,9 +252,14 @@ export class Player {
     return Math.hypot(dx, dy);
   }
 
-  /** Gegner (und später Tiere) in Schlagreichweite. */
-  foesInReach(game) {
-    return game.hittables().filter((e) => !e.dead && dist(this.x, this.y, e.x, e.y) <= PLAYER_ATTACK_RANGE + e.r);
+  /** Alles Treffbare in Schlagreichweite (passive Tiere nur, wenn all = true). */
+  foesInReach(game, all = false) {
+    const out = [], R = PLAYER_ATTACK_RANGE + 10;
+    game.forEachHittable((e) => {
+      if (Math.abs(e.x - this.x) > R || Math.abs(e.y - this.y) > R) return;
+      if ((all || !e.passive || e.aggroT > 0) && dist(this.x, this.y, e.x, e.y) <= PLAYER_ATTACK_RANGE + e.r) out.push(e);
+    });
+    return out;
   }
 
   /** Aktion: Kampf hat Vorrang, sonst Interaktion bzw. Sammeln am aktuellen Ziel. */
@@ -273,8 +378,9 @@ export class Player {
       a.hit = true;
       this.vx += this.aimX * 95;
       this.vy += this.aimY * 95;
+      game.noise(this.x, this.y, 5 * TILE);
       let hits = 0;
-      for (const e of this.foesInReach(game)) {
+      for (const e of this.foesInReach(game, true)) {
         const d = Math.max(1, dist(this.x, this.y, e.x, e.y));
         const dot = ((e.x - this.x) * this.aimX + (e.y - this.y) * this.aimY) / d;
         if (dot > 0.2 || d < 10) {
@@ -340,7 +446,9 @@ export class Player {
     this.vx = this.vy = 0;
     this.lastHit = game.time;
     this.invuln = RESPAWN_INVULN;
+    this.invulnBlink = true;
     this.standT = STAND_UP;
+    this.energy = this.maxEnergy;
     this.aimX = 0;
     this.aimY = 1;
     game.flashT = 0.35;
@@ -383,7 +491,7 @@ export class Player {
   draw(ctx, sil = null, time = 0) {
     if (this.dead) return;
     // Unverwundbar: Blinken
-    const blink = this.invuln > 0 && !sil && Math.floor(this.invuln * 14) % 2 === 0;
+    const blink = this.invuln > 0 && this.invulnBlink && !sil && Math.floor(this.invuln * 14) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
     const o = { ...this.look(), walk: this.moving ? this.walk : 0, breath: time, hurt: this.hurt > 0, silhouette: sil, outline: OUTLINE.player, item: 'sword' };
     o.dir = this.aimY < -0.7 ? 'up' : this.aimY > 0.7 && Math.abs(this.aimX) < 0.5 ? 'down' : 'side';
@@ -405,6 +513,17 @@ export class Player {
     }
     drawHumanoid(ctx, this.x, this.y, o);
     if (blink) ctx.globalAlpha = 1;
+  }
+
+  /** Nachbilder des Dashs (helle, schnell verblassende Silhouetten). */
+  drawGhosts(ctx, time) {
+    for (const g of this.ghosts) {
+      const age = time - g.t;
+      if (age > 0.25) continue;
+      ctx.globalAlpha = 0.45 * (1 - age / 0.25);
+      drawHumanoid(ctx, g.x, g.y, { ...this.look(), flip: g.flip, walk: g.walk, silhouette: '#ffe8b0', noShadow: true });
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Bogen-Trail des Schwerthiebs (verblasst schnell). */

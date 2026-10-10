@@ -19,6 +19,7 @@ import { buildSprites, drawNode } from './sprites.js';
 import { SpatialHash, separateUnits, resolve } from './physics.js';
 import { Interact } from './interact.js';
 import { Loot } from './loot.js';
+import { Wildlife } from './wildlife.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -46,7 +47,19 @@ class Game {
     this.lighting = new Lighting();
     this.interact = new Interact();
     this.loot = new Loot();
+    this.wildlife = new Wildlife();
+    this.noises = [];     // Kampflärm { x, y, r, t } – schreckt Tiere auf
     this.interact.addProvider(this.loot.provider);
+    this.interact.addProvider((g, out) => {
+      // Jagdbare Tiere in Reichweite: Glow + „Jagen“
+      const p = g.player;
+      for (const a of g.wildlife.list) {
+        if (a.dead || a.def.cls !== 'game' || Math.abs(a.x - p.x) > 30 || Math.abs(a.y - p.y) > 30) continue;
+        out.push({ kind: 'animal', obj: a, x: a.x, y: a.y, label: `${a.def.name} jagen`, promptH: (a.def.h || 8) + 6, prio: -2, reach: 28,
+          hit: (mx, my) => Math.abs(mx - a.x) < 8 && Math.abs(my - a.y + 4) < 8,
+          act: (gg) => { gg.player.faceTowards(a.x, a.y); gg.player.startAttack(gg); } });
+      }
+    });
     this.hitStop = 0;     // Trefferpause in Simulationsschritten
     this.flashT = 0;      // weißer Bildschirmblitz (Respawn)
     this.ui = new UI(this);
@@ -177,6 +190,8 @@ class Game {
     this.stats = { built: 0, kills: 0, gathered: 0, lost: 0 };
     this.effects.clear();
     this.loot.clear();
+    this.wildlife.clear();
+    this.noises.length = 0;
     this.combat.clear();
     this.enemies.clear();
     this.cycle = new DayCycle();
@@ -236,6 +251,7 @@ class Game {
       return;
     }
     if (inp.wasPressed('KeyF')) this.cycleSpeed();
+    if (inp.wasPressed('ShiftLeft', 'ShiftRight')) this.player.requestDash = true;
     if (inp.wasPressed('KeyH')) {
       this.showHelp();
       return;
@@ -259,14 +275,60 @@ class Game {
     return !this.buildings.selected;
   }
 
-  /** Alles, was der Spieler treffen kann (Gegner; später auch Tiere). */
+  /** Ruft fn für alles Treffbare auf (ohne Array-Aufbau). */
+  forEachHittable(fn) {
+    for (const e of this.enemies.list) if (!e.dead) fn(e);
+    for (const a of this.wildlife.list) if (!a.dead && a.def.cls !== 'deco') fn(a);
+  }
+
+  /** Alles, was der Spieler treffen kann: Gegner und nicht-dekorative Tiere. */
   hittables() {
-    return this.enemies.list;
+    const out = this._hit || (this._hit = []);
+    out.length = 0;
+    for (const e of this.enemies.list) out.push(e);
+    for (const a of this.wildlife.list) if (!a.dead && a.def.cls !== 'deco') out.push(a);
+    return out;
   }
 
   /** Treffer durch den Spieler an eine Einheit weiterleiten. */
   hitUnit(e, dmg, kx, ky) {
-    this.enemies.hit(e, dmg, this, kx, ky);
+    if (e.animal) this.wildlife.hit(e, dmg, this, kx, ky);
+    else this.enemies.hit(e, dmg, this, kx, ky);
+  }
+
+  /** Kampflärm: schreckt Tiere im Umkreis r auf. */
+  noise(x, y, r) {
+    if (this.noises.length < 24) this.noises.push({ x, y, r, t: 0.4 });
+  }
+
+  /**
+   * Lichtstärke 0..1 an einem Punkt (Flamme, Hütten, Türme; später Feuerschalen und Fackeln).
+   * Nachts relevant: Wölfe meiden Licht.
+   */
+  lightAt(x, y) {
+    let best = 0;
+    for (const s of this.lightSources()) {
+      const dx = x - s.x, dy = y - s.y;
+      if (dx > s.r || dx < -s.r || dy > s.r || dy < -s.r) continue;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < s.r) best = Math.max(best, s.k * (1 - d / s.r) * 1.6);
+    }
+    return Math.min(1, best);
+  }
+
+  /** Feste Lichtquellen (für lightAt und Wildlife); zwischengespeichert bis zur nächsten Belegungsänderung. */
+  lightSources() {
+    const c = this.buildings.center, key = this.buildings.version * 2 + (c && c.hp > 0 ? 1 : 0);
+    if (this._lights && this._lightsKey === key) return this._lights;
+    const out = [];
+    for (const b of this.buildings.list) {
+      if (b.type === 'center' && b.hp > 0) out.push({ x: b.x, y: b.y - 8, r: 150, k: 1 });
+      else if (b.type === 'hut') out.push({ x: b.x, y: b.y, r: 44, k: 0.75 });
+      else if (b.type === 'tower') out.push({ x: b.x, y: b.y - 14, r: 58, k: 0.8 });
+    }
+    this._lights = out;
+    this._lightsKey = key;
+    return out;
   }
 
   update(dt) {
@@ -298,6 +360,8 @@ class Game {
     this.buildings.update(dt, this);
     this.settlers.update(dt, this);
     this.enemies.update(dt, this);
+    this.wildlife.update(dt, this);
+    for (let i = this.noises.length - 1; i >= 0; i--) if ((this.noises[i].t -= dt) <= 0) this.noises.splice(i, 1);
     this.combat.update(dt, this);
     this.separateAll();
     this.ambientEffects(dt);
@@ -321,12 +385,21 @@ class Game {
 
   /** Alle Einheiten auseinanderschieben (Spieler schwer, Gegner nach Größe). */
   separateAll() {
-    const units = this._units || (this._units = []);
+    // Einträge werden wiederverwendet (keine Allokation pro Schritt)
+    const units = this._units || (this._units = []), pool = this._unitPool || (this._unitPool = []);
     units.length = 0;
+    const add = (e, mask, mass) => {
+      const u = pool[units.length] || (pool[units.length] = {});
+      u.e = e;
+      u.mask = mask;
+      u.mass = mass;
+      units.push(u);
+    };
     const p = this.player;
-    if (!p.dead) units.push({ e: p, mask: 'friendly', mass: 3 });
-    for (const s of this.settlers.list) if (!s.hidden) units.push({ e: s, mask: 'friendly', mass: 1 });
-    for (const e of this.enemies.list) if (!e.dead) units.push({ e, mask: 'enemy', mass: e.r * e.r * 0.1 });
+    if (!p.dead) add(p, 'friendly', 3);
+    for (const s of this.settlers.list) if (!s.hidden) add(s, 'friendly', 1);
+    for (const e of this.enemies.list) if (!e.dead) add(e, 'enemy', e.r * e.r * 0.1);
+    for (const a of this.wildlife.list) if (!a.dead && a.def.cls !== 'deco') add(a, 'animal', a.r * a.r * 0.08);
     separateUnits(this.world, units, this.unitHash);
   }
 
@@ -413,20 +486,24 @@ class Game {
     this.buildings.collectDrawables(list, ctx, camera, this.time);
     this.settlers.collectDrawables(list, ctx, camera, this.time);
     this.enemies.collectDrawables(list, ctx, camera, this.time);
+    this.wildlife.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
     const p = this.player;
     if (!p.dead) list.push({ y: p.y, draw: () => p.draw(ctx, null, this.time), unit: [p.x - 5, p.y - 19, 10, 19], sil: () => p.draw(ctx, '#fff3c4', this.time) });
     this.loot.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
     list.sort((a, b) => a.y - b.y);
     this.effects.drawCorpses(ctx);
+    if (!p.dead) p.drawGhosts(ctx, this.time);
     for (const d of list) d.draw();
     this.drawOccluded(ctx, list);
     if (!p.dead) p.drawTrail(ctx, this.time);
+    this.wildlife.drawAir(ctx, camera, this.time);
     this.combat.draw(ctx);
     this.effects.drawParticles(ctx);
 
     // Beleuchtung, danach Bedienelemente in der Welt (bleiben nachts gut sichtbar)
     this.lighting.draw(ctx, this);
     camera.apply(ctx);
+    this.wildlife.drawGlow(ctx, camera, this.time);
     if (!this.buildings.selected) this.drawTargetMarker(ctx);
     this.player.drawGatherBar(ctx);
     this.buildings.drawGhost(ctx, this.time);

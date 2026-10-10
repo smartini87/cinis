@@ -252,6 +252,7 @@ export class Enemies {
     e.prep = 0;
     e.cd = def.cd;
     e.attack = 1;
+    game.noise(e.x, e.y, 4 * TILE);
     fn();
     game.audio.play(e.type === 'brute' || e.type === 'boss' ? 'smash' : 'claw', 0.5);
   }

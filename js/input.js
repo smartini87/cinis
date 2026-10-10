@@ -7,6 +7,7 @@ export class Input {
     this.pressed = new Set();   // in diesem Frame neu gedrückt
     this.mouse = { x: 0, y: 0, down: false, clicked: false, rightClicked: false, wheel: 0, inside: false };
     this.usingTouch = false;
+    this.sprintHeld = false;   // Dash-Knopf (Touch) gehalten = Sprint
     // Virtueller Joystick (Touch): Ursprung + aktuelle Auslenkung in Canvas-Pixeln
     this.stick = { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 };
     this.tapId = -1;
@@ -40,6 +41,7 @@ export class Input {
       this.mouse.y = p.y;
       this.mouse.inside = true;
       this.usingTouch = false;
+    this.sprintHeld = false;   // Dash-Knopf (Touch) gehalten = Sprint
     });
     c.addEventListener('mouseleave', () => (this.mouse.inside = false));
     c.addEventListener('mousedown', (e) => {

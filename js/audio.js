@@ -157,6 +157,40 @@ export class SoundEngine {
         this.tone(1046, 0.7, { type: 'sine', vol: v(0.08), delay: 0.12 });
         this.noise(0.3, { vol: v(0.12), freq: 600, type: 'lowpass' });
         break;
+      case 'dash':
+        this.noise(0.18, { vol: v(0.22), freq: 1400, type: 'bandpass', q: 0.8, slide: 500 });
+        this.tone(220, 0.12, { type: 'sine', vol: v(0.06), slide: 440 });
+        break;
+      case 'chirp': {
+        // Vogelzwitschern: zwei, drei schnelle Triller
+        const n = 2 + ((Math.random() * 3) | 0), base = 2400 + Math.random() * 1600;
+        for (let i = 0; i < n; i++) this.tone(base + Math.random() * 400, 0.06, { type: 'sine', vol: v(0.05), slide: base * 1.3, delay: i * 0.09 });
+        break;
+      }
+      case 'cricket':
+        for (let i = 0; i < 3; i++) this.tone(4300, 0.025, { type: 'square', vol: v(0.012), delay: i * 0.045 });
+        break;
+      case 'owl':
+        this.tone(390, 0.35, { type: 'sine', vol: v(0.08), slide: 350, attack: 0.05 });
+        this.tone(370, 0.6, { type: 'sine', vol: v(0.08), slide: 320, attack: 0.08, delay: 0.5 });
+        break;
+      case 'howl':
+        this.tone(330, 1.6, { type: 'sine', vol: v(0.07), slide: 560, attack: 0.3 });
+        this.tone(335, 1.6, { type: 'triangle', vol: v(0.035), slide: 540, attack: 0.3, delay: 0.05 });
+        break;
+      case 'squeak':
+        this.tone(1800, 0.08, { type: 'square', vol: v(0.04), slide: 2600 });
+        break;
+      case 'grunt':
+        this.noise(0.25, { vol: v(0.2), freq: 260, type: 'lowpass', q: 3 });
+        this.tone(95, 0.22, { type: 'sawtooth', vol: v(0.06), slide: 70 });
+        break;
+      case 'bite':
+        this.noise(0.08, { vol: v(0.2), freq: 1800, type: 'bandpass', q: 2 });
+        break;
+      case 'flap':
+        for (let i = 0; i < 3; i++) this.noise(0.05, { vol: v(0.08), freq: 900, type: 'bandpass', q: 1, delay: i * 0.07 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

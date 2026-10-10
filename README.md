@@ -23,6 +23,7 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | Aktion | Tastatur / Maus | Touch |
 |---|---|---|
 | Bewegen | WASD / Pfeiltasten | linke Bildschirmseite ziehen (Joystick) |
+| Dash / Sprint | Shift drücken = Dash (kurzer Schub, kurz unverwundbar); Shift halten = Sprinten | Knopf „Dash“ (halten = Sprint) |
 | Sammeln & angreifen | Leertaste, E oder linke Maustaste **halten** (zielt auf den Mauszeiger) | Ziel antippen und halten |
 | Gebäude wählen | 1 – 6 oder Klick auf die Bauleiste | Bauleiste antippen |
 | Gebäude setzen | Linksklick (Mauern: Maustaste halten und ziehen) | Bauplatz antippen |
@@ -62,6 +63,22 @@ Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lag
 
 Gebaut werden kann im Umkreis von 12 Feldern um die Flamme und 6 Feldern um jedes andere Gebäude. Tagsüber reparieren die Siedler beschädigte Gebäude automatisch.
 
+### Wildnis und Jagd
+Tagsüber leben Hasen, Hirsche, Ziegen und Wildschweine in der Wildnis. Dazu kommen Tauben, Krähen, Möwen, Schmetterlinge, Libellen, Fische und Frösche. Nachts sind Eulen, Fledermäuse und Glühwürmchen unterwegs, und ab der zweiten Nacht streifen Wolfsrudel umher.
+
+| Tier | Verhalten | Beute |
+|---|---|---|
+| Hase | flieht im Zickzack, auch vor Kampflärm | 2 Nahrung |
+| Hirsch | Herde, flieht früh, schnell | 6 Nahrung, 1 Fell |
+| Ziege | kleine Herde auf trockenem Boden | 4 Nahrung, 1 Fell |
+| Wildschwein | neutral; wer zu nah kommt oder es angreift, wird nach kurzem Scharren angerannt | 5 Nahrung, 2 Fell |
+| Wolf (Rudel, nachts) | jagt dich und Siedler außerhalb der Siedlung, meidet das Licht von Flamme, Hütten und Türmen, gibt nach einer Weile auf und flieht bei schweren Verlusten | 2 Fell |
+
+Erlegte Tiere geben ihre Beute direkt in dein Inventar. Jagbare Tiere in Reichweite leuchten golden, ein Druck auf E greift sie an. Tiere greifen nie die Flamme oder Gebäude an.
+
+### Energie und Dash
+Die Energieleiste steht unter deinen Lebenspunkten. Ein Dash kostet 30 Energie, ein Sprint verbraucht Energie, solange du ihn hältst. Nach einer kurzen Pause lädt sich die Leiste wieder auf. Reicht die Energie nicht, blinkt die Leiste und der Dash bleibt aus. Auch beim Dash blockieren Mauern, Tore dagegen nicht.
+
 ### Siedler
 - Du startest mit 3 Siedlern. Jeden Morgen kommt ein neuer hinzu, wenn ein Platz frei ist (Flamme: 3, jede Hütte: +2) und 8 Nahrung im Lager liegen.
 - Siedler haben **Hunger** und **Durst**. Sie essen und trinken selbstständig aus dem Lager. Fehlt beides zu lange, verlieren sie Leben und sterben.
@@ -92,6 +109,7 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 ## Getroffene Annahmen (Designentscheidungen)
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
 - **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und einziges Lager. Ressourcen zählen erst nach dem Abliefern.
+- **Wildlife:** Tiere entstehen in einem Ring um die Kamera, passend zum Boden und zur Tageszeit, und verschwinden weit außerhalb der Sicht wieder. Es sind höchstens 60 gleichzeitig, davon höchstens 30 dekorative. Deko-Tiere und Tiere außerhalb der Sicht werden vereinfacht aktualisiert. Tiere werden nicht gespeichert. Fell ist eine neue Ressource, für Rezepte ab Phase 7.
 - **Kampfgefühl:** Ein Schwerthieb holt aus, zieht mit Bogenspur durch und lässt die Figur nach vorn ausfallen. Bei Treffern hält das Bild für drei Frames an (Trefferpause), dazu ein leichtes Wackeln, Rückstoß und weißes Aufblitzen. Sammeln braucht gehaltene Taste und zeigt einen Fortschrittsbalken. Das Werkzeug passt zum Ziel (Axt, Spitzhacke, Eimer).
 - **Lesbarkeit:** Der Boden ist bewusst entsättigt und etwas dunkler. Gebäude, Bäume, Felsen und Sträucher haben kräftigere Farben und eine dunkle Kontur. Der Spieler trägt einen hellen Umriss, Siedler einen dunklen, Gegner einen dunkelroten, alle mit Bodenschatten. Das Ziel in Reichweite leuchtet golden und zeigt ein „E“. Liegt die Flamme außerhalb der Sicht, zeigt ein goldener Pfeil am Bildschirmrand dorthin.
 - **Kollision:** Alle Figuren haben kreisförmige Hitboxen und gleiten an Hindernissen entlang. Gebäude, Mauern, Baumstämme und Felsen blockieren jeden – auch den Spieler und die Siedler. Nur **Tore** lassen eigene Leute durch, Gegner nicht. Siedler arbeiten, liefern und schlafen an einem Zugangspunkt am Gebäuderand und betreten Gebäude nie. Wer hinter einem Gebäude oder Baum steht, scheint als Silhouette durch.

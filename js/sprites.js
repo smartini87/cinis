@@ -229,6 +229,22 @@ function makeIcon(kind) {
       px(g, 6 - w, y, w * 2, 1, '#3f86c0');
     }
     px(g, 4, 6, 1, 2, '#9fd0f0');
+  } else if (kind === 'hide') {
+    // aufgespanntes Fell
+    blob(g, 6, 6, 5, 4, '#8a6a46', 5, 1);
+    blob(g, 6, 6, 3, 2, '#c9a87a', 6);
+    px(g, 1, 2, 2, 2, '#8a6a46');
+    px(g, 9, 2, 2, 2, '#8a6a46');
+    px(g, 1, 9, 2, 2, '#8a6a46');
+    px(g, 9, 9, 2, 2, '#8a6a46');
+  } else if (kind === 'energy') {
+    // Blitz
+    px(g, 6, 0, 3, 2, '#ffe08a');
+    px(g, 5, 2, 3, 2, '#ffe08a');
+    px(g, 3, 4, 6, 2, '#f0c040');
+    px(g, 5, 6, 3, 2, '#ffe08a');
+    px(g, 4, 8, 3, 2, '#f0c040');
+    px(g, 3, 10, 2, 2, '#f0c040');
   } else if (kind === 'people') {
     px(g, 2, 2, 3, 3, '#c99a6e');
     px(g, 1, 5, 5, 6, '#b8a074');
@@ -401,7 +417,7 @@ export function buildSprites() {
   Sprites.farm = inkSprite(makeFarm(), { edge: 0.3 });
   Sprites.sack = inkSprite(makeSack());
   Sprites.icons = {};
-  for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
+  for (const k of ['wood', 'stone', 'food', 'water', 'hide', 'people', 'heart', 'flame', 'energy']) Sprites.icons[k] = makeIcon(k);
 }
 
 /** Data-URL eines Icons für das DOM-HUD. */

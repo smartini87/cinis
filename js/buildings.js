@@ -33,6 +33,7 @@ export class Buildings {
     this.ghost = null;        // { tx, ty, ok, reason }
     this.lastDragTile = -1;   // für Mauer-Ziehen
     this.changed = true;      // Belegung geändert (Wegfindung neu berechnen)
+    this.version = 0;         // zählt jede Änderung der Gebäudeliste (Caches)
   }
 
   /** Gebäude anlegen und Kacheln belegen (ohne Kostenprüfung). */
@@ -50,6 +51,7 @@ export class Buildings {
     this.list.push(b);
     if (type === 'center') this.center = b;
     this.changed = true;
+    this.version++;
     return b;
   }
 
@@ -66,6 +68,7 @@ export class Buildings {
     if (i >= 0) this.list.splice(i, 1);
     b.dead = true;
     this.changed = true;
+    this.version++;
   }
 
   count(type) {

@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `balance`.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt).
@@ -38,6 +38,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
 | `save.js` | Spielstand in localStorage (`cinis.save.v1`): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
 | `particles.js` | Partikel, `converge` (Funken fliegen zu einem Punkt), `corpse` (zerfallende Figuren), schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
+| `wildlife.js` | Tiere: `ANIMAL_DEFS` (game/neutral/hostile/deco), Spawn im Ring nach Biom/Tageszeit, Statemachine (Flucht, Herde, Charge, Rudeljagd, Licht meiden), Deko vereinfacht, Beute ins Inventar, Klänge |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
@@ -57,4 +58,6 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `buildings.changed = true` nach jeder Belegungsänderung → Flussfeld wird im nächsten Update neu berechnet.
 - Szenario-Tests können die Simulation synchron vorspulen: `for (...) game.update(1/60)`. Für Screenshots eines bestimmten Moments `game.speed = 0` setzen (friert ein, Rendering läuft weiter).
 - `Game.update` pausiert für `game.hitStop` Schritte (Trefferpause) – Tests, die exakte Schrittzahlen erwarten, berücksichtigen das.
+- Treffbares: `game.forEachHittable` / `game.hittables()` (Gegner + Tiere), Treffer immer über `game.hitUnit`. Kampflärm `game.noise(x, y, r)`, Licht `game.lightAt(x, y)`.
+- Dash per Shift-Flanke in `handleFrameInput` → `player.requestDash`; Bewegung über `moveEntity` (Substeps), Tore passierbar.
 - Figuren: `drawHumanoid(ctx, x, y, o)` mit `walk`, `breath`, `dir`, `arm` (Weltwinkel) + `item`, `lean`, `pose`, `outline`, `silhouette`.

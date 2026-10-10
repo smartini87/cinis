@@ -145,9 +145,11 @@ export class SpatialHash {
   constructor(cell = 32) {
     this.cell = cell;
     this.map = new Map();
+    this.used = [];   // belegte Zellen seit dem letzten clear (Arrays werden wiederverwendet)
   }
   clear() {
-    this.map.clear();
+    for (const a of this.used) a.length = 0;
+    this.used.length = 0;
   }
   key(cx, cy) {
     return (cx + 1024) * 4096 + (cy + 1024);
@@ -156,6 +158,7 @@ export class SpatialHash {
     const k = this.key(Math.floor(o.x / this.cell), Math.floor(o.y / this.cell));
     let a = this.map.get(k);
     if (!a) this.map.set(k, (a = []));
+    if (!a.length) this.used.push(a);
     a.push(o);
   }
   /** Alle Objekte in Zellen, die den Kreis (x,y,r) berühren, an fn übergeben. */
