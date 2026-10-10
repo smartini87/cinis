@@ -117,3 +117,21 @@ html, body {
   .bkey { display: none; }
   .carry-panel { bottom: auto; top: 10px; left: auto; right: 10px; }
 }
+
+/* ---------------------------------------------------------------- Siedler */
+.pop-row { border-top: 1px solid #4a3c28; margin-top: 3px; padding-top: 3px; }
+.lbl.danger { color: #ff8a70; font-weight: bold; }
+.focus-panel { top: 196px; left: 10px; pointer-events: auto; width: 150px; }
+.focus-panel .lbl { font-size: 11px; color: #b9a988; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.focus-btns { display: flex; flex-wrap: wrap; gap: 3px; }
+.fbtn {
+  font: inherit; font-size: 12px; padding: 2px 6px; background: #2a231d; color: #efe6d2;
+  border: 1px solid #4a3c28; border-radius: 2px; cursor: pointer;
+}
+.fbtn:hover { border-color: #b08a4a; }
+.fbtn.active { background: #4a3a24; border-color: #ffd36a; color: #ffd36a; }
+
+@media (max-width: 640px) {
+  .focus-panel { top: 150px; width: 110px; }
+  .fbtn { font-size: 10px; padding: 1px 4px; }
+}

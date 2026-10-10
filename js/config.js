@@ -26,3 +26,20 @@ export const PLAYER_REACH = 22;      // Reichweite für Sammeln (Welteinheiten)
 export const DEPOSIT_RANGE = 20;     // Abstand zur Flamme, ab dem automatisch abgeliefert wird
 /** Sammelintervall pro Zieltyp in Sekunden */
 export const GATHER_TIME = { tree: 0.55, rock: 0.7, bush: 0.4, water: 0.45 };
+
+// Siedler
+export const SETTLER = {
+  hp: 40,
+  speed: 40,
+  hungerRate: 100 / 360,   // Sättigung pro Sekunde weniger
+  thirstRate: 100 / 240,
+  needAt: 45,              // ab hier gehen Siedler essen/trinken
+  gain: 35,                // Sättigung pro Einheit Nahrung/Wasser
+  carry: 5,                // Traglast
+  workTime: 1.1,           // Sekunden pro gesammelter Einheit
+  starveDamage: 1,         // LP pro Sekunde bei leerem Magen/Durst
+};
+export const START_SETTLERS = 3;
+export const SETTLER_ARRIVAL_COST = 8;   // Nahrung pro neuem Siedler
+export const FARM_GROW_TIME = 36;        // Sekunden Arbeit bis zur Ernte
+export const FARM_YIELD = 5;             // Nahrung pro Ernte

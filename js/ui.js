@@ -3,6 +3,8 @@
 import { RES, RES_KEYS } from './config.js';
 import { iconURL, buildingPreviewURL } from './sprites.js';
 import { BUILDING_DEFS, BUILDABLE } from './buildings.js';
+import { FOCI } from './settlers.js';
+import { SETTLER } from './config.js';
 
 /** Kurzhelfer zum Erzeugen von DOM-Elementen. */
 function el(tag, cls, parent, html) {
@@ -36,6 +38,29 @@ export class UI {
       img.alt = RES[k].name;
       this.resEls[k] = el('span', 'val', row, '0');
       el('span', 'lbl', row, RES[k].name);
+    }
+    // Bevölkerung
+    const pop = el('div', 'res-row pop-row', res);
+    const pimg = el('img', 'icon', pop);
+    pimg.src = iconURL('people');
+    pimg.alt = 'Siedler';
+    this.popEl = el('span', 'val', pop, '0');
+    this.popLbl = el('span', 'lbl', pop, 'Siedler');
+    pop.title = 'Siedler / Plätze. Neue Siedler kommen, wenn Platz (Hütten) und Nahrung da sind.';
+    // Arbeitsschwerpunkt der Sammler
+    const focus = el('div', 'panel focus-panel', hud);
+    el('div', 'lbl', focus, 'Siedler sammeln');
+    const fb = el('div', 'focus-btns', focus);
+    this.focusBtns = {};
+    for (const f of FOCI) {
+      const b = el('button', 'fbtn', fb, f.name);
+      b.type = 'button';
+      b.title = f.id === 'auto' ? 'Siedler sammeln, was am knappsten ist' : `Freie Siedler sammeln vor allem ${f.name}`;
+      b.addEventListener('click', () => {
+        this.game.settlers.focus = f.id;
+        this.game.audio?.play('click');
+      });
+      this.focusBtns[f.id] = b;
     }
     // Traglast
     const carry = el('div', 'panel carry-panel', hud);
@@ -101,6 +126,13 @@ export class UI {
     const parts = RES_KEYS.filter((k) => p.inv[k] > 0).map((k) => `${p.inv[k]} ${RES[k].name}`);
     this.set('carryT', this.carryTxt, `${c}/${p.capacity}` + (parts.length ? ' · ' + parts.join(', ') : ''));
     this.set('hint', this.hint, this.contextHint());
+    const st = g.settlers;
+    this.set('pop', this.popEl, `${st.list.length}/${st.capacity(g)}`);
+    const needy = st.list.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;
+    const hungry = st.list.filter((s) => s.hunger < SETTLER.needAt || s.thirst < SETTLER.needAt).length;
+    this.set('popLbl', this.popLbl, needy ? `Siedler · ${needy} leiden!` : hungry ? `Siedler · ${hungry} bedürftig` : 'Siedler');
+    this.set('popCls', this.popLbl, needy ? 'lbl danger' : 'lbl', 'className');
+    for (const f of FOCI) this.set('f' + f.id, this.focusBtns[f.id], st.focus === f.id ? 'fbtn active' : 'fbtn', 'className');
     const bs = g.buildings;
     for (const type of [...BUILDABLE, 'demolish']) {
       const btn = this.buildBtns[type];

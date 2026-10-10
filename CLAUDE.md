@@ -21,10 +21,11 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `util.js` | Mathe, Seed-Zufall (mulberry32), Rauschen, MinHeap |
 | `input.js` | Tastatur/Maus/Touch, Flanken pro Frame (`pressed`, `mouse.clicked`) |
 | `camera.js` | Kamera, ganzzahliger Pixel-Zoom, Welt↔Bildschirm |
-| `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, Kollision, Gelände-Rendering |
+| `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, Kollision, A* + BFS-zum-Wasser, Gelände-Rendering |
 | `sprites.js` | Prozedurale Pixel-Grafik (Offscreen-Canvases) + Figuren-Zeichner |
 | `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
 | `buildings.js` | Gebäudedefinitionen + Kosten, Bausystem (Vorschau/Platzieren/Abriss, Bauradius), Belegungsraster (`world.buildingAt`), Brunnen-Produktion, Zeichnen |
+| `settlers.js` | Siedler: Hunger/Durst, Jobvergabe (Farm), Aufgaben-Automat (gather/water/farm/eat/deliver/idle), A*-Wegfolgen, Arbeitsschwerpunkt |
 | `particles.js` | Partikel + schwebende Texte (`game.effects`) |
 | `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`) |
 

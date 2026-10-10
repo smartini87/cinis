@@ -1,12 +1,13 @@
 // main.js – Einstiegspunkt: Spielzustand, fester Zeitschritt (Game Loop), Rendering-Reihenfolge.
 
-import { TILE, STEP, START_STOCK } from './config.js';
+import { TILE, STEP, START_STOCK, START_SETTLERS } from './config.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { Buildings, BUILDABLE } from './buildings.js';
 import { Effects } from './particles.js';
+import { Settlers } from './settlers.js';
 import { UI } from './ui.js';
 import { buildSprites, drawNode } from './sprites.js';
 
@@ -49,6 +50,12 @@ class Game {
     this.stock = { ...START_STOCK };
     this.stats = { built: 0, kills: 0, gathered: 0 };
     this.effects.clear();
+    this.settlers = new Settlers();
+    for (let i = 0; i < START_SETTLERS; i++) {
+      const c = this.buildings.center;
+      this.settlers.spawn(c.x - 16 + i * 16, c.y + 28);
+    }
+    this.arrivalT = 75;
     const cx = (this.world.cx + 0.5) * TILE, cy = (this.world.cy + 2.5) * TILE;
     this.player = new Player(cx, cy);
     this.camera.snap(cx, cy);
@@ -100,6 +107,13 @@ class Game {
     this.world.updateNodes(dt);
     this.player.update(dt, this);
     this.buildings.update(dt, this);
+    this.settlers.update(dt, this);
+    // Zuzug neuer Siedler in festen Abständen
+    this.arrivalT -= dt;
+    if (this.arrivalT <= 0) {
+      this.arrivalT = 75;
+      this.settlers.tryArrival(this, 1);
+    }
     this.effects.update(dt);
     this.camera.follow(this.player.x, this.player.y - 8, dt);
   }
@@ -124,6 +138,7 @@ class Game {
       }
     }
     this.buildings.collectDrawables(list, ctx, camera, this.time);
+    this.settlers.collectDrawables(list, ctx, camera, this.time);
     list.push({ y: this.player.y, draw: () => this.player.draw(ctx) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();

@@ -1,7 +1,7 @@
 // world.js – Kachelkarte: Generierung (Seed), Gelände-Rendering, Ressourcenknoten, Kollision.
 
 import { TILE, MAP_W, MAP_H } from './config.js';
-import { mulberry32, fbm, hash2, clamp } from './util.js';
+import { mulberry32, fbm, hash2, clamp, MinHeap } from './util.js';
 
 /** Kacheltypen */
 export const T = { GRASS: 0, DRY: 1, DIRT: 2, SAND: 3, PAVE: 4, SHALLOW: 5, WATER: 6, ASH: 7 };
@@ -248,6 +248,96 @@ export class World {
         }
       }
     }
+  }
+
+  // ---------------------------------------------------------------- Wegfindung (freundliche Einheiten)
+  _searchBuffers() {
+    if (!this._g) {
+      const n = this.w * this.h;
+      this._g = new Float32Array(n);
+      this._came = new Int32Array(n);
+      this._stamp = new Uint32Array(n);   // Generationsmarke statt Array-Reset
+      this._closed = new Uint32Array(n);
+      this._gen = 0;
+    }
+    this._gen++;
+    return this._gen;
+  }
+
+  _reconstruct(goal, start) {
+    const path = [];
+    for (let c = goal; c !== start; c = this._came[c]) path.push([c % this.w, (c / this.w) | 0]);
+    return path.reverse();
+  }
+
+  /** A* auf dem Geländeraster (8 Richtungen, keine Eckabkürzung). Liefert [[tx,ty],…] oder null. */
+  findPath(sx, sy, gx, gy, maxNodes = 6000) {
+    if (!this.walkable(gx, gy) || !this.inBounds(sx, sy)) return null;
+    const W = this.w, start = sy * W + sx, goal = gy * W + gx;
+    if (start === goal) return [];
+    const gen = this._searchBuffers();
+    const heap = new MinHeap();
+    const h = (i) => {
+      const dx = Math.abs((i % W) - gx), dy = Math.abs(((i / W) | 0) - gy);
+      return Math.max(dx, dy) + 0.414 * Math.min(dx, dy);
+    };
+    this._g[start] = 0;
+    this._stamp[start] = gen;
+    heap.push(start, h(start));
+    let expanded = 0;
+    while (heap.size) {
+      const cur = heap.pop();
+      if (cur === goal) return this._reconstruct(goal, start);
+      if (this._closed[cur] === gen) continue;
+      this._closed[cur] = gen;
+      if (++expanded > maxNodes) return null;
+      const cx = cur % W, cy = (cur / W) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (!this.walkable(nx, ny)) continue;
+          if (dx && dy && (!this.walkable(cx + dx, cy) || !this.walkable(cx, cy + dy))) continue;
+          const ni = ny * W + nx;
+          if (this._closed[ni] === gen) continue;
+          const cost = this._g[cur] + (dx && dy ? 1.414 : 1) + (this.tiles[ni] === T.SHALLOW ? 0.6 : 0);
+          if (this._stamp[ni] !== gen || cost < this._g[ni]) {
+            this._stamp[ni] = gen;
+            this._g[ni] = cost;
+            this._came[ni] = cur;
+            heap.push(ni, cost + h(ni));
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Breitensuche zur nächsten Stelle, an der man Wasser schöpfen kann. */
+  findPathToWater(sx, sy, maxNodes = 5000) {
+    if (!this.inBounds(sx, sy)) return null;
+    const W = this.w, start = sy * W + sx;
+    const gen = this._searchBuffers();
+    const queue = [start];
+    this._stamp[start] = gen;
+    const isSource = (x, y) => {
+      if (this.tileAt(x, y) === T.SHALLOW) return true;
+      return this.tileAt(x + 1, y) === T.WATER || this.tileAt(x - 1, y) === T.WATER || this.tileAt(x, y + 1) === T.WATER || this.tileAt(x, y - 1) === T.WATER;
+    };
+    for (let qi = 0; qi < queue.length && qi < maxNodes; qi++) {
+      const cur = queue[qi], cx = cur % W, cy = (cur / W) | 0;
+      if (isSource(cx, cy) && this.inBounds(cx, cy)) return { path: this._reconstruct(cur, start), tx: cx, ty: cy };
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, ny = cy + dy;
+        if (!this.inBounds(nx, ny) || !this.walkable(nx, ny)) continue;
+        const ni = ny * W + nx;
+        if (this._stamp[ni] === gen) continue;
+        this._stamp[ni] = gen;
+        this._came[ni] = cur;
+        queue.push(ni);
+      }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------- Kollision
