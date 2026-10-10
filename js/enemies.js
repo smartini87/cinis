@@ -85,7 +85,7 @@ export class Enemies {
       const r = 2 + Math.floor(Math.random() * (world.w - 4));
       const d = Math.floor(Math.random() * 3);
       const [tx, ty] = edge === 'n' ? [r, d] : edge === 's' ? [r, world.h - 1 - d] : edge === 'w' ? [d, r] : [world.w - 1 - d, r];
-      if (world.walkable(tx, ty) && !world.buildingAt[world.idx(tx, ty)] && Number.isFinite(world.flowAt(tx, ty))) {
+      if (world.passable(tx, ty, 'enemy') && Number.isFinite(world.flowAt(tx, ty))) {
         return { x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE };
       }
     }
@@ -130,29 +130,7 @@ export class Enemies {
       }
       this.updateEnemy(e, dt, game);
     }
-    this.separate();
     this.list = this.list.filter((e) => !e.dead);
-  }
-
-  /** Gegner nicht übereinander stapeln. */
-  separate() {
-    const L = this.list;
-    for (let i = 0; i < L.length; i++) {
-      const a = L[i];
-      for (let j = i + 1; j < L.length; j++) {
-        const b = L[j];
-        const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r;
-        if (Math.abs(dx) > min || Math.abs(dy) > min) continue;
-        const d = Math.hypot(dx, dy) || 0.01;
-        if (d < min) {
-          const push = (min - d) * 0.25;
-          a.x -= (dx / d) * push;
-          a.y -= (dy / d) * push;
-          b.x += (dx / d) * push;
-          b.y += (dy / d) * push;
-        }
-      }
-    }
   }
 
   /** Nächstes lebendes Ziel (Spieler/Siedler) im Aggro-Radius. */
@@ -187,10 +165,7 @@ export class Enemies {
       e.retarget = 0.4;
       e.target = this.findUnitTarget(e, game);
     }
-    const solid = (tx, ty) => !world.walkable(tx, ty) || !!world.buildingAt[ty * world.w + tx];
-    // Steckt der Gegner in einem Gebäude (darauf gebaut), ignoriert er Kollisionen bis er frei ist
-    const inside = world.blocked(e.x, e.y, e.r, solid);
-    const moveSolid = inside ? (tx, ty) => !world.walkable(tx, ty) : solid;
+    const solid = (tx, ty) => !world.passable(tx, ty, 'enemy');
 
     // 1) Einheit verfolgen und angreifen
     const t = e.target;
@@ -200,7 +175,7 @@ export class Enemies {
         this.tryAttack(e, def, game, () => damageUnit(game, t, e.dmg, ((t.x - e.x) / (d || 1)) * 4, ((t.y - e.y) / (d || 1)) * 4), t.x);
         return;
       }
-      const blocked = this.step(e, t.x - e.x, t.y - e.y, dt, world, moveSolid);
+      const blocked = this.step(e, t.x - e.x, t.y - e.y, dt, world);
       if (blocked) {
         e.blockedT += dt;
         if (e.blockedT > 0.6) {
@@ -237,7 +212,7 @@ export class Enemies {
         this.tryAttack(e, def, game, () => damageBuilding(game, c, e.dmg * def.bld), c.x);
         return;
       }
-      this.step(e, c.x - e.x, c.y - e.y, dt, world, moveSolid);
+      this.step(e, c.x - e.x, c.y - e.y, dt, world);
       return;
     }
     const b = world.buildingAt[bestI];
@@ -247,17 +222,17 @@ export class Enemies {
         return;
       }
     }
-    this.step(e, (bx + 0.5) * TILE - e.x, (by + 0.5) * TILE - e.y, dt, world, moveSolid);
+    this.step(e, (bx + 0.5) * TILE - e.x, (by + 0.5) * TILE - e.y, dt, world);
   }
 
   /** Schritt in Richtung (dx,dy); liefert true, wenn blockiert. */
-  step(e, dx, dy, dt, world, solid) {
+  step(e, dx, dy, dt, world) {
     const d = Math.hypot(dx, dy);
     if (d < 0.5) return false;
     const sp = e.speed * dt;
     e.walk += dt * (e.type === 'dog' ? 16 : 9);
     if (Math.abs(dx) > 0.5) e.flip = dx < 0;
-    return world.moveEntity(e, (dx / d) * sp, (dy / d) * sp, e.r, solid);
+    return world.moveEntity(e, (dx / d) * sp, (dy / d) * sp, e.r, 'enemy');
   }
 
   tryAttack(e, def, game, fn, tx) {
@@ -275,8 +250,7 @@ export class Enemies {
     e.hp -= dmg;
     e.hurt = 0.12;
     const kb = e.type === 'boss' ? 0.1 : e.type === 'brute' ? 0.3 : 1;
-    const solid = (tx, ty) => !game.world.walkable(tx, ty) || !!game.world.buildingAt[ty * game.world.w + tx];
-    game.world.moveEntity(e, kx * kb, ky * kb, e.r, solid);
+    game.world.moveEntity(e, kx * kb, ky * kb, e.r, 'enemy');
     game.effects.burst(e.x, e.y - 8, { n: 4, color: ['#5a5450', '#8a8580', '#e8742a'], speed: 40, life: 0.4 });
     if (e.hp <= 0) this.kill(e, game, true);
   }
@@ -297,7 +271,8 @@ export class Enemies {
   collectDrawables(out, ctx, cam, time) {
     for (const e of this.list) {
       if (!cam.visible(e.x - 12, e.y - 34, 24, 36)) continue;
-      out.push({ y: e.y, draw: () => this.drawOne(ctx, e, time) });
+      const h = e.type === 'boss' ? 32 : e.type === 'brute' ? 24 : 17;
+      out.push({ y: e.y, draw: () => this.drawOne(ctx, e, time), unit: [e.x - 6, e.y - h, 12, h], sil: () => drawEnemy(ctx, e, time, '#ff9070') });
     }
   }
 

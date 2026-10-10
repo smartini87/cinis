@@ -20,16 +20,18 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') 
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}\n${e.stack || ''}`));
 page.on('requestfailed', (r) => errors.push(`[requestfailed] ${r.url()}`));
 
-await page.goto(`http://localhost:${port}/?seed=${process.env.SEED || 4242}&play`);
+// Szenarien können zusätzliche URL-Parameter verlangen: export const query = 'skiptut&…'
+const scenario = process.argv[2];
+const mod = scenario ? await import(pathToFileURL(path.resolve(scenario)).href) : null;
+const extra = mod && mod.query ? `&${mod.query}` : '';
+await page.goto(`http://localhost:${port}/?seed=${process.env.SEED || 4242}&play${extra}`);
 await page.waitForTimeout(1500);
 // Standardablauf: ein wenig herumlaufen
 for (const k of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
   await page.keyboard.down(k); await page.waitForTimeout(300); await page.keyboard.up(k);
 }
-const scenario = process.argv[2];
-if (scenario) {
+if (mod) {
   try {
-    const mod = await import(pathToFileURL(path.resolve(scenario)).href);
     await mod.default(page, { outDir, errors });
   } catch (e) {
     errors.push(`[szenario] ${e.message}`);

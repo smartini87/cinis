@@ -220,12 +220,12 @@ export class Settlers {
     if (this.shouldShelter(s, game)) return this.goShelter(s, game);
     // 1) Bedürfnisse
     if ((s.hunger < SETTLER.needAt && stock.food > 0) || (s.thirst < SETTLER.needAt && stock.water > 0)) {
-      return this.goTo(s, game, { type: 'eat' }, buildings.center.tx + 1, buildings.center.ty + 1);
+      return this.goToBuilding(s, game, { type: 'eat' }, buildings.center);
     }
     // 2) Getragenes abliefern
-    if (s.carry) return this.goTo(s, game, { type: 'deliver' }, buildings.center.tx + 1, buildings.center.ty + 1);
-    // 3) Farmarbeit
-    if (s.job === 'farm' && s.farm) return this.goTo(s, game, { type: 'farm', farm: s.farm }, s.farm.tx, s.farm.ty + 1);
+    if (s.carry) return this.goToBuilding(s, game, { type: 'deliver' }, buildings.center);
+    // 3) Farmarbeit (am Feldrand, nie auf dem Feld)
+    if (s.job === 'farm' && s.farm) return this.goToBuilding(s, game, { type: 'farm', farm: s.farm }, s.farm);
     // 4) Sammeln
     const res = this.wantedResource(game);
     if (res === 'water') {
@@ -239,8 +239,12 @@ export class Settlers {
     } else {
       const node = this.findNode(s, game, RES_NODE[res]) || this.findNode(s, game, null);
       if (node) {
-        this.claim(s, node);
-        return this.goTo(s, game, { type: 'gather', node }, node.tx, node.ty);
+        const ap = game.world.accessTile(node.tx, node.ty, s.x, s.y);
+        if (ap && this.goTo(s, game, { type: 'gather', node }, ap[0], ap[1])) {
+          this.claim(s, node);
+          return true;
+        }
+        node.unreachableT = game.time; // eine Weile nicht mehr versuchen
       }
     }
     // 5) Nichts zu tun: in der Nähe der Flamme umherschlendern
@@ -256,6 +260,7 @@ export class Settlers {
       if (n.removed || n.amount <= 0) continue;
       if (type && n.type !== type) continue;
       if ((this.claims.get(n.id) || 0) >= 2) continue;
+      if (n.unreachableT !== undefined && game.time - n.unreachableT < 20) continue;
       // Siedler entfernen sich nicht zu weit von der Flamme (Stein ist knapper → größerer Radius)
       if (dist(n.x, n.y, c.x, c.y) > (n.type === 'rock' ? 40 : 26) * TILE) continue;
       const d = dist(n.x, n.y, s.x, s.y);
@@ -275,11 +280,24 @@ export class Settlers {
       s.path = null;
       return false;
     }
+    task.goal = [tx, ty];
     s.task = task;
     s.path = path;
     s.pathI = 0;
     s.stuck = 0;
+    s.repaths = 0;
     return true;
+  }
+
+  /** Zum Zugangspunkt eines Gebäudes gehen (Siedler betreten Gebäude nie). */
+  goToBuilding(s, game, task, b) {
+    const ap = game.buildings.accessPoint(b, s.x, s.y);
+    if (!ap) {
+      s.task = { type: 'idle', t: 1 };
+      s.path = null;
+      return false;
+    }
+    return this.goTo(s, game, task, ap[0], ap[1]);
   }
 
   /** Dem geplanten Pfad folgen. Liefert true, wenn das Ziel erreicht ist. */
@@ -298,16 +316,26 @@ export class Settlers {
     const sp = SETTLER.speed * (s.carry ? 0.85 : 1);
     const step = Math.min(d, sp * dt);
     const ox = s.x, oy = s.y;
-    game.world.moveEntity(s, (dx / d) * step, (dy / d) * step, s.r, game.world.solidFriendly);
+    game.world.moveEntity(s, (dx / d) * step, (dy / d) * step, s.r, 'friendly');
     s.moving = true;
     s.walk += dt * 10;
     if (Math.abs(dx) > 0.5) s.flip = dx < 0;
-    // Feststecken erkennen und Aufgabe neu wählen
+    // Feststecken erkennen: erst neuen Weg planen, dann Aufgabe aufgeben
     if (Math.hypot(s.x - ox, s.y - oy) < step * 0.3) {
       s.stuck += dt;
-      if (s.stuck > 1.5) {
-        s.task = null;
-        s.path = null;
+      if (s.stuck > 1) {
+        s.stuck = 0;
+        const goal = s.task && s.task.goal;
+        const path = goal && s.repaths < 2 ? game.world.findPath(s.tx, s.ty, goal[0], goal[1]) : null;
+        if (path) {
+          s.repaths++;
+          s.path = path;
+          s.pathI = 0;
+        } else {
+          if (s.task && s.task.type === 'gather') this.release(s);
+          s.task = null;
+          s.path = null;
+        }
       }
     } else s.stuck = 0;
     return false;
@@ -347,11 +375,11 @@ export class Settlers {
     this.release(s);
     const home = this.findShelter(s, game);
     if (!home) return false;
-    return this.goTo(s, game, { type: 'shelter', home }, home.tx + (home.size >> 1), home.ty + home.size - 1);
+    return this.goToBuilding(s, game, { type: 'shelter', home }, home);
   }
 
-  /** Siedler verlässt seine Unterkunft. */
-  wake(s, b) {
+  /** Siedler verlässt seine Unterkunft (tritt am Zugangspunkt heraus). */
+  wake(s, b, buildings) {
     s.hidden = false;
     s.home = null;
     s.task = null;
@@ -359,8 +387,11 @@ export class Settlers {
     if (b) {
       const i = b.sleepers.indexOf(s);
       if (i >= 0) b.sleepers.splice(i, 1);
-      s.x = b.x + (Math.random() - 0.5) * b.size * TILE * 0.6;
-      s.y = (b.ty + b.size) * TILE + 4;
+      const ap = buildings && !b.dead ? buildings.accessPoint(b, s.x, s.y) : null;
+      if (ap) {
+        s.x = (ap[0] + 0.5) * TILE + (Math.random() - 0.5) * 6;
+        s.y = (ap[1] + 0.5) * TILE + (Math.random() - 0.5) * 6;
+      }
     }
   }
 
@@ -370,7 +401,7 @@ export class Settlers {
       s.checkT = (s.checkT || 0) - dt;
       if (s.checkT <= 0) {
         s.checkT = 0.5 + Math.random() * 0.5;
-        if (!this.shouldShelter(s, game) && !this.enemyNear(s.x, s.y, game, 8 * TILE)) this.wake(s, s.home);
+        if (!this.shouldShelter(s, game) && !this.enemyNear(s.x, s.y, game, 8 * TILE)) this.wake(s, s.home, game.buildings);
       }
       return;
     }
@@ -492,12 +523,20 @@ export class Settlers {
     }
     f.growth += dt / FARM_GROW_TIME;
     s.timer += dt;
-    // Gelegentlich auf dem Feld weiterbewegen (Arbeit sichtbar machen)
-    if (s.timer > 4) {
+    s.flip = f.x < s.x; // zum Feld gewandt arbeiten
+    // Gelegentlich an eine andere Stelle des Feldrands wechseln (Arbeit sichtbar machen)
+    if (s.timer > 5) {
       s.timer = 0;
-      s.x = (f.tx + 0.3 + Math.random() * 1.4) * TILE;
-      s.y = (f.ty + 0.6 + Math.random() * 1.3) * TILE;
-      s.flip = Math.random() < 0.5;
+      const ap = game.buildings.accessPoint(f, f.x + (Math.random() - 0.5) * 80, f.y + (Math.random() - 0.5) * 80);
+      if (ap) {
+        const path = game.world.findPath(s.tx, s.ty, ap[0], ap[1], 400);
+        if (path && path.length) {
+          t.goal = ap;
+          s.path = path;
+          s.pathI = 0;
+          return;
+        }
+      }
     }
     if (f.growth >= 1) {
       f.growth = 0;
@@ -511,16 +550,17 @@ export class Settlers {
   collectDrawables(out, ctx, cam, time) {
     for (const s of this.list) {
       if (s.hidden || !cam.visible(s.x - 8, s.y - 24, 16, 26)) continue;
-      out.push({ y: s.y, draw: () => this.drawSettler(ctx, s, time) });
+      out.push({ y: s.y, draw: () => this.drawSettler(ctx, s, time), unit: [s.x - 5, s.y - 19, 10, 19], sil: () => this.drawSettler(ctx, s, time, '#d8e6f0') });
     }
   }
 
-  drawSettler(ctx, s, time) {
+  drawSettler(ctx, s, time, sil = null) {
     const working = s.task && (s.task.type === 'gather' || s.task.type === 'farm' || s.task.type === 'water') && !s.moving;
     drawHumanoid(ctx, s.x, s.y, {
-      flip: s.flip, walk: s.moving ? s.walk : working ? Math.sin(time * 8) * 0.6 : 0,
+      flip: s.flip, walk: s.moving ? s.walk : working ? Math.sin(time * 8) * 0.6 : 0, silhouette: sil,
       tunic: s.tunic, skin: '#c99a6e', hair: s.hair, hurt: s.hurt > 0, carry: s.carry ? s.carry.res : null,
     });
+    if (sil) return;
     // Bedürfnis-Symbole bei Mangel
     const low = s.hunger < SETTLER.needAt * 0.6 ? '#c27ab3' : s.thirst < SETTLER.needAt * 0.6 ? '#7fc0ea' : null;
     if (low && Math.sin(time * 6) > 0) {

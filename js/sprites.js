@@ -342,15 +342,16 @@ export function drawHumanoid(ctx, x, y, o) {
   y = Math.round(y);
   const f = o.flip ? -1 : 1;
   // Rechteck relativ zur Figur, horizontal gespiegelt bei Blick nach links
+  const sil = o.silhouette;
   const R = (rx, ry, w, h, c) => {
-    ctx.fillStyle = c;
+    ctx.fillStyle = sil || c;
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };
   const step = o.walk ? Math.round(Math.sin(o.walk) * 1.5) : 0;
   const bob = o.walk ? Math.abs(Math.round(Math.sin(o.walk))) : 0;
   const skin = o.hurt ? '#ffffff' : o.skin;
   const tunic = o.hurt ? '#ffffff' : o.tunic;
-  R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
+  if (!sil) R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
   // Beine
   R(-3, -5, 2, 4 + Math.max(0, step), skin);
   R(1, -5, 2, 4 + Math.max(0, -step), skin);
@@ -445,6 +446,11 @@ export function drawBallista(ctx, x, y, angle, recoil) {
 /** Kleines Vorschaubild eines Gebäudes für die Bauleiste. */
 export function buildingPreviewURL(type) {
   let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower }[type];
+  if (type === 'gate') {
+    const [gc, gg] = canvas(16, 24);
+    drawGate(gg, 0, 24, 0, 0);
+    spr = gc;
+  }
   if (type === 'farm') {
     const [fc, fg] = canvas(32, 32);
     fg.drawImage(Sprites.farm, 0, 0);
@@ -464,12 +470,13 @@ export function buildingPreviewURL(type) {
  * Zeichnet einen Gegner mit Füßen bei (e.x, e.y).
  * e: { type, flip, walk, hurt, attack (0..1 Ausholbewegung), burn }
  */
-export function drawEnemy(ctx, e, time) {
+export function drawEnemy(ctx, e, time, sil = null) {
   const x = Math.round(e.x), y = Math.round(e.y);
   const f = e.flip ? -1 : 1;
   const white = e.hurt > 0;
   const R = (rx, ry, w, h, c) => {
-    ctx.fillStyle = white ? '#ffffff' : c;
+    if (sil && c.startsWith('rgba(0,0,0')) return; // Schatten nicht in der Silhouette
+    ctx.fillStyle = sil || (white ? '#ffffff' : c);
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };
   const step = Math.round(Math.sin(e.walk) * 1.5);
@@ -543,6 +550,53 @@ export function drawEnemy(ctx, e, time) {
       R(1 + lunge, -27, 1, 1, '#ffe08a');
       R(3 + lunge, -27, 1, 1, '#ffe08a');
       break;
+    }
+  }
+}
+
+/**
+ * Tor mit Unterkante bei bottom. rot 0: Mauer läuft waagerecht (Durchgang nord–süd),
+ * rot 1: Mauer läuft senkrecht (Durchgang west–ost). open 0..1 animiert die Flügel.
+ */
+export function drawGate(ctx, x, bottom, rot, open) {
+  x = Math.round(x);
+  const P = (rx, ry, w, h, c) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(x + rx, bottom + ry, w, h);
+  };
+  if (rot === 0) {
+    P(3, -18, 10, 18, '#2a2420'); // Durchgang (dunkel)
+    // Pfosten + Sturz
+    P(0, -22, 3, 22, '#9a958a');
+    P(13, -22, 3, 22, '#9a958a');
+    P(0, -22, 16, 4, '#a8a498');
+    P(0, -22, 16, 1, '#d0ccc0');
+    P(0, -1, 16, 1, '#5a5650');
+    // Torflügel (Holz, Eisenbeschlag)
+    const w = Math.max(0, Math.round(5 * (1 - open)));
+    if (w > 0) {
+      P(3, -18, w, 17, '#7a5233');
+      P(13 - w, -18, w, 17, '#7a5233');
+      P(3, -13, w, 1, '#3b3634');
+      P(13 - w, -13, w, 1, '#3b3634');
+      P(3, -6, w, 1, '#3b3634');
+      P(13 - w, -6, w, 1, '#3b3634');
+      if (w >= 4) {
+        P(7, -18, 1, 17, '#5b3f2a');
+        P(8, -18, 1, 17, '#5b3f2a');
+      }
+    }
+  } else {
+    // Mauer von der Seite: schmal; Pfosten an Nord- und Südende, Flügel dazwischen
+    P(5, -24, 6, 8, '#9a958a');
+    P(5, -24, 6, 1, '#d0ccc0');
+    P(5, -7, 6, 7, '#9a958a');
+    P(5, -7, 6, 1, '#c3beb2');
+    P(5, -1, 6, 1, '#5a5650');
+    const h = Math.max(0, Math.round(9 * (1 - open)));
+    if (h > 0) {
+      P(6, -16, 4, h, '#7a5233');
+      P(6, -16, 4, 1, '#a07c52');
     }
   }
 }

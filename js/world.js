@@ -2,6 +2,7 @@
 
 import { TILE, MAP_W, MAP_H } from './config.js';
 import { mulberry32, fbm, hash2, clamp, MinHeap } from './util.js';
+import { moveCircle, tilePassable, nodeSolid } from './physics.js';
 
 /** Kacheltypen */
 export const T = { GRASS: 0, DRY: 1, DIRT: 2, SAND: 3, PAVE: 4, SHALLOW: 5, WATER: 6, ASH: 7 };
@@ -38,6 +39,10 @@ export class World {
     this.cx = this.w >> 1; // Zentrum (Ewige Flamme)
     this.cy = this.h >> 1;
     this.fords = [];
+    this.nodesChanged = false; // feste Knoten (Baum/Fels) kamen hinzu oder verschwanden → Flussfeld neu
+    this.navDirty = true;      // Navigationsraster der eigenen Leute neu berechnen
+    this.nav = null;           // Uint8Array: 1 = begehbar für eigene Leute
+    this.region = null;        // Int32Array: Zusammenhangskomponente je Kachel (−1 = blockiert)
     this.terrain = null;   // vorgerendertes Gelände (Canvas)
     this.generate();
   }
@@ -200,6 +205,7 @@ export class World {
     };
     this.nodes.push(node);
     this.nodeAt[y * this.w + x] = node.id;
+    this.nodesChanged = this.navDirty = true;
     return node;
   }
 
@@ -230,6 +236,7 @@ export class World {
 
   /** Knoten endgültig entfernen (z. B. leere Trümmer oder wenn gebaut wird). */
   removeNode(node) {
+    if (nodeSolid(node)) this.nodesChanged = this.navDirty = true;
     node.removed = true;
     node.amount = 0;
     if (this.nodeAt[node.ty * this.w + node.tx] === node.id) this.nodeAt[node.ty * this.w + node.tx] = -1;
@@ -243,6 +250,7 @@ export class World {
     if (node.amount <= 0) {
       node.timer = 0;
       if (node.type === 'rock') this.removeNode(node);
+      else if (node.type === 'tree') this.nodesChanged = this.navDirty = true; // Stumpf blockiert nicht mehr
     }
     return take;
   }
@@ -258,6 +266,7 @@ export class World {
         if (n.timer >= def.regrow) {
           n.amount = n.max;
           n.timer = 0;
+          this.nodesChanged = this.navDirty = true;
         }
       } else if (n.type === 'bush' && n.amount < n.max) {
         n.timer += dt;
@@ -289,10 +298,80 @@ export class World {
     return path.reverse();
   }
 
-  /** A* auf dem Geländeraster (8 Richtungen, keine Eckabkürzung). Liefert [[tx,ty],…] oder null. */
-  findPath(sx, sy, gx, gy, maxNodes = 6000) {
-    if (!this.walkable(gx, gy) || !this.inBounds(sx, sy)) return null;
+  /** Begehbar für eine Maske: Gelände, Gebäude (Tore nur für eigene Leute), Baumstämme und Felsen. */
+  passable(tx, ty, mask = 'friendly') {
+    return tilePassable(this, tx, ty, mask);
+  }
+
+  /**
+   * Navigationsraster der eigenen Leute (begehbar ja/nein) und Zusammenhangskomponenten.
+   * Wird nur bei Änderungen (Gebäude, Bäume, Felsen) neu aufgebaut; spart aussichtslose A*-Suchen.
+   */
+  updateNav() {
+    const W = this.w, H = this.h, n = W * H;
+    if (!this.nav) {
+      this.nav = new Uint8Array(n);
+      this.region = new Int32Array(n);
+    }
+    const nav = this.nav, region = this.region;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) nav[y * W + x] = tilePassable(this, x, y, 'friendly') ? 1 : 0;
+    region.fill(-1);
+    let label = 0;
+    const queue = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      if (!nav[i] || region[i] >= 0) continue;
+      let head = 0, tail = 0;
+      queue[tail++] = i;
+      region[i] = label;
+      while (head < tail) {
+        const cur = queue[head++], cx = cur % W, cy = (cur / W) | 0;
+        for (let k = 0; k < 4; k++) {
+          const nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const ni = ny * W + nx;
+          if (nav[ni] && region[ni] < 0) {
+            region[ni] = label;
+            queue[tail++] = ni;
+          }
+        }
+      }
+      label++;
+    }
+    this.navDirty = false;
+  }
+
+  /** Komponente einer Kachel; eine blockierte Startkachel übernimmt die einer begehbaren Nachbarkachel. */
+  regionNear(tx, ty) {
+    if (this.navDirty || !this.nav) this.updateNav();
+    if (!this.inBounds(tx, ty)) return -1;
+    const r = this.region[ty * this.w + tx];
+    if (r >= 0) return r;
+    for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const x = tx + dx, y = ty + dy;
+      if (this.inBounds(x, y) && this.region[y * this.w + x] >= 0) return this.region[y * this.w + x];
+    }
+    return -1;
+  }
+
+  /**
+   * A* auf dem Kachelraster (8 Richtungen, keine Eckabkürzung). Die Startkachel darf belegt sein.
+   * Liefert [[tx,ty],…] oder null.
+   */
+  findPath(sx, sy, gx, gy, maxNodes = 6000, mask = 'friendly') {
+    if (!this.inBounds(sx, sy) || !this.inBounds(gx, gy)) return null;
     const W = this.w, start = sy * W + sx, goal = gy * W + gx;
+    let ok;
+    if (mask === 'friendly') {
+      if (this.navDirty || !this.nav) this.updateNav();
+      const nav = this.nav;
+      if (!nav[goal]) return null;
+      // Ziel in einer anderen Zusammenhangskomponente: gar nicht erst suchen
+      if (this.region[goal] !== this.regionNear(sx, sy)) return null;
+      ok = (x, y) => x >= 0 && y >= 0 && x < W && y < this.h && nav[y * W + x] === 1;
+    } else {
+      if (!this.passable(gx, gy, mask)) return null;
+      ok = (x, y) => this.passable(x, y, mask);
+    }
     if (start === goal) return [];
     const gen = this._searchBuffers();
     const heap = new MinHeap();
@@ -315,8 +394,8 @@ export class World {
         for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dy) continue;
           const nx = cx + dx, ny = cy + dy;
-          if (!this.walkable(nx, ny)) continue;
-          if (dx && dy && (!this.walkable(cx + dx, cy) || !this.walkable(cx, cy + dy))) continue;
+          if (!ok(nx, ny)) continue;
+          if (dx && dy && (!ok(cx + dx, cy) || !ok(cx, cy + dy))) continue;
           const ni = ny * W + nx;
           if (this._closed[ni] === gen) continue;
           const cost = this._g[cur] + (dx && dy ? 1.414 : 1) + (this.tiles[ni] === T.SHALLOW ? 0.6 : 0);
@@ -332,8 +411,24 @@ export class World {
     return null;
   }
 
+  /** Nächste begehbare Nachbarkachel eines Knotens (Arbeitsplatz davor), vom Punkt (fx,fy) aus gesehen. */
+  accessTile(tx, ty, fx, fy, mask = 'friendly') {
+    let best = null, bd = Infinity;
+    for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const x = tx + dx, y = ty + dy;
+      if (!this.passable(x, y, mask)) continue;
+      if (dx && dy && (!this.passable(tx + dx, ty, mask) && !this.passable(tx, ty + dy, mask))) continue;
+      const d = Math.hypot((x + 0.5) * TILE - fx, (y + 0.5) * TILE - fy) + (dx && dy ? 6 : 0);
+      if (d < bd) {
+        bd = d;
+        best = [x, y];
+      }
+    }
+    return best;
+  }
+
   /** Breitensuche zur nächsten Stelle, an der man Wasser schöpfen kann. */
-  findPathToWater(sx, sy, maxNodes = 5000) {
+  findPathToWater(sx, sy, maxNodes = 5000, mask = 'friendly') {
     if (!this.inBounds(sx, sy)) return null;
     const W = this.w, start = sy * W + sx;
     const gen = this._searchBuffers();
@@ -345,10 +440,10 @@ export class World {
     };
     for (let qi = 0; qi < queue.length && qi < maxNodes; qi++) {
       const cur = queue[qi], cx = cur % W, cy = (cur / W) | 0;
-      if (isSource(cx, cy) && this.inBounds(cx, cy)) return { path: this._reconstruct(cur, start), tx: cx, ty: cy };
+      if (isSource(cx, cy) && this.passable(cx, cy, mask)) return { path: this._reconstruct(cur, start), tx: cx, ty: cy };
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = cx + dx, ny = cy + dy;
-        if (!this.inBounds(nx, ny) || !this.walkable(nx, ny)) continue;
+        if (!this.passable(nx, ny, mask)) continue;
         const ni = ny * W + nx;
         if (this._stamp[ni] === gen) continue;
         this._stamp[ni] = gen;
@@ -363,8 +458,10 @@ export class World {
   /**
    * Dijkstra vom Zentrum aus über die ganze Karte. Gebäude sind „teuer", aber passierbar:
    * Gegner laufen um Mauern herum, wenn der Umweg kurz ist, sonst schlagen sie sich durch.
+   * Baumstämme und Felsen sind Hindernisse.
    */
   computeFlowField() {
+    this.nodesChanged = false;
     const W = this.w, H = this.h, n = W * H;
     if (!this.flow) this.flow = new Float32Array(n);
     const flow = this.flow, ba = this.buildingAt, tiles = this.tiles;
@@ -377,7 +474,9 @@ export class World {
         heap.push(i, 0);
       }
     }
-    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x];
+    const nodeAt = this.nodeAt, nodes = this.nodes;
+    const solidNode = (i) => nodeAt[i] >= 0 && !!nodeSolid(nodes[nodeAt[i]]);
+    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x] && !solidNode(y * W + x);
     while (heap.size) {
       const cur = heap.pop();
       if (closed[cur]) continue;
@@ -389,11 +488,11 @@ export class World {
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
           const ni = ny * W + nx;
-          if (closed[ni] || tiles[ni] === T.WATER) continue;
+          if (closed[ni] || tiles[ni] === T.WATER || solidNode(ni)) continue;
           if (dx && dy && (!free(cx + dx, cy) || !free(cx, cy + dy))) continue;
           let c = tiles[ni] === T.SHALLOW ? 1.8 : 1;
           const b = ba[ni];
-          if (b && b.type !== 'center') c += b.type === 'wall' ? 14 : 8;
+          if (b && b.type !== 'center') c += b.type === 'wall' ? 14 : b.type === 'gate' ? 12 : 8;
           const nd = flow[cur] + c * (dx && dy ? 1.414 : 1);
           if (nd < flow[ni]) {
             flow[ni] = nd;
@@ -409,34 +508,13 @@ export class World {
   }
 
   // ---------------------------------------------------------------- Kollision
-  /** Prüft, ob ein Kreis (als Box angenähert) an (x,y) mit Radius r feste Kacheln berührt. */
-  blocked(x, y, r, solid) {
-    const x0 = Math.floor((x - r) / TILE), x1 = Math.floor((x + r) / TILE);
-    const y0 = Math.floor((y - r) / TILE), y1 = Math.floor((y + r) / TILE);
-    for (let ty = y0; ty <= y1; ty++) {
-      for (let tx = x0; tx <= x1; tx++) {
-        if (solid(tx, ty)) return true;
-      }
-    }
-    return false;
+  /**
+   * Bewegt eine Entität (Kreis mit Radius r) mit Gleiten an Hindernissen; mask = 'friendly' | 'enemy' | 'animal'.
+   * Gibt true zurück, wenn etwas im Weg war.
+   */
+  moveEntity(e, dx, dy, r, mask) {
+    return moveCircle(this, e, dx, dy, mask, r);
   }
-
-  /** Bewegt eine Entität achsweise, gleitet an Hindernissen entlang. Gibt true zurück, wenn blockiert. */
-  moveEntity(e, dx, dy, r, solid) {
-    let hit = false;
-    if (dx !== 0) {
-      if (!this.blocked(e.x + dx, e.y, r, solid)) e.x += dx;
-      else hit = true;
-    }
-    if (dy !== 0) {
-      if (!this.blocked(e.x, e.y + dy, r, solid)) e.y += dy;
-      else hit = true;
-    }
-    return hit;
-  }
-
-  /** Standard-Solidität für freundliche Einheiten: nur tiefes Wasser blockiert. */
-  solidFriendly = (tx, ty) => !this.walkable(tx, ty);
 
   // ---------------------------------------------------------------- Rendering
   /** Gelände einmalig pixelgenau in ein Offscreen-Canvas rendern. */

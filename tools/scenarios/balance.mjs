@@ -13,9 +13,13 @@ export default async function (page) {
       }
       return out.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
     };
+    // Straßen (Achsen durch die Flamme) bleiben frei, damit Siedler überall hinkommen
+    const size = { hut: 2, farm: 2 };
+    const offRoad = (type, x, y) => { const s = size[type] || 1; return !(x <= cx && cx < x + s) && !(y <= cy && cy < y + s); };
     const tryPlace = (type, cands) => {
       for (const [x, y] of cands) {
-        if (B.canPlace(type, x, y).ok && B.canAfford(g, { ...{ hut: { wood: 20, stone: 5 }, farm: { wood: 14, water: 6 }, well: { stone: 12, wood: 4 }, wall: { stone: 4 }, tower: { wood: 20, stone: 18 } }[type] })) {
+        if (type !== 'gate' && !offRoad(type, x, y)) continue;
+        if (B.canPlace(type, x, y).ok && B.canAfford(g, B.costAt(type, x, y))) {
           return B.place(g, type, x, y);
         }
       }
@@ -23,6 +27,7 @@ export default async function (page) {
     };
     const towerSpots = ring(5, 7).filter(([x, y]) => (x + y) % 3 === 0).concat(ring(10, 12).filter(([x, y]) => (x + y) % 2 === 0));
     const wallSpots = ring(9, 9);
+    const gateSpots = wallSpots.filter(([x, y]) => x === cx || y === cy);
     const homeSpots = ring(2, 4);
     const bot = () => {
       const pop = g.settlers.list.length;
@@ -30,6 +35,7 @@ export default async function (page) {
       while (B.count('farm') < Math.max(1, Math.ceil(pop / 6)) && tryPlace('farm', ring(3, 8))) {}
       while (B.count('well') < Math.max(1, Math.ceil(pop / 7)) && tryPlace('well', ring(3, 8))) {}
       while (g.stock.wood > 40 && g.stock.stone > 30 && tryPlace('tower', towerSpots)) {}
+      while (g.stock.stone > 20 && tryPlace('gate', gateSpots)) {}
       while (g.stock.stone > 20 && tryPlace('wall', wallSpots)) {}
     };
     // Bot klinkt sich in die Ereignisse ein
@@ -37,7 +43,7 @@ export default async function (page) {
     const rows = [];
     let minCenter = 1e9;
     g.onDawn = (day) => {
-      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.list.length, huts: B.count('hut'), towers: B.count('tower'), walls: B.count('wall'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), kills: g.stats.kills, lost: g.stats.lost });
+      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.list.length, huts: B.count('hut'), towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), kills: g.stats.kills, lost: g.stats.lost });
       minCenter = 1e9;
       origDawn(day);
       bot();

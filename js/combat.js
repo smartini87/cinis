@@ -66,7 +66,7 @@ export function damageBuilding(game, b, dmg) {
     return;
   }
   // Schlafende Siedler fliehen aus dem einstürzenden Gebäude
-  for (const s of b.sleepers) game.settlers.wake(s, b);
+  for (const s of [...b.sleepers]) game.settlers.wake(s, b);
   b.sleepers.length = 0;
   game.ui.toast(`${BUILDING_DEFS[b.type].name} wurde zerstört!`, 'danger');
   game.buildings.remove(b);
@@ -78,7 +78,7 @@ export function damageUnit(game, u, dmg, kx = 0, ky = 0) {
   u.hp -= dmg;
   u.hurt = 0.15;
   u.lastHit = game.time;
-  game.world.moveEntity(u, kx, ky, u.r, game.world.solidFriendly);
+  game.world.moveEntity(u, kx, ky, u.r, 'friendly');
   game.effects.burst(u.x, u.y - 8, { n: 5, color: ['#a8322c', '#7a1c18'], speed: 35, life: 0.4 });
   if (u === game.player) {
     game.camera.addShake(3, 0.2);

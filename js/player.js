@@ -2,7 +2,7 @@
 
 import {
   TILE, RES, RES_KEYS, PLAYER_CAPACITY, PLAYER_REACH, DEPOSIT_RANGE, GATHER_TIME,
-  PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN,
+  PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid } from './sprites.js';
@@ -22,6 +22,8 @@ export class Player {
     this.y = y;
     this.r = 4;           // Kollisionsradius
     this.speed = 72;      // Welteinheiten pro Sekunde
+    this.vx = 0;          // aktuelle Geschwindigkeit (mit Beschleunigung/Abbremsung)
+    this.vy = 0;
     this.flip = false;
     this.walk = 0;        // Laufanimationsphase
     this.moving = false;
@@ -61,17 +63,26 @@ export class Player {
     // Langsame Heilung, wenn eine Weile kein Treffer kam
     if (game.time - this.lastHit > 5) this.hp = Math.min(this.maxHp, this.hp + 3 * dt);
     const ax = input.axis();
-    this.moving = ax.x !== 0 || ax.y !== 0;
-    if (this.moving) {
-      world.moveEntity(this, ax.x * this.speed * dt, ax.y * this.speed * dt, this.r, world.solidFriendly);
-      this.walk += dt * 12;
+    const steering = ax.x !== 0 || ax.y !== 0;
+    this.accelerate(ax.x * this.speed, ax.y * this.speed, steering ? PLAYER_ACCEL : PLAYER_DECEL, dt);
+    const sp = Math.hypot(this.vx, this.vy);
+    this.moving = sp > 8;
+    if (sp > 0.01) {
+      const ox = this.x, oy = this.y;
+      if (world.moveEntity(this, this.vx * dt, this.vy * dt, this.r, 'friendly')) {
+        // An der Wand bleibt nur der tatsächlich gefahrene (gleitende) Anteil der Geschwindigkeit erhalten
+        this.vx = (this.x - ox) / dt;
+        this.vy = (this.y - oy) / dt;
+      }
+    }
+    if (steering) {
       const l = Math.hypot(ax.x, ax.y);
       this.aimX = ax.x / l;
       this.aimY = ax.y / l;
       if (ax.x !== 0) this.flip = ax.x < 0;
-    } else {
-      this.walk = 0;
     }
+    if (this.moving) this.walk += dt * 12 * Math.min(1, sp / this.speed);
+    else this.walk = 0;
 
     this.target = this.findTarget(game);
     this.actionT -= dt;
@@ -82,6 +93,18 @@ export class Player {
     // Automatisch an der Ewigen Flamme abliefern
     const center = game.buildings.center;
     if (center && this.carried > 0 && game.buildings.distTo(center, this.x, this.y) < DEPOSIT_RANGE) this.deposit(game);
+  }
+
+  /** Geschwindigkeit mit begrenzter Beschleunigung an den Sollwert annähern. */
+  accelerate(tx, ty, rate, dt) {
+    const dx = tx - this.vx, dy = ty - this.vy, d = Math.hypot(dx, dy), max = rate * dt;
+    if (d <= max) {
+      this.vx = tx;
+      this.vy = ty;
+    } else {
+      this.vx += (dx / d) * max;
+      this.vy += (dy / d) * max;
+    }
   }
 
   /** Bestes Sammelziel bestimmen: Mauszeiger > Blickrichtung > nächstes Wasser. */
@@ -207,6 +230,7 @@ export class Player {
     this.hp = this.maxHp;
     this.x = c.x;
     this.y = c.y + 2 * TILE;
+    this.vx = this.vy = 0;
     this.lastHit = game.time;
     game.effects.burst(this.x, this.y - 8, { n: 16, color: ['#ffd36a', '#fff3c4'], speed: 40, life: 0.8, up: 30 });
   }
@@ -233,13 +257,14 @@ export class Player {
     }
   }
 
-  draw(ctx) {
+  /** Zeichnen; sil = Farbe für die Silhouette (hinter Gebäuden), dann ohne Waffe. */
+  draw(ctx, sil = null) {
     if (this.dead) return;
     drawHumanoid(ctx, this.x, this.y, {
-      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0,
+      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0, silhouette: sil,
       tunic: '#a8322c', skin: '#c99a6e', helmet: '#b8a04a', plume: '#c0392b', belt: '#6b4a2a',
     });
-    if (this.swing > 0) {
+    if (this.swing > 0 && !sil) {
       // Werkzeug-/Waffenschwung in Blickrichtung
       const base = Math.atan2(this.aimY, this.aimX);
       const a = base + (this.swing / 0.22 - 0.5) * 2.2 * (this.flip ? -1 : 1);

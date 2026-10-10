@@ -16,6 +16,7 @@ import { UI } from './ui.js';
 import { SoundEngine } from './audio.js';
 import { saveGame, loadGame, deleteSave } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
+import { SpatialHash, separateUnits, resolve } from './physics.js';
 
 class Game {
   constructor() {
@@ -32,6 +33,8 @@ class Game {
     this.state = 'menu';  // menu | tutorial | playing | paused | over
     this.speed = 1;       // Spieltempo (1×, 2×, 3×)
     this.saveT = 0;
+    this.unitHash = new SpatialHash(32);
+    this.flowT = 0;
     buildSprites();
     this.audio = new SoundEngine();
     this.effects = new Effects();
@@ -250,16 +253,28 @@ class Game {
   update(dt) {
     this.time += dt;
     this.cycle.update(dt, this);
-    if (this.buildings.changed) {
+    // Flussfeld sofort bei Gebäudeänderungen; Baum/Fels-Änderungen nur, solange Gegner unterwegs sind,
+    // und höchstens alle 4 s (gefällte Bäume ändern die Wege kaum)
+    this.flowT -= dt;
+    const foes = this.enemies.list.length > 0;
+    if (this.buildings.changed || (this.world.nodesChanged && foes && this.flowT <= 0)) {
+      if (this.buildings.changed) this.ejectUnits();
       this.world.computeFlowField();
       this.buildings.changed = false;
+      this.flowT = 4;
     }
-    this.world.updateNodes(dt);
+    // Nachwachsen 4× pro Sekunde reicht
+    this.nodeT = (this.nodeT || 0) + dt;
+    if (this.nodeT >= 0.25) {
+      this.world.updateNodes(this.nodeT);
+      this.nodeT = 0;
+    }
     this.player.update(dt, this);
     this.buildings.update(dt, this);
     this.settlers.update(dt, this);
     this.enemies.update(dt, this);
     this.combat.update(dt, this);
+    this.separateAll();
     this.ambientEffects(dt);
     this.effects.update(dt);
     this.camera.follow(this.player.x, this.player.y - 8, dt);
@@ -269,6 +284,25 @@ class Game {
       this.saveT = 0;
       saveGame(this);
     }
+  }
+
+  /** Nach einer Belegungsänderung: Einheiten aus neu gebauten Gebäuden an den Rand schieben. */
+  ejectUnits() {
+    const w = this.world, p = this.player;
+    if (!p.dead) resolve(w, p, p.r, 'friendly');
+    for (const s of this.settlers.list) if (!s.hidden) resolve(w, s, s.r, 'friendly');
+    for (const e of this.enemies.list) if (!e.dead) resolve(w, e, e.r, 'enemy');
+  }
+
+  /** Alle Einheiten auseinanderschieben (Spieler schwer, Gegner nach Größe). */
+  separateAll() {
+    const units = this._units || (this._units = []);
+    units.length = 0;
+    const p = this.player;
+    if (!p.dead) units.push({ e: p, mask: 'friendly', mass: 3 });
+    for (const s of this.settlers.list) if (!s.hidden) units.push({ e: s, mask: 'friendly', mass: 1 });
+    for (const e of this.enemies.list) if (!e.dead) units.push({ e, mask: 'enemy', mass: e.r * e.r * 0.1 });
+    separateUnits(this.world, units, this.unitHash);
   }
 
   /** Atmosphäre: Glut über der Flamme, treibende Ascheflocken, Staub beim Laufen. */
@@ -348,15 +382,17 @@ class Game {
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const n = world.nodeAtTile(tx, ty);
-        if (n && !n.removed) list.push({ y: n.y + 4, draw: () => drawNode(ctx, n) });
+        if (n && !n.removed) list.push({ y: n.y + 4, draw: () => drawNode(ctx, n), occ: n.type === 'tree' && n.amount > 0 ? [n.x - 10, n.y - 22, 20, 22] : null });
       }
     }
     this.buildings.collectDrawables(list, ctx, camera, this.time);
     this.settlers.collectDrawables(list, ctx, camera, this.time);
     this.enemies.collectDrawables(list, ctx, camera, this.time);
-    list.push({ y: this.player.y, draw: () => this.player.draw(ctx) });
+    const p = this.player;
+    if (!p.dead) list.push({ y: p.y, draw: () => p.draw(ctx), unit: [p.x - 5, p.y - 19, 10, 19], sil: () => p.draw(ctx, '#fff3c4') });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
+    this.drawOccluded(ctx, list);
     this.combat.draw(ctx);
     this.effects.drawParticles(ctx);
 
@@ -379,6 +415,31 @@ class Game {
       ctx.font = '14px monospace';
       ctx.fillText(`${this.fps.toFixed(0)} FPS`, 10, this.canvas.height - 10);
     }
+  }
+
+  /**
+   * Figuren, die hinter einem Gebäude oder Baum stehen, scheinen als dezente Silhouette durch –
+   * so verschwindet niemand hinter Hütten oder Türmen.
+   */
+  drawOccluded(ctx, list) {
+    const occs = [];
+    for (let i = 0; i < list.length; i++) if (list[i].occ) occs.push(i);
+    if (!occs.length) return;
+    ctx.globalAlpha = 0.38;
+    for (let i = 0; i < list.length; i++) {
+      const u = list[i];
+      if (!u.unit) continue;
+      const [ux, uy, uw, uh] = u.unit;
+      for (const j of occs) {
+        if (j <= i) continue; // nur später (davor) gezeichnete Objekte verdecken
+        const [ox, oy, ow, oh] = list[j].occ;
+        if (ux < ox + ow && ux + uw > ox && uy < oy + oh && uy + uh > oy) {
+          u.sil();
+          break;
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Virtueller Joystick bei Touch-Bedienung. */

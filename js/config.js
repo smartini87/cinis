@@ -22,6 +22,8 @@ export const START_STOCK = { wood: 15, stone: 10, food: 20, water: 20 };
 
 // Spieler
 export const PLAYER_CAPACITY = 30;   // maximale Traglast
+export const PLAYER_ACCEL = 700;     // Beschleunigung (Welteinheiten/s²)
+export const PLAYER_DECEL = 1000;    // Abbremsen ohne Eingabe
 export const PLAYER_REACH = 22;      // Reichweite für Sammeln (Welteinheiten)
 export const DEPOSIT_RANGE = 20;     // Abstand zur Flamme, ab dem automatisch abgeliefert wird
 /** Sammelintervall pro Zieltyp in Sekunden */

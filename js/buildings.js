@@ -4,7 +4,7 @@
 import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE } from './config.js';
 import { dist } from './util.js';
 import { T } from './world.js';
-import { Sprites, drawFlame, drawCrops, drawBallista } from './sprites.js';
+import { Sprites, drawFlame, drawCrops, drawBallista, drawGate } from './sprites.js';
 
 export const BUILDING_DEFS = {
   center: { name: 'Ewige Flamme', size: 3, hp: 1200, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
@@ -13,8 +13,9 @@ export const BUILDING_DEFS = {
   well: { name: 'Brunnen', size: 1, hp: 150, cost: { stone: 12, wood: 4 }, key: '3', desc: 'Fördert stetig Wasser ins Lager.' },
   wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
   tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
+  gate: { name: 'Tor', size: 1, hp: 420, cost: { wood: 8, stone: 6 }, key: '6', desc: 'Eigene Leute gehen hindurch, Gegner nicht. Lässt sich in Mauern setzen.' },
 };
-export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower'];
+export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate'];
 
 export const WELL_INTERVAL = 9;    // Sekunden pro Wasser
 export const CENTER_BEDS = 3;      // Schlafplätze/Siedlerplätze der Flamme
@@ -42,8 +43,9 @@ export class Buildings {
       hp: def.hp, maxHp: def.hp,
       x: (tx + def.size / 2) * TILE, y: (ty + def.size / 2) * TILE,
       flash: 0, timer: 0, growth: 0, worker: null, aim: -Math.PI / 2, cooldown: 0, recoil: 0,
-      sleepers: [],
+      sleepers: [], rot: 0, open: 0,
     };
+    if (type === 'gate') b.rot = this.gateRotation(tx, ty);
     this.setTiles(b, b);
     this.list.push(b);
     if (type === 'center') this.center = b;
@@ -52,6 +54,7 @@ export class Buildings {
   }
 
   setTiles(b, value) {
+    this.world.navDirty = true;
     for (let y = b.ty; y < b.ty + b.size; y++) {
       for (let x = b.tx; x < b.tx + b.size; x++) this.world.buildingAt[this.world.idx(x, y)] = value;
     }
@@ -77,6 +80,41 @@ export class Buildings {
     const x0 = b.tx * TILE, y0 = b.ty * TILE, x1 = x0 + b.size * TILE, y1 = y0 + b.size * TILE;
     const dx = Math.max(x0 - x, 0, x - x1), dy = Math.max(y0 - y, 0, y - y1);
     return Math.hypot(dx, dy);
+  }
+
+  /**
+   * Zugangspunkt: nächste begehbare Kachel direkt am Gebäuderand (von (fx,fy) aus gesehen).
+   * Siedler arbeiten, liefern und schlafen dort – nie im Gebäude. Liefert [tx,ty] oder null.
+   */
+  accessPoint(b, fx, fy) {
+    const w = this.world;
+    let best = null, bd = Infinity;
+    for (let y = b.ty - 1; y <= b.ty + b.size; y++) {
+      for (let x = b.tx - 1; x <= b.tx + b.size; x++) {
+        const edgeX = x === b.tx - 1 || x === b.tx + b.size, edgeY = y === b.ty - 1 || y === b.ty + b.size;
+        if (!edgeX && !edgeY) continue;
+        if (edgeX && edgeY) continue; // Ecken: diagonal am Gebäude vorbei ist kein echter Zugang
+        if (!w.passable(x, y, 'friendly')) continue;
+        const d = Math.hypot((x + 0.5) * TILE - fx, (y + 0.5) * TILE - fy);
+        if (d < bd) {
+          bd = d;
+          best = [x, y];
+        }
+      }
+    }
+    return best;
+  }
+
+  /** Tor-Ausrichtung nach den Nachbarmauern: 0 = Mauer läuft waagerecht, 1 = senkrecht. */
+  gateRotation(tx, ty) {
+    const w = this.world;
+    const isWall = (x, y) => {
+      const o = w.inBounds(x, y) ? w.buildingAt[w.idx(x, y)] : null;
+      return !!o && (o.type === 'wall' || o.type === 'gate');
+    };
+    if (isWall(tx - 1, ty) || isWall(tx + 1, ty)) return 0;
+    if (isWall(tx, ty - 1) || isWall(tx, ty + 1)) return 1;
+    return 0;
   }
 
   // ---------------------------------------------------------------- Kosten
@@ -113,13 +151,24 @@ export class Buildings {
         if (!w.inBounds(x, y)) return { ok: false, reason: 'Außerhalb der Karte' };
         const t = w.tileAt(x, y);
         if (t === T.WATER || t === T.SHALLOW) return { ok: false, reason: 'Nicht im Wasser bauen' };
-        if (w.buildingAt[w.idx(x, y)]) return { ok: false, reason: 'Platz ist belegt' };
+        const occ = w.buildingAt[w.idx(x, y)];
+        if (occ && !(type === 'gate' && occ.type === 'wall')) return { ok: false, reason: 'Platz ist belegt' };
         const n = w.nodeAtTile(x, y);
         if (n && !n.removed && (n.amount > 0 || n.type === 'rock')) return { ok: false, reason: `${n.type === 'tree' ? 'Baum' : n.type === 'rock' ? 'Trümmer' : 'Strauch'} im Weg – erst abbauen` };
       }
     }
     if (!this.inTerritory(tx, ty, size)) return { ok: false, reason: 'Zu weit von der Siedlung entfernt' };
     return { ok: true, reason: '' };
+  }
+
+  /** Kosten am Bauplatz: Ein Tor in einer Mauer kostet nur die Differenz. */
+  costAt(type, tx, ty) {
+    const cost = BUILDING_DEFS[type].cost;
+    const occ = this.world.inBounds(tx, ty) ? this.world.buildingAt[this.world.idx(tx, ty)] : null;
+    if (type !== 'gate' || !occ || occ.type !== 'wall') return cost;
+    const out = {};
+    for (const k of RES_KEYS) if (cost[k]) out[k] = Math.max(0, cost[k] - (BUILDING_DEFS.wall.cost[k] || 0));
+    return out;
   }
 
   place(game, type, tx, ty) {
@@ -130,12 +179,15 @@ export class Buildings {
       game.audio.play('error');
       return null;
     }
-    if (!this.canAfford(game, def.cost)) {
+    const cost = this.costAt(type, tx, ty);
+    if (!this.canAfford(game, cost)) {
       game.ui.toast(`Nicht genug Ressourcen für ${def.name}.`, 'warn', 'afford');
       game.audio.play('error');
       return null;
     }
-    this.pay(game, def.cost);
+    this.pay(game, cost);
+    const old = this.world.buildingAt[this.world.idx(tx, ty)];
+    if (old) this.remove(old); // Mauer wird durch das Tor ersetzt
     // Stümpfe/leere Sträucher unter dem Bauplatz verschwinden
     for (let y = ty; y < ty + def.size; y++) {
       for (let x = tx; x < tx + def.size; x++) {
@@ -194,7 +246,7 @@ export class Buildings {
     const size = BUILDING_DEFS[this.selected].size;
     const tx = Math.round(wx / TILE - size / 2), ty = Math.round(wy / TILE - size / 2);
     const chk = this.canPlace(this.selected, tx, ty);
-    const afford = this.canAfford(game, BUILDING_DEFS[this.selected].cost);
+    const afford = this.canAfford(game, this.costAt(this.selected, tx, ty));
     this.ghost = { tx, ty, ok: chk.ok && afford, reason: chk.ok ? (afford ? '' : 'Nicht genug Ressourcen') : chk.reason };
     const tileKey = ty * this.world.w + tx;
     // Mauern lassen sich bei gedrückter Maustaste ziehen
@@ -215,6 +267,7 @@ export class Buildings {
       // Siedler reparieren tagsüber beschädigte Gebäude (abstrahiert als Regeneration)
       if (sunny && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
       if (b.type === 'tower') this.updateTower(b, dt, game);
+      if (b.type === 'gate') this.updateGate(b, dt, game);
       if (b.type === 'well') {
         b.timer += dt;
         if (b.timer >= WELL_INTERVAL) {
@@ -224,6 +277,16 @@ export class Buildings {
         }
       }
     }
+  }
+
+  /** Tor öffnet sich, wenn eigene Leute in der Nähe sind (rein optisch – passierbar ist es für sie immer). */
+  updateGate(b, dt, game) {
+    const near = (u) => Math.abs(u.x - b.x) < 18 && Math.abs(u.y - b.y) < 18;
+    let want = !game.player.dead && near(game.player);
+    if (!want) for (const s of game.settlers.list) if (!s.hidden && near(s)) { want = true; break; }
+    const prev = b.open;
+    b.open = Math.max(0, Math.min(1, b.open + (want ? dt : -dt) * 5));
+    if (prev === 0 && b.open > 0 && game.camera.visible(b.x, b.y, 1, 1, 0)) game.audio.play('gate', 0.35);
   }
 
   /** Ballistenturm: nächsten Gegner in Reichweite anvisieren und Bolzen feuern. */
@@ -258,7 +321,22 @@ export class Buildings {
       const x = b.tx * TILE, y = b.ty * TILE, s = b.size * TILE;
       if (!cam.visible(x, y - 40, s, s + 40)) continue;
       // Farmen liegen flach am Boden und werden zuerst gezeichnet
-      out.push({ y: b.type === 'farm' ? y : y + s - 2, draw: () => this.drawBuilding(ctx, b, time) });
+      const flat = b.type === 'farm';
+      const h = flat ? 0 : this.spriteHeight(b);
+      out.push({ y: flat ? y : y + s - 2, draw: () => this.drawBuilding(ctx, b, time), occ: flat ? null : [x - 2, y + s - h, s + 4, h] });
+    }
+  }
+
+  /** Sichtbare Höhe des Gebäude-Sprites über der Unterkante (für Verdeckung). */
+  spriteHeight(b) {
+    switch (b.type) {
+      case 'center': return Sprites.center.height - 6 + 16;
+      case 'hut': return Sprites.hut.height - 2;
+      case 'well': return Sprites.well.height - 2;
+      case 'wall': return Sprites.wall.height - 1;
+      case 'tower': return Sprites.tower.height - 2;
+      case 'gate': return 24;
+      default: return b.size * TILE;
     }
   }
 
@@ -302,6 +380,9 @@ export class Buildings {
         ctx.drawImage(Sprites.tower, x - 2, bottom - Sprites.tower.height + 2);
         drawBallista(ctx, x + 8, bottom - 30, b.aim, b.recoil);
         break;
+      case 'gate':
+        drawGate(ctx, x, bottom, b.rot, b.open);
+        break;
     }
     if (b.spawn > 0) ctx.restore();
     if (b.flash > 0) {
@@ -336,7 +417,7 @@ export class Buildings {
       return;
     }
     const def = BUILDING_DEFS[this.selected];
-    const fake = { ...g, type: this.selected, size: def.size, hp: 1, maxHp: 1, growth: 0, aim: -Math.PI / 2, recoil: 0 };
+    const fake = { ...g, type: this.selected, size: def.size, hp: 1, maxHp: 1, growth: 0, aim: -Math.PI / 2, recoil: 0, open: 0, rot: this.selected === 'gate' ? this.gateRotation(g.tx, g.ty) : 0 };
     ctx.globalAlpha = 0.6;
     this.drawBuilding(ctx, fake, time);
     ctx.globalAlpha = 1;

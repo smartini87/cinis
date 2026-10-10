@@ -146,6 +146,11 @@ export class SoundEngine {
         this.tone(90, 0.18, { vol: v(0.4), slide: 55 });
         this.noise(0.2, { vol: v(0.25), freq: 700, type: 'lowpass' });
         break;
+      case 'gate':
+        // knarrende Torflügel
+        this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });
+        this.noise(0.12, { vol: v(0.08), freq: 900, q: 4 });
+        break;
       case 'demolish':
         this.noise(0.35, { vol: v(0.35), freq: 500, type: 'lowpass', slide: 150 });
         break;

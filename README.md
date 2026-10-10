@@ -24,7 +24,7 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 |---|---|---|
 | Bewegen | WASD / Pfeiltasten | linke Bildschirmseite ziehen (Joystick) |
 | Sammeln & angreifen | Leertaste, E oder linke Maustaste **halten** (zielt auf den Mauszeiger) | Ziel antippen und halten |
-| Gebäude wählen | 1 – 5 oder Klick auf die Bauleiste | Bauleiste antippen |
+| Gebäude wählen | 1 – 6 oder Klick auf die Bauleiste | Bauleiste antippen |
 | Gebäude setzen | Linksklick (Mauern: Maustaste halten und ziehen) | Bauplatz antippen |
 | Bauen abbrechen | Rechtsklick oder Esc | Gebäude in der Bauleiste erneut antippen |
 | Abriss (50 % zurück) | X, dann Gebäude anklicken | „Abriss“ antippen, dann Gebäude |
@@ -56,8 +56,9 @@ Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lag
 | 1 | Hütte (2×2) | 20 Holz, 5 Stein | +2 Siedlerplätze, nachts Schutz für 2 Siedler |
 | 2 | Farm (2×2) | 14 Holz, 6 Wasser | Ein Siedler baut Nahrung an (4 pro Ernte) |
 | 3 | Brunnen | 4 Holz, 12 Stein | +1 Wasser alle 9 s |
-| 4 | Mauer | 4 Stein | 320 LP, hält Gegner auf; eigene Leute gehen durch (Tore) |
+| 4 | Mauer | 4 Stein | 320 LP, blockiert alle – Gegner, Siedler und dich |
 | 5 | Turm | 20 Holz, 18 Stein | Ballista, 6 Felder Reichweite |
+| 6 | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; auf eine Mauer gesetzt ersetzt es sie (zahlt nur die Differenz) |
 
 Gebaut werden kann im Umkreis von 12 Feldern um die Flamme und 6 Feldern um jedes andere Gebäude. Tagsüber reparieren die Siedler beschädigte Gebäude automatisch.
 
@@ -91,7 +92,7 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 ## Getroffene Annahmen (Designentscheidungen)
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
 - **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und einziges Lager. Ressourcen zählen erst nach dem Abliefern.
-- **Tore statt Türen:** Eigene Einheiten passieren alle eigenen Gebäude, auch Mauern. Gegner nicht. Das hält die Wegfindung robust und Mauern trotzdem sinnvoll.
+- **Kollision:** Alle Figuren haben kreisförmige Hitboxen und gleiten an Hindernissen entlang. Gebäude, Mauern, Baumstämme und Felsen blockieren jeden – auch den Spieler und die Siedler. Nur **Tore** lassen eigene Leute durch, Gegner nicht. Siedler arbeiten, liefern und schlafen an einem Zugangspunkt am Gebäuderand und betreten Gebäude nie. Wer hinter einem Gebäude oder Baum steht, scheint als Silhouette durch.
 - **Sofortbau:** Gebäude stehen sofort, ohne Bauphase. Reparatur ist als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s).
 - **Nur Siedler essen und trinken.** Die Spielfigur hat keine Bedürfnisse, regeneriert aber Leben, wenn sie eine Weile nicht getroffen wurde.
 - **Siedler-Zuzug:** höchstens ein neuer Siedler pro Morgen, gegen Nahrung und nur bei freiem Platz.
