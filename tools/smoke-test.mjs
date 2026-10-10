@@ -28,8 +28,12 @@ for (const k of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
 }
 const scenario = process.argv[2];
 if (scenario) {
-  const mod = await import(pathToFileURL(path.resolve(scenario)).href);
-  await mod.default(page, { outDir, errors });
+  try {
+    const mod = await import(pathToFileURL(path.resolve(scenario)).href);
+    await mod.default(page, { outDir, errors });
+  } catch (e) {
+    errors.push(`[szenario] ${e.message}`);
+  }
 }
 await page.screenshot({ path: path.join(outDir, 'screenshot.png') });
 const fps = await page.evaluate(() => window.__game && Math.round(window.__game.fps));

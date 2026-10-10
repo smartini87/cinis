@@ -1,7 +1,8 @@
 // buildings.js – Gebäudedefinitionen, Bausystem (Vorschau, Platzierung, Abriss), Belegungsraster,
 // Produktion (Brunnen) und Zeichnen. Das Zentrum (Ewige Flamme) ist das Lager der Siedlung.
 
-import { TILE, RES, RES_KEYS } from './config.js';
+import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE } from './config.js';
+import { dist } from './util.js';
 import { T } from './world.js';
 import { Sprites, drawFlame, drawCrops, drawBallista } from './sprites.js';
 
@@ -207,9 +208,13 @@ export class Buildings {
 
   // ---------------------------------------------------------------- Simulation
   update(dt, game) {
+    const sunny = game.cycle.isSunny;
     for (const b of this.list) {
       if (b.flash > 0) b.flash -= dt;
       if (b.spawn > 0) b.spawn -= dt;
+      // Siedler reparieren tagsüber beschädigte Gebäude (abstrahiert als Regeneration)
+      if (sunny && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
+      if (b.type === 'tower') this.updateTower(b, dt, game);
       if (b.type === 'well') {
         b.timer += dt;
         if (b.timer >= WELL_INTERVAL) {
@@ -219,6 +224,31 @@ export class Buildings {
         }
       }
     }
+  }
+
+  /** Ballistenturm: nächsten Gegner in Reichweite anvisieren und Bolzen feuern. */
+  updateTower(b, dt, game) {
+    b.cooldown -= dt;
+    if (b.recoil > 0) b.recoil = Math.max(0, b.recoil - dt * 20);
+    if (b.cooldown > 0) return;
+    let best = null, bd = TOWER.range;
+    for (const e of game.enemies.list) {
+      if (e.dead) continue;
+      const d = dist(b.x, b.y, e.x, e.y);
+      if (d < bd) {
+        bd = d;
+        best = e;
+      }
+    }
+    if (!best) {
+      b.cooldown = 0.2;
+      return;
+    }
+    b.aim = Math.atan2(best.y - 6 - (b.y - 22), best.x - b.x);
+    game.combat.fireBolt(b.x, b.y - 22, best, TOWER.damage, TOWER.boltSpeed);
+    b.cooldown = TOWER.cooldown;
+    b.recoil = 3;
+    if (game.camera.visible(b.x, b.y, 1, 1, 64)) game.audio?.play('bolt', 0.4);
   }
 
   // ---------------------------------------------------------------- Rendering

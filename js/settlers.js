@@ -137,6 +137,10 @@ export class Settlers {
     const i = this.list.indexOf(s);
     if (i >= 0) this.list.splice(i, 1);
     if (s.farm) s.farm.worker = null;
+    if (s.home) {
+      const j = s.home.sleepers.indexOf(s);
+      if (j >= 0) s.home.sleepers.splice(j, 1);
+    }
     game.effects.burst(s.x, s.y - 6, { n: 16, color: ['#8a1c1c', '#5a5048', '#3b3634'], speed: 50, life: 0.8 });
     game.ui.toast(`${s.name} ist ${how}.`, 'danger');
     game.audio?.play('death');
@@ -211,6 +215,8 @@ export class Settlers {
   /** Nächste Aufgabe für einen untätigen Siedler wählen. */
   chooseTask(s, game) {
     const { buildings, stock } = game;
+    // 0) Nachts oder bei Gefahr: Schutz suchen
+    if (this.shouldShelter(s, game)) return this.goShelter(s, game);
     // 1) Bedürfnisse
     if ((s.hunger < SETTLER.needAt && stock.food > 0) || (s.thirst < SETTLER.needAt && stock.water > 0)) {
       return this.goTo(s, game, { type: 'eat' }, buildings.center.tx + 1, buildings.center.ty + 1);
@@ -306,8 +312,76 @@ export class Settlers {
     return false;
   }
 
+  /** Nacht (bzw. kurz davor) oder Gegner in der Nähe? */
+  shouldShelter(s, game) {
+    const c = game.cycle;
+    if (c.isNight || (c.isEvening && c.timeToNight < 12)) return true;
+    return this.enemyNear(s.x, s.y, game, 5 * TILE);
+  }
+
+  enemyNear(x, y, game, r) {
+    for (const e of game.enemies.list) if (!e.dead && Math.abs(e.x - x) < r && Math.abs(e.y - y) < r && dist(e.x, e.y, x, y) < r) return true;
+    return false;
+  }
+
+  /** Nächste Hütte mit freiem Bett, sonst die Ewige Flamme. */
+  findShelter(s, game) {
+    let best = game.buildings.center, bd = Infinity;
+    for (const h of game.buildings.ofType('hut')) {
+      const incoming = this.list.filter((o) => o !== s && o.task && o.task.type === 'shelter' && o.task.home === h).length;
+      if (h.sleepers.length + incoming >= BUILDING_DEFS.hut.beds) continue;
+      const d = dist(s.x, s.y, h.x, h.y);
+      if (d < bd) {
+        bd = d;
+        best = h;
+      }
+    }
+    // Die Flamme ist näher? Dann lieber dorthin (kurzer Weg ist sicherer)
+    const c = game.buildings.center;
+    if (best !== c && dist(s.x, s.y, c.x, c.y) < bd * 0.6) best = c;
+    return best;
+  }
+
+  goShelter(s, game) {
+    this.release(s);
+    const home = this.findShelter(s, game);
+    if (!home) return false;
+    return this.goTo(s, game, { type: 'shelter', home }, home.tx + (home.size >> 1), home.ty + home.size - 1);
+  }
+
+  /** Siedler verlässt seine Unterkunft. */
+  wake(s, b) {
+    s.hidden = false;
+    s.home = null;
+    s.task = null;
+    s.path = null;
+    if (b) {
+      const i = b.sleepers.indexOf(s);
+      if (i >= 0) b.sleepers.splice(i, 1);
+      s.x = b.x + (Math.random() - 0.5) * b.size * TILE * 0.6;
+      s.y = (b.ty + b.size) * TILE + 4;
+    }
+  }
+
   updateSettler(s, dt, game) {
-    if (s.hidden) return;
+    if (s.hidden) {
+      // Morgens (und wenn keine Gegner nahe sind) wieder herauskommen
+      s.checkT = (s.checkT || 0) - dt;
+      if (s.checkT <= 0) {
+        s.checkT = 0.5 + Math.random() * 0.5;
+        if (!this.shouldShelter(s, game) && !this.enemyNear(s.x, s.y, game, 8 * TILE)) this.wake(s, s.home);
+      }
+      return;
+    }
+    // Gefahr/Nacht unterbricht jede Arbeit
+    s.checkT = (s.checkT || 0) - dt;
+    if (s.checkT <= 0) {
+      s.checkT = 0.3;
+      if ((!s.task || s.task.type !== 'shelter') && this.shouldShelter(s, game)) {
+        this.goShelter(s, game);
+        return;
+      }
+    }
     if (!s.task) {
       this.chooseTask(s, game);
       return;
@@ -332,6 +406,20 @@ export class Settlers {
       case 'gather':
         this.doGather(s, t, dt, game);
         break;
+      case 'shelter': {
+        const h = t.home;
+        if (h.dead) {
+          s.task = null;
+          break;
+        }
+        if (s.carry && h.type === 'center') this.doDeliver(s, game);
+        s.hidden = true;
+        s.home = h;
+        s.task = null;
+        s.path = null;
+        h.sleepers.push(s);
+        break;
+      }
       case 'water':
         s.timer += dt;
         if (s.timer >= SETTLER.workTime * 0.8) {

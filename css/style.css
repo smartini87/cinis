@@ -135,3 +135,32 @@ html, body {
   .focus-panel { top: 150px; width: 110px; }
   .fbtn { font-size: 10px; padding: 1px 4px; }
 }
+
+/* ---------------------------------------------------------------- Tag/Nacht, Flamme, LP */
+.day-panel { top: 10px; left: 50%; transform: translateX(-50%); width: min(420px, 60vw); text-align: center; }
+.day-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.day-num { font-size: 19px; font-weight: bold; color: #ffd36a; letter-spacing: 1px; white-space: nowrap; }
+.day-phase { font-size: 13px; color: #d9cba8; }
+.day-phase.evening { color: #f0a53a; }
+.day-phase.night { color: #ff8a70; }
+.cycle { position: relative; display: flex; height: 6px; margin: 5px 0; border: 1px solid #000; }
+.cycle-day { background: linear-gradient(90deg, #c08a4a, #e8c86a 20%, #e8c86a 80%, #c06a3a); }
+.cycle-night { background: #1d2346; }
+.cycle-mark { position: absolute; top: -3px; width: 3px; height: 12px; background: #fff; box-shadow: 0 0 4px #fff; transform: translateX(-1px); }
+.flame-row { display: flex; align-items: center; gap: 6px; }
+.flame-row .bar, .hp-panel .bar { flex: 1; margin: 0; height: 9px; }
+.flame-bar .fill { background: linear-gradient(#f0a53a, #b8401c); }
+.flame-bar .fill.low { animation: pulse 0.8s infinite; }
+.flame-txt, .hp-txt { font-size: 12px; min-width: 38px; text-align: right; }
+.icon.small { width: 16px; height: 16px; }
+.hp-panel { left: 10px; bottom: 82px; width: 220px; display: flex; align-items: center; gap: 6px; }
+.hp-bar .fill { background: linear-gradient(#e0604a, #8a1c1c); }
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+@media (max-width: 640px) {
+  .day-panel { top: auto; bottom: 92px; width: 70vw; padding: 3px 6px; }
+  .day-num { font-size: 14px; }
+  .day-phase { font-size: 10px; }
+  .hp-panel { bottom: auto; top: 64px; left: auto; right: 10px; width: 150px; }
+  .hint { bottom: 150px; }
+}

@@ -1,6 +1,9 @@
 // player.js – der Spieler: Bewegung, Zielwahl, Sammeln, Inventar und Abliefern an der Flamme.
 
-import { TILE, RES, RES_KEYS, PLAYER_CAPACITY, PLAYER_REACH, DEPOSIT_RANGE, GATHER_TIME } from './config.js';
+import {
+  TILE, RES, RES_KEYS, PLAYER_CAPACITY, PLAYER_REACH, DEPOSIT_RANGE, GATHER_TIME,
+  PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN,
+} from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid } from './sprites.js';
 import { dist } from './util.js';
@@ -29,6 +32,12 @@ export class Player {
     this.actionT = 0;     // Abklingzeit bis zur nächsten Aktion
     this.swing = 0;       // Restdauer der Schwunganimation
     this.target = null;   // aktuelles Sammelziel
+    this.hp = PLAYER_HP;
+    this.maxHp = PLAYER_HP;
+    this.hurt = 0;
+    this.lastHit = -99;
+    this.dead = false;
+    this.respawnT = 0;
   }
 
   get tx() {
@@ -43,6 +52,14 @@ export class Player {
 
   update(dt, game) {
     const { input, world } = game;
+    if (this.hurt > 0) this.hurt -= dt;
+    if (this.dead) {
+      this.respawnT -= dt;
+      if (this.respawnT <= 0) this.respawn(game);
+      return;
+    }
+    // Langsame Heilung, wenn eine Weile kein Treffer kam
+    if (game.time - this.lastHit > 5) this.hp = Math.min(this.maxHp, this.hp + 3 * dt);
     const ax = input.axis();
     this.moving = ax.x !== 0 || ax.y !== 0;
     if (this.moving) {
@@ -125,6 +142,8 @@ export class Player {
       const w = camera.screenToWorld(input.mouse.x, input.mouse.y);
       this.faceTowards(w.x, w.y);
     }
+    // Kampf hat Vorrang vor dem Sammeln
+    if (this.attack(game, viaMouse && input.mouse.inside)) return;
     const t = this.target;
     if (!t) return;
     this.faceTowards(t.x, t.y);
@@ -145,6 +164,49 @@ export class Player {
     this.actionT = GATHER_TIME[kind];
     effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 5, color: CHIP_COLORS[kind], speed: 45, life: 0.5, up: 35 });
     effects.text(t.x, t.y - 14, `+1 ${RES[res].name}`, RES[res].color);
+  }
+
+  /** Schwerthieb: trifft alle Gegner im Bogen vor dem Spieler. Liefert true, wenn Gegner in Reichweite. */
+  attack(game, aimedByMouse) {
+    const foes = game.enemies.list.filter((e) => !e.dead && dist(this.x, this.y, e.x, e.y) <= PLAYER_ATTACK_RANGE + e.r);
+    if (!foes.length) return false;
+    if (!aimedByMouse) {
+      foes.sort((a, b) => dist(this.x, this.y, a.x, a.y) - dist(this.x, this.y, b.x, b.y));
+      this.faceTowards(foes[0].x, foes[0].y);
+    }
+    let hits = 0;
+    for (const e of foes) {
+      const d = Math.max(1, dist(this.x, this.y, e.x, e.y));
+      const dot = ((e.x - this.x) * this.aimX + (e.y - this.y) * this.aimY) / d;
+      if (dot > 0.25 || d < 10) {
+        game.enemies.hit(e, PLAYER_DAMAGE, game, this.aimX * 6, this.aimY * 6);
+        hits++;
+      }
+    }
+    this.actionT = PLAYER_ATTACK_TIME;
+    game.audio?.play(hits ? 'hit' : 'swing');
+    return true;
+  }
+
+  die(game) {
+    this.dead = true;
+    this.hp = 0;
+    this.respawnT = PLAYER_RESPAWN;
+    const lost = this.carried;
+    for (const k of RES_KEYS) this.inv[k] = 0;
+    game.effects.burst(this.x, this.y - 8, { n: 24, color: ['#a8322c', '#b8a04a', '#7a1c18'], speed: 60, life: 0.9 });
+    game.ui.toast(`Du bist gefallen!${lost ? ` ${lost} getragene Ressourcen sind verloren.` : ''}`, 'danger');
+    game.audio?.play('death');
+  }
+
+  respawn(game) {
+    const c = game.buildings.center;
+    this.dead = false;
+    this.hp = this.maxHp;
+    this.x = c.x;
+    this.y = c.y + 2 * TILE;
+    this.lastHit = game.time;
+    game.effects.burst(this.x, this.y - 8, { n: 16, color: ['#ffd36a', '#fff3c4'], speed: 40, life: 0.8, up: 30 });
   }
 
   faceTowards(x, y) {
@@ -169,8 +231,9 @@ export class Player {
   }
 
   draw(ctx) {
+    if (this.dead) return;
     drawHumanoid(ctx, this.x, this.y, {
-      flip: this.flip, walk: this.moving ? this.walk : 0,
+      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0,
       tunic: '#a8322c', skin: '#c99a6e', helmet: '#b8a04a', plume: '#c0392b', belt: '#6b4a2a',
     });
     if (this.swing > 0) {
@@ -180,10 +243,13 @@ export class Player {
       ctx.save();
       ctx.translate(Math.round(this.x), Math.round(this.y - 8));
       ctx.rotate(a);
+      // Gladius: Griff + Klinge
       ctx.fillStyle = '#6b4a2a';
-      ctx.fillRect(2, -1, 7, 2);
-      ctx.fillStyle = '#c8ccd0';
-      ctx.fillRect(8, -2, 4, 4);
+      ctx.fillRect(2, -1, 3, 2);
+      ctx.fillStyle = '#b8a04a';
+      ctx.fillRect(5, -2, 1, 4);
+      ctx.fillStyle = '#d8dce0';
+      ctx.fillRect(6, -1, 8, 2);
       ctx.restore();
     }
   }

@@ -4,7 +4,9 @@ import { RES, RES_KEYS } from './config.js';
 import { iconURL, buildingPreviewURL } from './sprites.js';
 import { BUILDING_DEFS, BUILDABLE } from './buildings.js';
 import { FOCI } from './settlers.js';
-import { SETTLER } from './config.js';
+import { SETTLER, WIN_NIGHTS } from './config.js';
+import { DAY_LEN, CYCLE } from './time.js';
+import { fmtTime } from './util.js';
 
 /** Kurzhelfer zum Erzeugen von DOM-Elementen. */
 function el(tag, cls, parent, html) {
@@ -62,6 +64,28 @@ export class UI {
       });
       this.focusBtns[f.id] = b;
     }
+    // Tag/Nacht + Zustand der Flamme (oben Mitte)
+    const day = el('div', 'panel day-panel', hud);
+    const top = el('div', 'day-top', day);
+    this.dayEl = el('span', 'day-num', top);
+    this.phaseEl = el('span', 'day-phase', top);
+    const cyc = el('div', 'cycle', day);
+    el('div', 'cycle-day', cyc).style.width = `${(DAY_LEN / CYCLE) * 100}%`;
+    el('div', 'cycle-night', cyc).style.width = `${(1 - DAY_LEN / CYCLE) * 100}%`;
+    this.cycleMark = el('div', 'cycle-mark', cyc);
+    const flame = el('div', 'flame-row', day);
+    const fimg = el('img', 'icon small', flame);
+    fimg.src = iconURL('flame');
+    fimg.alt = 'Flamme';
+    this.flameBar = el('div', 'fill', el('div', 'bar flame-bar', flame));
+    this.flameTxt = el('span', 'flame-txt', flame);
+    // Lebenspunkte des Spielers
+    const hp = el('div', 'panel hp-panel', hud);
+    const himg = el('img', 'icon small', hp);
+    himg.src = iconURL('heart');
+    himg.alt = 'Leben';
+    this.hpBar = el('div', 'fill', el('div', 'bar hp-bar', hp));
+    this.hpTxt = el('span', 'hp-txt', hp);
     // Traglast
     const carry = el('div', 'panel carry-panel', hud);
     el('div', 'lbl', carry, 'Getragen');
@@ -126,6 +150,24 @@ export class UI {
     const parts = RES_KEYS.filter((k) => p.inv[k] > 0).map((k) => `${p.inv[k]} ${RES[k].name}`);
     this.set('carryT', this.carryTxt, `${c}/${p.capacity}` + (parts.length ? ' · ' + parts.join(', ') : ''));
     this.set('hint', this.hint, this.contextHint());
+    // Tag/Nacht
+    const cy = g.cycle;
+    this.set('day', this.dayEl, `Tag ${Math.min(cy.day, WIN_NIGHTS)} / ${WIN_NIGHTS}`);
+    let phase;
+    if (cy.isNight) phase = `Nacht · Morgengrauen in ${fmtTime(cy.timeToDawn)} · ${g.enemies.list.length + g.enemies.queue.length} Feinde`;
+    else if (cy.isEvening) phase = `Dämmerung · Nacht in ${fmtTime(cy.timeToNight)}`;
+    else phase = `Tag · Nacht in ${fmtTime(cy.timeToNight)}`;
+    this.set('phase', this.phaseEl, phase);
+    this.set('phaseCls', this.phaseEl, 'day-phase' + (cy.isNight ? ' night' : cy.isEvening ? ' evening' : ''), 'className');
+    this.set('mark', this.cycleMark.style, `${cy.progress * 100}%`, 'left');
+    const ctr = g.buildings.center;
+    const ck = ctr ? Math.max(0, ctr.hp / ctr.maxHp) : 0;
+    this.set('flameW', this.flameBar.style, `${ck * 100}%`, 'width');
+    this.set('flameT', this.flameTxt, `${Math.ceil(ck * 100)} %`);
+    this.set('flameCls', this.flameBar, 'fill' + (ck < 0.35 ? ' low' : ''), 'className');
+    // Spieler-LP
+    this.set('hpW', this.hpBar.style, `${(p.hp / p.maxHp) * 100}%`, 'width');
+    this.set('hpT', this.hpTxt, p.dead ? 'gefallen' : `${Math.ceil(p.hp)}`);
     const st = g.settlers;
     this.set('pop', this.popEl, `${st.list.length}/${st.capacity(g)}`);
     const needy = st.list.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;
@@ -146,6 +188,8 @@ export class UI {
     const g = this.game, p = g.player, touch = g.input.usingTouch;
     const key = touch ? 'Tippen' : '[Leertaste/Klick]';
     const bs = g.buildings;
+    if (g.over) return '';
+    if (p.dead) return `Du bist gefallen – Rückkehr an der Flamme in ${Math.ceil(p.respawnT)} s`;
     if (bs.selected === 'demolish') return touch ? 'Gebäude antippen zum Abreißen' : 'Gebäude anklicken zum Abreißen · Rechtsklick/Esc: beenden';
     if (bs.selected) {
       const def = BUILDING_DEFS[bs.selected];
@@ -153,6 +197,7 @@ export class UI {
       return touch ? `${def.name} – zum Bauen tippen` : `${def.name} – Klick: bauen${bs.selected === 'wall' ? ' (ziehen für Reihen)' : ''} · Rechtsklick/Esc: abbrechen`;
     }
     if (p.carried >= p.capacity) return 'Voll beladen – zurück zur Ewigen Flamme, um abzuliefern.';
+    if (g.enemies.list.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 40)) return `${key} Angreifen`;
     const t = p.target;
     if (t) {
       if (t.kind === 'water') return `${key} Wasser schöpfen`;

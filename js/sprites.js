@@ -458,3 +458,103 @@ export function buildingPreviewURL(type) {
   g.drawImage(spr, Math.round(20 - w / 2), Math.round(38 - h), Math.round(w), Math.round(h));
   return c.toDataURL();
 }
+
+// ------------------------------------------------------------------ Gegner
+/**
+ * Zeichnet einen Gegner mit Füßen bei (e.x, e.y).
+ * e: { type, flip, walk, hurt, attack (0..1 Ausholbewegung), burn }
+ */
+export function drawEnemy(ctx, e, time) {
+  const x = Math.round(e.x), y = Math.round(e.y);
+  const f = e.flip ? -1 : 1;
+  const white = e.hurt > 0;
+  const R = (rx, ry, w, h, c) => {
+    ctx.fillStyle = white ? '#ffffff' : c;
+    ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
+  };
+  const step = Math.round(Math.sin(e.walk) * 1.5);
+  const lunge = e.attack > 0 ? Math.round(Math.sin(e.attack * Math.PI) * 3) : 0;
+  const eye = e.burn ? '#ffe08a' : '#ff7a2a';
+  switch (e.type) {
+    case 'walker': {
+      // Aschgänger: gebückte, aschgraue Gestalt mit glühenden Augen
+      R(-4, -1, 8, 2, 'rgba(0,0,0,0.3)');
+      R(-3, -5, 2, 5 + Math.max(0, step), '#4a4542');
+      R(1, -5, 2, 5 + Math.max(0, -step), '#4a4542');
+      R(-4 + lunge, -12, 8, 8, '#3b3634');
+      R(-4 + lunge, -12, 8, 1, '#5a5450');
+      R(2 + lunge, -10, 4 + lunge, 2, '#8a8580');
+      R(-5 + lunge, -9, 2, 4, '#8a8580');
+      R(-2 + lunge * 1.3, -16, 6, 5, '#8a8580');
+      R(1 + lunge * 1.3, -15, 1, 1, eye);
+      R(3 + lunge * 1.3, -15, 1, 1, eye);
+      R(-2 + lunge, -7, 1, 2, '#b8401c');
+      break;
+    }
+    case 'dog': {
+      // Ruinenhund: niedrig, dunkel, schnell
+      R(-5, -1, 11, 2, 'rgba(0,0,0,0.3)');
+      R(-5, -4, 2, 3 + Math.max(0, step), '#2c2622');
+      R(-2, -4, 2, 3 + Math.max(0, -step), '#2c2622');
+      R(2, -4, 2, 3 + Math.max(0, step), '#2c2622');
+      R(4, -4, 2, 3 + Math.max(0, -step), '#2c2622');
+      R(-6, -8, 12, 5, '#4a3a30');
+      R(-6, -8, 12, 1, '#5e4a3c');
+      R(-8, -9, 3, 2, '#4a3a30');
+      R(4 + lunge, -11, 5, 5, '#4a3a30');
+      R(5 + lunge, -13, 2, 2, '#3b2e26');
+      R(7 + lunge, -10, 1, 1, eye);
+      R(8 + lunge, -8, 2, 1, '#e8e2d4');
+      break;
+    }
+    case 'brute': {
+      // Aschkoloss: massig, mit glühenden Rissen
+      R(-7, -1, 14, 3, 'rgba(0,0,0,0.35)');
+      R(-5, -6, 4, 6 + Math.max(0, step), '#3b3634');
+      R(1, -6, 4, 6 + Math.max(0, -step), '#3b3634');
+      R(-7 + lunge, -18, 14, 13, '#4a4542');
+      R(-7 + lunge, -18, 14, 2, '#6a6460');
+      R(-3 + lunge, -14, 1, 6, '#e8742a');
+      R(2 + lunge, -15, 1, 4, '#e8742a');
+      R(-1 + lunge, -10, 4, 1, '#e8742a');
+      R(-10 + lunge, -16, 3, 9, '#5a5450');
+      R(7 + lunge * 2, -16, 4, 9, '#5a5450');
+      R(7 + lunge * 2, -8, 5, 4, '#6a6460');
+      R(-3 + lunge, -23, 7, 6, '#5a5450');
+      R(1 + lunge, -21, 2, 1, eye);
+      break;
+    }
+    case 'boss': {
+      // Prätor der Asche: gerüstet, roter Umhang, Lorbeerkranz aus Glut
+      R(-9, -1, 18, 3, 'rgba(0,0,0,0.4)');
+      R(-8, -22, 4, 20, '#7a1c18');
+      R(-6, -7, 4, 7 + Math.max(0, step), '#2c2622');
+      R(2, -7, 4, 7 + Math.max(0, -step), '#2c2622');
+      R(-6 + lunge, -22, 12, 15, '#3b3634');
+      R(-6 + lunge, -22, 12, 3, '#8a7a4a');
+      R(-6 + lunge, -12, 12, 2, '#8a7a4a');
+      R(-2 + lunge, -19, 4, 6, '#b8401c');
+      R(6 + lunge * 2, -21, 3, 10, '#4a4542');
+      // Schwert
+      R(8 + lunge * 2, -30 + lunge, 2, 18, '#9aa0a6');
+      R(6 + lunge * 2, -13 + lunge, 6, 2, '#8a7a4a');
+      R(-4 + lunge, -29, 9, 7, '#6a6460');
+      R(-5 + lunge, -31, 11, 2, (time * 4) % 2 < 1 ? '#f0a53a' : '#e8742a');
+      R(1 + lunge, -27, 1, 1, '#ffe08a');
+      R(3 + lunge, -27, 1, 1, '#ffe08a');
+      break;
+    }
+  }
+}
+
+/** Ballista-Bolzen */
+export function drawBolt(ctx, x, y, angle) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.rotate(angle);
+  ctx.fillStyle = '#8d6240';
+  ctx.fillRect(-5, 0, 7, 1);
+  ctx.fillStyle = '#d8d4ca';
+  ctx.fillRect(2, -1, 2, 3);
+  ctx.restore();
+}

@@ -340,6 +340,55 @@ export class World {
     return null;
   }
 
+  // ---------------------------------------------------------------- Flussfeld (Gegner)
+  /**
+   * Dijkstra vom Zentrum aus über die ganze Karte. Gebäude sind „teuer", aber passierbar:
+   * Gegner laufen um Mauern herum, wenn der Umweg kurz ist, sonst schlagen sie sich durch.
+   */
+  computeFlowField() {
+    const W = this.w, H = this.h, n = W * H;
+    if (!this.flow) this.flow = new Float32Array(n);
+    const flow = this.flow, ba = this.buildingAt, tiles = this.tiles;
+    flow.fill(Infinity);
+    const closed = new Uint8Array(n);
+    const heap = new MinHeap();
+    for (let i = 0; i < n; i++) {
+      if (ba[i] && ba[i].type === 'center') {
+        flow[i] = 0;
+        heap.push(i, 0);
+      }
+    }
+    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x];
+    while (heap.size) {
+      const cur = heap.pop();
+      if (closed[cur]) continue;
+      closed[cur] = 1;
+      const cx = cur % W, cy = (cur / W) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const ni = ny * W + nx;
+          if (closed[ni] || tiles[ni] === T.WATER) continue;
+          if (dx && dy && (!free(cx + dx, cy) || !free(cx, cy + dy))) continue;
+          let c = tiles[ni] === T.SHALLOW ? 1.8 : 1;
+          const b = ba[ni];
+          if (b && b.type !== 'center') c += b.type === 'wall' ? 14 : 8;
+          const nd = flow[cur] + c * (dx && dy ? 1.414 : 1);
+          if (nd < flow[ni]) {
+            flow[ni] = nd;
+            heap.push(ni, nd);
+          }
+        }
+      }
+    }
+  }
+
+  flowAt(tx, ty) {
+    return this.inBounds(tx, ty) && this.flow ? this.flow[ty * this.w + tx] : Infinity;
+  }
+
   // ---------------------------------------------------------------- Kollision
   /** Prüft, ob ein Kreis (als Box angenähert) an (x,y) mit Radius r feste Kacheln berührt. */
   blocked(x, y, r, solid) {
