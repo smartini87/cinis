@@ -22,7 +22,10 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `camera.js` | Kamera, ganzzahliger Pixel-Zoom, Welt↔Bildschirm |
 | `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, Kollision, Gelände-Rendering |
 | `sprites.js` | Prozedurale Pixel-Grafik (Offscreen-Canvases) + Figuren-Zeichner |
-| `player.js` | Spielerfigur |
+| `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
+| `buildings.js` | Gebäudedefinitionen, Belegungsraster (`world.buildingAt`), Zeichnen |
+| `particles.js` | Partikel + schwebende Texte (`game.effects`) |
+| `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`) |
 
 ## Konventionen
 - Welteinheiten: 1 Kachel = `TILE` (16) Weltpixel; Entitäten haben `x,y` = Fußpunkt in Welteinheiten.

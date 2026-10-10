@@ -216,6 +216,40 @@ export class World {
     if (this.nodeAt[node.ty * this.w + node.tx] === node.id) this.nodeAt[node.ty * this.w + node.tx] = -1;
   }
 
+  /** Ressource abbauen; liefert die tatsächlich entnommene Menge. */
+  harvest(node, amount) {
+    const take = Math.min(amount, node.amount);
+    node.amount -= take;
+    node.shake = 0.2;
+    if (node.amount <= 0) {
+      node.timer = 0;
+      if (node.type === 'rock') this.removeNode(node);
+    }
+    return take;
+  }
+
+  /** Nachwachsen von Bäumen (aus Stümpfen) und Früchten. */
+  updateNodes(dt) {
+    for (const n of this.nodes) {
+      if (n.removed) continue;
+      if (n.shake > 0) n.shake -= dt;
+      const def = NODE_DEFS[n.type];
+      if (n.type === 'tree' && n.amount <= 0) {
+        n.timer += dt;
+        if (n.timer >= def.regrow) {
+          n.amount = n.max;
+          n.timer = 0;
+        }
+      } else if (n.type === 'bush' && n.amount < n.max) {
+        n.timer += dt;
+        if (n.timer >= def.regrow) {
+          n.amount++;
+          n.timer = 0;
+        }
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- Kollision
   /** Prüft, ob ein Kreis (als Box angenähert) an (x,y) mit Radius r feste Kacheln berührt. */
   blocked(x, y, r, solid) {

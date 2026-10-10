@@ -28,3 +28,59 @@ html, body {
   inset: 0;
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------------- HUD */
+.hud { position: absolute; inset: 0; }
+
+.panel {
+  position: absolute;
+  background: rgba(24, 20, 17, 0.82);
+  border: 2px solid #6b5533;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 220, 150, 0.08);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 15px;
+}
+
+.icon { width: 24px; height: 24px; image-rendering: pixelated; vertical-align: middle; }
+
+.res-panel { top: 10px; left: 10px; display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+.res-row { display: flex; align-items: center; gap: 8px; }
+.res-row .val { font-weight: bold; font-size: 18px; min-width: 38px; text-align: right; color: #f5e7c6; }
+.res-row .lbl { color: #b9a988; font-size: 13px; }
+
+.carry-panel { left: 10px; bottom: 10px; width: 220px; }
+.carry-panel .lbl { font-size: 12px; color: #b9a988; text-transform: uppercase; letter-spacing: 1px; }
+.bar { height: 8px; background: #2c2622; border: 1px solid #000; margin: 4px 0; }
+.bar .fill { height: 100%; width: 0; background: linear-gradient(#d9b25a, #a8792c); transition: width 0.15s; }
+.carry-txt { font-size: 13px; }
+
+.hint {
+  position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+  color: #f5e7c6; font-size: 15px; text-shadow: 0 1px 2px #000, 0 0 6px #000; white-space: nowrap;
+}
+
+.toasts {
+  position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(90vw, 560px);
+}
+.toast {
+  background: rgba(24, 20, 17, 0.9); border-left: 4px solid #d9b25a; padding: 7px 14px;
+  font-size: 15px; border-radius: 3px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: toastIn 0.25s ease-out; transition: opacity 0.5s, transform 0.5s; text-align: center;
+}
+.toast.warn { border-color: #e0a030; }
+.toast.danger { border-color: #d0402a; color: #ffd7cc; }
+.toast.good { border-color: #6fbf5a; }
+.toast.out { opacity: 0; transform: translateY(-8px); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } }
+
+@media (max-width: 640px) {
+  .panel { font-size: 13px; padding: 4px 7px; }
+  .res-panel { min-width: 0; }
+  .res-row .lbl { display: none; }
+  .res-row .val { font-size: 15px; min-width: 28px; }
+  .icon { width: 18px; height: 18px; }
+  .carry-panel { width: 150px; }
+  .hint { font-size: 13px; bottom: 96px; white-space: normal; text-align: center; width: 90vw; }
+}

@@ -157,6 +157,47 @@ function makeIcon(kind) {
   return c;
 }
 
+// ------------------------------------------------------------------ Gebäude
+function makeCenter() {
+  // Ruine eines Rundtempels (Tholos) mit großer Bronzeschale – die Ewige Flamme
+  const [c, g] = canvas(52, 60);
+  // Stufen
+  px(g, 2, 50, 48, 8, '#8e8a80');
+  px(g, 4, 48, 44, 3, '#b9b4a8');
+  px(g, 2, 50, 48, 1, '#d8d4ca');
+  px(g, 2, 54, 48, 1, '#6f6b63');
+  px(g, 2, 57, 48, 1, '#5a5650');
+  // Innenraum (Schatten)
+  px(g, 6, 22, 40, 26, '#3b3634');
+  px(g, 6, 44, 40, 4, '#2c2826');
+  // Säulen (einige abgebrochen)
+  const heights = [26, 26, 18, 26, 26, 12, 26];
+  for (let i = 0; i < 7; i++) {
+    const x = 5 + i * 7, h = heights[i];
+    px(g, x, 48 - h, 4, h, '#d8d4ca');
+    px(g, x + 3, 48 - h, 1, h, '#a8a498');
+    px(g, x + 1, 48 - h, 1, h, '#ece8de');
+    px(g, x - 1, 47, 6, 2, '#b9b4a8');
+    if (h === 26) px(g, x - 1, 21, 6, 2, '#c3beb2');
+  }
+  // Gebälk (teilweise eingestürzt)
+  px(g, 3, 16, 14, 5, '#c3beb2');
+  px(g, 24, 16, 26, 5, '#c3beb2');
+  px(g, 3, 16, 14, 1, '#ece8de');
+  px(g, 24, 16, 26, 1, '#ece8de');
+  for (let x = 4; x < 50; x += 4) if (x < 17 || x > 24) px(g, x, 18, 2, 1, '#8e8a80');
+  // Bronzeschale auf Sockel
+  px(g, 22, 34, 8, 14, '#8e8a80');
+  px(g, 23, 34, 2, 14, '#b9b4a8');
+  px(g, 16, 28, 20, 6, '#8a5a2a');
+  px(g, 17, 33, 18, 2, '#6a4420');
+  px(g, 16, 28, 20, 1, '#c08a4a');
+  // Trümmer davor
+  px(g, 40, 52, 7, 3, '#c3beb2');
+  px(g, 6, 53, 5, 2, '#b9b4a8');
+  return c;
+}
+
 /** Alle statischen Sprites erzeugen (einmalig beim Start). */
 export function buildSprites() {
   Sprites.pine = [0, 1, 2].map(makePine);
@@ -165,6 +206,7 @@ export function buildSprites() {
   Sprites.rock = [0, 1, 2].map(makeRock);
   Sprites.bush = makeBush(true);
   Sprites.bushEmpty = makeBush(false);
+  Sprites.center = makeCenter();
   Sprites.icons = {};
   for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
 }
@@ -238,5 +280,27 @@ export function drawHumanoid(ctx, x, y, o) {
     const col = { wood: '#8d6240', stone: '#b9b4a8', food: '#7a3266', water: '#3f86c0' }[o.carry];
     R(-3, -22 - bob, 6, 4, col);
     R(-3, -22 - bob, 6, 1, 'rgba(255,255,255,0.35)');
+  }
+}
+
+/** Animierte Flamme (Spitze bei x,y-Basis); size skaliert, t = Zeit. */
+export function drawFlame(ctx, x, y, size, t) {
+  x = Math.round(x);
+  y = Math.round(y);
+  const layers = [
+    ['#b8401c', 1.0],
+    ['#e8742a', 0.75],
+    ['#f0a53a', 0.5],
+    ['#ffe08a', 0.28],
+  ];
+  for (const [col, k] of layers) {
+    ctx.fillStyle = col;
+    const h = Math.round(size * 2.2 * k);
+    for (let i = 0; i < h; i++) {
+      const prog = i / h;
+      const w = Math.max(1, Math.round(size * k * (1 - prog) * (0.85 + 0.15 * Math.sin(t * 9 + i))));
+      const sway = Math.round(Math.sin(t * 6 + i * 0.5) * prog * 2);
+      ctx.fillRect(x - w + sway, y - i, w * 2, 1);
+    }
   }
 }
