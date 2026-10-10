@@ -7,6 +7,7 @@
 import { TILE, RES } from './config.js';
 import { T } from './world.js';
 import { drawShadow } from './sprites.js';
+import { resolve, moveCircle, placeOnFreeTile } from './physics.js';
 import { damageUnit } from './combat.js';
 import { dist } from './util.js';
 
@@ -20,10 +21,10 @@ const TERRITORY = 13 * TILE;   // jagdbare Tiere und Wölfe meiden den Kern der 
  */
 export const ANIMAL_DEFS = {
   rabbit: { name: 'Hase', cls: 'game', hp: 8, speed: 30, run: 84, r: 3, flee: 4.5 * TILE, drop: { food: 2 }, biome: ['grass', 'dry'], time: 'day', group: [1, 2], cap: 7, h: 7 },
-  deer: { name: 'Hirsch', cls: 'game', hp: 36, speed: 26, run: 96, r: 5, flee: 7 * TILE, drop: { food: 6, hide: 1 }, biome: ['grass'], time: 'day', group: [3, 5], cap: 9, herd: true, h: 15 },
-  goat: { name: 'Ziege', cls: 'game', hp: 24, speed: 24, run: 72, r: 4, flee: 5 * TILE, drop: { food: 4, hide: 1 }, biome: ['dry', 'dirt', 'ash'], time: 'day', group: [2, 3], cap: 5, herd: true, h: 11 },
-  boar: { name: 'Wildschwein', cls: 'neutral', hp: 60, speed: 20, run: 128, r: 5, dmg: 12, drop: { food: 5, hide: 2 }, biome: ['grass', 'dirt', 'dry'], time: 'day', group: [1, 2], cap: 3, h: 10 },
-  wolf: { name: 'Wolf', cls: 'hostile', hp: 42, speed: 36, run: 68, r: 4, dmg: 6, cd: 1.1, drop: { hide: 2 }, biome: ['grass', 'dry', 'dirt', 'ash'], time: 'night', group: [3, 4], cap: 8, h: 10 },
+  deer: { name: 'Hirsch', cls: 'game', hp: 36, speed: 26, run: 96, r: 4.5, flee: 7 * TILE, drop: { food: 6, hide: 1 }, biome: ['grass'], time: 'day', group: [3, 5], cap: 9, herd: true, h: 15 },
+  goat: { name: 'Ziege', cls: 'game', hp: 24, speed: 24, run: 72, r: 3.5, flee: 5 * TILE, drop: { food: 4, hide: 1 }, biome: ['dry', 'dirt', 'ash'], time: 'day', group: [2, 3], cap: 5, herd: true, h: 11 },
+  boar: { name: 'Wildschwein', cls: 'neutral', hp: 60, speed: 20, run: 128, r: 4.5, dmg: 12, drop: { food: 5, hide: 2 }, biome: ['grass', 'dirt', 'dry'], time: 'day', group: [1, 2], cap: 3, h: 10 },
+  wolf: { name: 'Wolf', cls: 'hostile', hp: 42, speed: 36, run: 68, r: 3.5, dmg: 6, cd: 1.1, drop: { hide: 2 }, biome: ['grass', 'dry', 'dirt', 'ash'], time: 'night', group: [3, 4], cap: 8, h: 10 },
   pigeon: { cls: 'deco', kind: 'bird', biome: ['ruin', 'dirt'], time: 'day', group: [2, 4], cap: 8, color: ['#8a8a96', '#b4b4c0', '#6a6a78'] },
   crow: { cls: 'deco', kind: 'bird', biome: ['ruin', 'ash', 'dry'], time: 'dayDusk', group: [2, 3], cap: 6, color: ['#2a2626', '#3e3838', '#151313'] },
   gull: { cls: 'deco', kind: 'bird', biome: ['shore'], time: 'day', group: [1, 3], cap: 4, color: ['#ecebe6', '#ffffff', '#8a8a90'] },
@@ -150,12 +151,18 @@ export class Wildlife {
       a.z = def.kind === 'bird' ? 0 : 18 + Math.random() * 10;
     }
     if (def.kind === 'insect' || def.kind === 'dragonfly' || def.kind === 'firefly') a.z = 5 + Math.random() * 6;
+    // Landtiere nie in Hindernissen (Baumstamm, Fels, Gebäude) beginnen lassen
+    if (this.world && def.cls !== 'deco') {
+      placeOnFreeTile(this.world, a, 'animal');
+      resolve(this.world, a, a.r, 'animal');
+    }
     this.list.push(a);
     return a;
   }
 
   // ---------------------------------------------------------------- Simulation
   update(dt, game) {
+    this.world = game.world;
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
       this.spawnT = 0.4;
@@ -189,6 +196,8 @@ export class Wildlife {
 
   updateOne(a, dt, game) {
     if (a.alpha < 1) a.alpha = Math.min(1, a.alpha + dt);
+    if (a.def.cls !== 'deco') this.watchdog(a, dt, game);
+    if (a.restT > 0) a.restT -= dt;
     if (a.hurt > 0) a.hurt -= dt;
     if (Math.abs(a.kvx) + Math.abs(a.kvy) > 1) {
       game.world.moveEntity(a, a.kvx * dt, a.kvy * dt, a.r, 'animal');
@@ -203,13 +212,70 @@ export class Wildlife {
     else this.updateGame(a, dt, game);
   }
 
+  /**
+   * Wächter gegen Festhängen: Will ein Landtier laufen, kommt aber 1 s nicht vom Fleck, weicht es in eine freie
+   * Richtung aus; gibt es keine, duckt es sich und wartet (kein weiterer Laufversuch).
+   */
+  watchdog(a, dt, game) {
+    a.wdT = (a.wdT || 0) + dt;
+    if (a.wdT < 0.5) return;
+    const moved = Math.hypot(a.x - (a.wdX ?? a.x), a.y - (a.wdY ?? a.y)), wants = a.walk !== a.wdWalk;
+    a.wdT = 0;
+    a.wdX = a.x;
+    a.wdY = a.y;
+    a.wdWalk = a.walk;
+    a.wdStuck = wants && moved < 1.5 ? (a.wdStuck || 0) + 0.5 : 0;
+    if (a.wdStuck < 1) return;
+    a.wdStuck = 0;
+    // Schon kürzlich ausgewichen und wieder festgefahren: dann lieber eine Weile stehen bleiben
+    const again = game.time - (a.wdLast || -99) < 4;
+    a.wdLast = game.time;
+    const esc = again ? null : this.escape(a, game);
+    if (esc) {
+      a.esc = esc;
+      if (a.state === 'wander') {
+        a.tx = a.x + esc.x * 30;
+        a.ty = a.y + esc.y * 30;
+      }
+    } else {
+      a.state = 'idle';
+      a.t = 0;
+      a.restT = 3;
+      a.esc = null;
+      if (a.pack) a.pack.target = null;
+    }
+  }
+
   /** Bewegt ein Landtier in Richtung (dx,dy) mit Tempo sp; liefert true bei Hindernis. */
   move(a, dx, dy, sp, dt, game) {
     const d = Math.hypot(dx, dy);
-    if (d < 0.5) return false;
+    if (d < 0.5 || a.restT > 0) return false;
     a.walk += dt * sp * 0.25;
     if (Math.abs(dx) > 0.3) a.flip = dx < 0;
-    return game.world.moveEntity(a, (dx / d) * sp * dt, (dy / d) * sp * dt, a.r, 'animal');
+    const ox = a.x, oy = a.y;
+    const hit = game.world.moveEntity(a, (dx / d) * sp * dt, (dy / d) * sp * dt, a.r, 'animal');
+    // Festgefahren? (kaum Bewegung trotz Laufwunsch) – Verhaltensroutinen suchen dann einen anderen Weg
+    if (Math.hypot(a.x - ox, a.y - oy) < sp * dt * 0.3) a.blockedT = (a.blockedT || 0) + dt;
+    else a.blockedT = 0;
+    return hit;
+  }
+
+  /**
+   * Ausweichrichtung, wenn ein Tier festhängt: von zwölf Richtungen die, in der eine Probebewegung am weitesten
+   * kommt. Kommt es nirgends voran (Dickicht), bleibt es stehen (null).
+   */
+  escape(a, game) {
+    let best = null, bd = 3;
+    for (let i = 0; i < 12; i++) {
+      const ang = (i / 12) * Math.PI * 2 + Math.random() * 0.3, probe = { x: a.x, y: a.y };
+      moveCircle(game.world, probe, Math.cos(ang) * 14, Math.sin(ang) * 14, 'animal', a.r);
+      const d = Math.hypot(probe.x - a.x, probe.y - a.y);
+      if (d > bd) {
+        bd = d;
+        best = { x: Math.cos(ang), y: Math.sin(ang), t: 0.6 };
+      }
+    }
+    return best;
   }
 
   /** Nächste Bedrohung (Spieler, Siedler, Gegner, für Beutetiere auch Wölfe) im Umkreis r. */
@@ -293,9 +359,21 @@ export class Wildlife {
         dx += ox;
         dy += oy;
       }
-      if (this.move(a, dx, dy, def.run, dt, game)) {
-        // Hindernis: zur Seite ausweichen
+      if (a.esc && a.esc.t > 0) {
+        a.esc.t -= dt;
+        this.move(a, a.esc.x, a.esc.y, def.run, dt, game);
+      } else if (this.move(a, dx, dy, def.run, dt, game)) {
+        // Hindernis: zur Seite ausweichen; hängt es fest, eine freie Richtung suchen
         this.move(a, -dy, dx, def.run * 0.8, dt, game);
+        if (a.blockedT > 0.6) {
+          a.esc = this.escape(a, game);
+          if (!a.esc) {
+            // eingekeilt: Tier duckt sich und wartet
+            a.state = 'idle';
+            a.t = 0;
+            a.blockedT = 0;
+          }
+        }
       }
       if (d > def.flee * 1.6 || a.t > 5) {
         a.state = 'idle';
@@ -316,7 +394,7 @@ export class Wildlife {
     }
     // Wandern
     const dx = a.tx - a.x, dy = a.ty - a.y;
-    if (Math.hypot(dx, dy) < 3 || a.t > 6 || this.move(a, dx, dy, def.speed, dt, game)) {
+    if (Math.hypot(dx, dy) < 3 || a.t > 6 || (this.move(a, dx, dy, def.speed, dt, game) && a.blockedT > 0.3)) {
       a.state = 'idle';
       a.t = 0;
       a.phase = Math.random() * 10;
@@ -431,14 +509,24 @@ export class Wildlife {
         a.state = 'leave';
         a.t = 0;
       }
-      const dx = a.x - (c ? c.x : a.x), dy = a.y - (c ? c.y : a.y);
-      this.move(a, dx || 1, dy, def.run, dt, game);
+      if (a.blockedT > 0.6 && !(a.esc && a.esc.t > 0)) a.esc = this.escape(a, game) || { x: 0, y: 0, t: 1 };
+      if (a.esc && a.esc.t > 0) {
+        a.esc.t -= dt;
+        this.move(a, a.esc.x, a.esc.y, def.run, dt, game);
+      } else {
+        const dx = a.x - (c ? c.x : a.x), dy = a.y - (c ? c.y : a.y);
+        this.move(a, dx || 1, dy, def.run, dt, game);
+      }
       if (a.t > 10) a.dead = true;
       return;
     }
     // Licht meiden: aus dem Schein der Flamme und der Feuer heraus
     if (game.lightAt(a.x, a.y) > 0.35 && c) {
-      this.move(a, a.x - c.x, a.y - c.y, def.run, dt, game);
+      if (a.blockedT > 0.6) a.esc = this.escape(a, game);
+      if (a.esc && a.esc.t > 0 && (a.esc.x || a.esc.y)) {
+        a.esc.t -= dt;
+        this.move(a, a.esc.x, a.esc.y, def.run, dt, game);
+      } else this.move(a, a.x - c.x, a.y - c.y, def.run, dt, game);
       if (pack) {
         pack.target = null;
         pack.cooldown = Math.max(pack.cooldown, 4);
@@ -476,7 +564,17 @@ export class Wildlife {
         if (pack) pack.target = null;
         return;
       }
+      if (a.esc && a.esc.t > 0) {
+        a.esc.t -= dt;
+        this.move(a, a.esc.x, a.esc.y, def.run, dt, game);
+        return;
+      }
       this.move(a, tg.x - a.x + ox, tg.y - a.y + oy, def.run, dt, game);
+      if (a.blockedT > 0.8) {
+        // Hindernis zwischen Wolf und Beute: ausweichen oder die Jagd aufgeben
+        a.esc = this.escape(a, game);
+        if (!a.esc && pack) pack.target = null;
+      }
       return;
     }
     a.prey = null;
@@ -501,7 +599,16 @@ export class Wildlife {
       a.ty = base.y + Math.sin(ang) * (lead === a ? 60 : 20);
     }
     const dx = a.tx - a.x, dy = a.ty - a.y;
-    if (Math.hypot(dx, dy) > 3) this.move(a, dx, dy, def.speed, dt, game);
+    if (a.restT > 0) return; // eingekeilt: kurz stehen bleiben
+    if (Math.hypot(dx, dy) > 3) {
+      this.move(a, dx, dy, def.speed, dt, game);
+      if (a.blockedT > 0.5) {
+        // Hindernis: neues Ziel, und wenn es gar nicht weitergeht, eine Weile stehen bleiben
+        a.t = 99;
+        a.blockedT = 0;
+        if (!this.escape(a, game)) a.restT = 3;
+      }
+    }
   }
 
   /** Rudelziel wählen: Spieler/Siedler außerhalb der Siedlung und außerhalb des Lichts; nach 12 s aufgeben. */

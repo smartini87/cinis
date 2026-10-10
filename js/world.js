@@ -213,6 +213,7 @@ export class World {
     this.nodes.push(node);
     this.nodeAt[y * this.w + x] = node.id;
     this.nodesChanged = this.navDirty = true;
+    if (nodeSolid(node)) this.solidAdded = true;
     return node;
   }
 
@@ -306,7 +307,7 @@ export class World {
         if (n.timer >= def.regrow) {
           n.amount = n.max;
           n.timer = 0;
-          this.nodesChanged = this.navDirty = true;
+          this.nodesChanged = this.navDirty = this.solidAdded = true;
         }
       } else if ((n.type === 'bush' || n.type === 'herb') && n.amount < n.max) {
         n.timer += dt;

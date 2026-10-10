@@ -17,7 +17,7 @@ import { UI } from './ui.js';
 import { SoundEngine } from './audio.js';
 import { saveGame, loadGame, deleteSave, discardOldSaves } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
-import { SpatialHash, separateUnits, resolve } from './physics.js';
+import { SpatialHash, separateUnits, resolve, placeOnFreeTile } from './physics.js';
 import { Interact } from './interact.js';
 import { Loot } from './loot.js';
 import { Wildlife } from './wildlife.js';
@@ -267,6 +267,8 @@ class Game {
     this.noises.length = 0;
     this.combat.clear();
     this.enemies.clear();
+    this.enemies.world = this.world;
+    this.wildlife.world = this.world;
     this.cycle = new DayCycle();
     this.settlers = new Settlers();
     for (let i = 0; i < (opts.empty ? 0 : START_SETTLERS); i++) {
@@ -467,6 +469,11 @@ class Game {
       this.world.updateNodes(this.nodeT);
       this.nodeT = 0;
     }
+    // Neue Baumstämme/Felsen (Nachwachsen, Trümmer) schieben Einheiten, die dort stehen, sofort heraus
+    if (this.world.solidAdded) {
+      this.world.solidAdded = false;
+      this.ejectUnits();
+    }
     this.player.update(dt, this);
     this.buildings.update(dt, this);
     this.settlers.update(dt, this);
@@ -490,10 +497,16 @@ class Game {
 
   /** Nach einer Belegungsänderung: Einheiten aus neu gebauten Gebäuden an den Rand schieben. */
   ejectUnits() {
-    const w = this.world, p = this.player;
-    if (!p.dead) resolve(w, p, p.r, 'friendly');
-    for (const s of this.settlers.list) if (!s.hidden) resolve(w, s, s.r, 'friendly');
-    for (const e of this.enemies.list) if (!e.dead) resolve(w, e, e.r, 'enemy');
+    const w = this.world;
+    const eject = (u, mask) => {
+      resolve(w, u, u.r, mask);
+      // Zwischen mehreren Hindernissen eingeklemmt: auf die nächste freie Kachelmitte
+      if (resolve.unresolved) placeOnFreeTile(w, u, mask.replace('!', ''), true);
+    };
+    if (!this.player.dead) eject(this.player, 'friendly');
+    for (const s of this.settlers.list) if (!s.hidden) eject(s, 'friendly');
+    for (const e of this.enemies.list) if (!e.dead) eject(e, e.mask);
+    for (const a of this.wildlife.list) if (!a.dead && a.def.cls !== 'deco') eject(a, 'animal');
   }
 
   /** Alle Einheiten auseinanderschieben (Spieler schwer, Gegner nach Größe). */
@@ -511,7 +524,7 @@ class Game {
     const p = this.player;
     if (!p.dead) add(p, 'friendly', 3);
     for (const s of this.settlers.list) if (!s.hidden) add(s, 'friendly', 1);
-    for (const e of this.enemies.list) if (!e.dead) add(e, 'enemy', e.r * e.r * 0.1);
+    for (const e of this.enemies.list) if (!e.dead) add(e, e.mask, e.r * e.r * 0.1);
     for (const a of this.wildlife.list) if (!a.dead && a.def.cls !== 'deco') add(a, 'animal', a.r * a.r * 0.08);
     separateUnits(this.world, units, this.unitHash);
   }

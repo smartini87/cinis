@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `endless`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `endless`, `stress` (15 Spielminuten Kollisions-Stresstest), `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
@@ -77,5 +77,6 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - Baubarkeit: `game.isAvailable(type)` = Einstieg freigeschaltet (`progress.has('b:x')`) und `unlockMet` (Flammenstufe/Bauplan). Bauleiste in `BUILD_CATEGORIES`.
 - Neue Gebäude/HUD-Teile/Mechaniken immer über `progress` freischalten (`UNLOCKS`-Eintrag); gesperrte Gebäude erscheinen nicht in der Bauleiste und lassen sich nicht platzieren.
 - Treffbares: `game.forEachHittable` / `game.hittables()` (Gegner + Tiere), Treffer immer über `game.hitUnit`. Kampflärm `game.noise(x, y, r)`, Licht `game.lightAt(x, y)`.
+- Kollision robust halten: neue Einheiten über `placeOnFreeTile` + `resolve` setzen; `moveCircle` nimmt Teilschritte zurück, die eingeklemmt enden; neue Baumstämme/Felsen setzen `world.solidAdded` (→ `ejectUnits`). Große Gegner (Koloss, Boss, Brecher) haben die Maske `enemy!` und walzen durchs Unterholz. Tiere haben einen Festhäng-Wächter (`wildlife.watchdog`), Siedler planen Wege nie aus einer gesperrten Kachel heraus (`settlers.pathFrom`).
 - Dash per Shift-Flanke in `handleFrameInput` → `player.requestDash`; Bewegung über `moveEntity` (Substeps), Tore passierbar.
 - Figuren: `drawHumanoid(ctx, x, y, o)` mit `walk`, `breath`, `dir`, `arm` (Weltwinkel) + `item`, `lean`, `pose`, `outline`, `silhouette`.

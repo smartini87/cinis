@@ -7,19 +7,20 @@ import { drawEnemy, OUTLINE } from './sprites.js';
 import { drawEdgeArrow } from './ui.js';
 import { damageBuilding, damageUnit } from './combat.js';
 import { dist } from './util.js';
+import { resolve, placeOnFreeTile, moveCircle } from './physics.js';
 
 /**
  * Gegnertypen. bld = Faktor für Schaden an Gebäuden, aggro = Radius, in dem Einheiten verfolgt werden,
  * range = Fernkampfreichweite, breaker = folgt dem Brecher-Flussfeld (mitten durch Mauern).
  */
 export const ENEMY_DEFS = {
-  walker: { name: 'Aschgänger', hp: 40, speed: 26, dmg: 8, cd: 1.0, r: 4, bld: 1, aggro: 4 * TILE },
+  walker: { name: 'Aschgänger', hp: 40, speed: 26, dmg: 8, cd: 1.0, r: 3.5, bld: 1, aggro: 4 * TILE },
   dog: { name: 'Ruinenhund (Läufer)', hp: 24, speed: 52, dmg: 5, cd: 0.6, r: 3, bld: 0.5, aggro: 6 * TILE },
   swarm: { name: 'Aschfalter (Schwarm)', hp: 9, speed: 60, dmg: 3, cd: 0.5, r: 2, bld: 0.3, aggro: 7 * TILE },
-  breaker: { name: 'Brecher', hp: 95, speed: 21, dmg: 12, cd: 1.2, r: 5, bld: 3, aggro: 1.5 * TILE, breaker: true },
-  archer: { name: 'Aschenwerfer (Fernkampf)', hp: 32, speed: 24, dmg: 7, cd: 1.8, r: 4, bld: 1, aggro: 7 * TILE, range: 5 * TILE },
-  brute: { name: 'Aschkoloss', hp: 170, speed: 17, dmg: 22, cd: 1.6, r: 6, bld: 2, aggro: 3 * TILE },
-  boss: { name: 'Prätor der Asche', hp: 700, speed: 19, dmg: 32, cd: 1.5, r: 8, bld: 1.5, aggro: 5 * TILE },
+  breaker: { name: 'Brecher', hp: 95, speed: 21, dmg: 12, cd: 1.2, r: 5, bld: 3, aggro: 1.5 * TILE, breaker: true, trample: true },
+  archer: { name: 'Aschenwerfer (Fernkampf)', hp: 32, speed: 24, dmg: 7, cd: 1.8, r: 3.5, bld: 1, aggro: 7 * TILE, range: 5 * TILE },
+  brute: { name: 'Aschkoloss', hp: 170, speed: 17, dmg: 22, cd: 1.6, r: 6, bld: 2, aggro: 3 * TILE, trample: true },
+  boss: { name: 'Prätor der Asche', hp: 700, speed: 19, dmg: 32, cd: 1.5, r: 8, bld: 1.5, aggro: 5 * TILE, trample: true },
 };
 const SPAWN_ORDER = ['walker', 'dog', 'swarm', 'breaker', 'archer', 'brute', 'boss'];
 
@@ -127,18 +128,24 @@ export class Enemies {
   spawn(type, x, y, hpMul = 1, dmgMul = 1) {
     const def = ENEMY_DEFS[type];
     const e = {
-      id: nextId++, type, x, y, r: def.r,
+      id: nextId++, type, x, y, r: def.r, mask: def.trample ? 'enemy!' : 'enemy',
       hp: def.hp * hpMul, maxHp: def.hp * hpMul, dmg: def.dmg * dmgMul,
       speed: def.speed * (0.9 + Math.random() * 0.2),
       cd: Math.random() * def.cd, flip: false, walk: Math.random() * 6, hurt: 0, attack: 0,
       target: null, retarget: 0, dead: false, burn: false, blockedT: 0, kvx: 0, kvy: 0, prep: 0,
     };
+    // Nie in einem Hindernis beginnen (Lagerwächter, Hinterhalte, Spawns am Rand)
+    if (this.world) {
+      placeOnFreeTile(this.world, e, 'enemy');
+      resolve(this.world, e, e.r, e.mask);
+    }
     this.list.push(e);
     return e;
   }
 
   update(dt, game) {
     const { cycle, world } = game;
+    this.world = world;
     // Geplante Spawns während der Nacht
     if (cycle.isNight) {
       this.nightT += dt;
@@ -165,7 +172,7 @@ export class Enemies {
       if (e.attack > 0) e.attack = Math.max(0, e.attack - dt * 3);
       // Rückstoß klingt schnell ab
       if (Math.abs(e.kvx) + Math.abs(e.kvy) > 1) {
-        world.moveEntity(e, e.kvx * dt, e.kvy * dt, e.r, 'enemy');
+        world.moveEntity(e, e.kvx * dt, e.kvy * dt, e.r, e.mask);
         const k = Math.exp(-12 * dt);
         e.kvx *= k;
         e.kvy *= k;
@@ -240,6 +247,19 @@ export class Enemies {
    * Wächter eines Lagers: patrouillieren um das Feuer, greifen an, wer zu nah kommt,
    * und kehren zurück, wenn das Ziel die Leine (guard.r) verlässt.
    */
+  /** Patrouillenpunkt um das Lager, den eine Probebewegung mit der echten Kollision erreicht (sonst null). */
+  patrolPoint(e, g, world) {
+    for (let tries = 0; tries < 8; tries++) {
+      const a = Math.random() * Math.PI * 2, r = 12 + Math.random() * 30;
+      const x = g.x + Math.cos(a) * r, y = g.y + Math.sin(a) * r * 0.7;
+      if (Math.hypot(x - e.x, y - e.y) < 8) continue;
+      const probe = { x: e.x, y: e.y };
+      moveCircle(world, probe, x - e.x, y - e.y, e.mask, e.r);
+      if (Math.hypot(probe.x - x, probe.y - y) < 3) return { x, y };
+    }
+    return null;
+  }
+
   updateGuard(e, dt, game) {
     const def = ENEMY_DEFS[e.type], g = e.guard;
     e.cd -= dt;
@@ -256,21 +276,39 @@ export class Enemies {
         this.tryAttack(e, def, game, () => damageUnit(game, t, e.dmg, ((t.x - e.x) / (d || 1)) * 4, ((t.y - e.y) / (d || 1)) * 4), t.x);
         return;
       }
+      const ox = e.x, oy = e.y;
       this.step(e, t.x - e.x, t.y - e.y, dt, game.world);
+      // Ziel hinter einem Hindernis: nach kurzer Zeit aufgeben und zur Patrouille zurückkehren
+      e.blockedT = Math.hypot(e.x - ox, e.y - oy) < e.speed * dt * 0.3 ? (e.blockedT || 0) + dt : 0;
+      if (e.blockedT > 1) {
+        e.blockedT = 0;
+        e.target = null;
+        e.retarget = 2.5;
+      }
       return;
     }
     e.target = null;
     // Patrouille: zufällige Punkte rund ums Lager, gemächlich
     e.patrolT = (e.patrolT || 0) - dt;
     if (!e.patrol || e.patrolT <= 0 || dist(e.x, e.y, e.patrol.x, e.patrol.y) < 3) {
-      const a = Math.random() * Math.PI * 2, r = 12 + Math.random() * 30;
-      e.patrol = { x: g.x + Math.cos(a) * r, y: g.y + Math.sin(a) * r * 0.7 };
+      e.patrol = this.patrolPoint(e, g, game.world);
       e.patrolT = 3 + Math.random() * 4;
+      e.waitT = e.patrol ? 0 : 1.5;
     }
-    const sp = e.speed;
+    if (e.waitT > 0 || !e.patrol) {
+      e.waitT -= dt; // kurz innehalten, kein freier Patrouillenpunkt
+      return;
+    }
+    const sp = e.speed, ox = e.x, oy = e.y;
     e.speed = sp * 0.45;
-    if (this.step(e, e.patrol.x - e.x, e.patrol.y - e.y, dt, game.world)) e.patrolT = 0;
+    this.step(e, e.patrol.x - e.x, e.patrol.y - e.y, dt, game.world);
     e.speed = sp;
+    // Kommt der Wächter nicht voran, neuen Punkt wählen
+    e.blockedT = Math.hypot(e.x - ox, e.y - oy) < sp * 0.45 * dt * 0.3 ? (e.blockedT || 0) + dt : 0;
+    if (e.blockedT > 0.6) {
+      e.blockedT = 0;
+      e.patrolT = 0;
+    }
   }
 
   updateEnemy(e, dt, game) {
@@ -512,7 +550,7 @@ export class Enemies {
     const sp = e.speed * dt * (e.slowT > 0 ? 0.4 : 1);
     e.walk += dt * (e.type === 'dog' ? 16 : 9);
     if (Math.abs(dx) > 0.5) e.flip = dx < 0;
-    return world.moveEntity(e, (dx / d) * sp, (dy / d) * sp, e.r, 'enemy');
+    return world.moveEntity(e, (dx / d) * sp, (dy / d) * sp, e.r, e.mask);
   }
 
   tryAttack(e, def, game, fn, tx) {

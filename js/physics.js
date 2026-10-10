@@ -3,6 +3,8 @@
 // Bewegung in Substeps verhindert Durchrutschen bei hohem Tempo bzw. Dash. Dazu die Trennung von Einheiten.
 //
 // Masken: 'friendly' (Spieler, Siedler – laufen durch Tore), 'enemy', 'animal' (Tore sind für sie zu).
+// Mit angehängtem '!' (z. B. 'enemy!') ignoriert die Bewegung Baumstämme und Felsen: große Gegner (Koloss,
+// Boss, Brecher) walzen durchs Unterholz.
 
 import { TILE } from './config.js';
 
@@ -10,7 +12,7 @@ import { TILE } from './config.js';
 const WATER = 6;
 
 /** Feste Kreise der Ressourcenknoten: Radius und Versatz des Mittelpunkts nach unten. */
-export const NODE_SOLID = { tree: { r: 4, oy: 3 }, rock: { r: 6, oy: 2 } };
+export const NODE_SOLID = { tree: { r: 3, oy: 3 }, rock: { r: 4, oy: 2 } };
 
 /** Blockiert dieser Knoten gerade (Stümpfe und Sträucher nicht)? */
 export function nodeSolid(n) {
@@ -24,7 +26,7 @@ export function nodeSolid(n) {
 /** Ist das Gebäude für diese Maske passierbar? (Tore nur für eigene Leute) */
 export function buildingPassable(b, mask) {
   if (b.type === 'trap') return true; // Fallen liegen flach am Boden
-  return b.type === 'gate' && mask === 'friendly' && !b.site;
+  return b.type === 'gate' && (mask === 'friendly' || mask === 'friendly!') && !b.site;
 }
 
 const isWallish = (o) => !!o && (o.type === 'wall' || o.type === 'gate');
@@ -56,6 +58,8 @@ const RECTS = [null, null];
  */
 export function resolve(world, e, r, mask) {
   let hit = false;
+  const nodes = !mask.endsWith('!');
+  resolve.unresolved = false;
   for (let iter = 0; iter < 4; iter++) {
     let moved = false;
     const x0 = Math.floor((e.x - r) / TILE), x1 = Math.floor((e.x + r) / TILE);
@@ -78,7 +82,7 @@ export function resolve(world, e, r, mask) {
             moved = pushRect(e, r, rx, ry, rw, rh) || moved;
           }
         }
-        const id = world.nodeAt[ty * world.w + tx];
+        const id = nodes ? world.nodeAt[ty * world.w + tx] : -1;
         if (id >= 0) {
           const n = world.nodes[id], s = nodeSolid(n);
           if (s) moved = pushCircle(e, r, n.x, n.y + s.oy, s.r) || moved;
@@ -87,6 +91,7 @@ export function resolve(world, e, r, mask) {
     }
     if (!moved) break;
     hit = true;
+    if (iter === 3) resolve.unresolved = true; // eingekeilt: Schieben hat nicht gereicht
   }
   return hit;
 }
@@ -132,10 +137,23 @@ export function moveCircle(world, e, dx, dy, mask, r = e.r) {
   const n = Math.max(1, Math.ceil(len / Math.max(1, r * 0.5)));
   const sx = dx / n, sy = dy / n;
   let hit = false;
+  // Startet die Einheit bereits eingeklemmt, darf sie sich herausbewegen (keine Rücknahme)
+  const probe = { x: e.x, y: e.y };
+  resolve(world, probe, r, mask);
+  const startClean = Math.abs(probe.x - e.x) + Math.abs(probe.y - e.y) < 0.5;
   for (let i = 0; i < n; i++) {
+    const ox = e.x, oy = e.y;
     e.x += sx;
     e.y += sy;
-    if (resolve(world, e, r, mask)) hit = true;
+    if (resolve(world, e, r, mask)) {
+      hit = true;
+      // Kein sauberer Platz gefunden (zwischen mehreren Hindernissen eingekeilt): Teilschritt zurücknehmen
+      if (resolve.unresolved && startClean) {
+        e.x = ox;
+        e.y = oy;
+        break;
+      }
+    }
   }
   return hit;
 }
@@ -241,5 +259,30 @@ export function separateUnits(world, units, hash) {
     // Begrenzen, damit große Stapel sich über mehrere Schritte sanft lösen
     const l = Math.hypot(u.px, u.py), k = l > 2 ? 2 / l : 1;
     moveCircle(world, u.e, u.px * k, u.py * k, u.mask);
+  }
+}
+
+/**
+ * Steht eine Einheit auf einer unbegehbaren Kachel (Wasser, Gebäude, Requisite), wird sie auf die Mitte der
+ * nächsten begehbaren Kachel (bis 6 Kacheln entfernt) versetzt – für frisch erzeugte Einheiten.
+ */
+export function placeOnFreeTile(world, e, mask, force = false) {
+  const tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
+  if (tilePassable(world, tx, ty, mask)) {
+    if (force) {
+      e.x = (tx + 0.5) * TILE;
+      e.y = (ty + 0.5) * TILE;
+    }
+    return;
+  }
+  for (let r = 1; r <= 6; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !tilePassable(world, tx + dx, ty + dy, mask)) continue;
+        e.x = (tx + dx + 0.5) * TILE;
+        e.y = (ty + dy + 0.5) * TILE;
+        return;
+      }
+    }
   }
 }

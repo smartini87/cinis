@@ -225,7 +225,7 @@ export class Settlers {
     s.repathT = (s.repathT || 0) - dt;
     if (!s.path || s.repathT <= 0) {
       s.repathT = 0.6;
-      const path = game.world.findPath(s.tx, s.ty, p.tx, p.ty, 3000);
+      const path = this.pathFrom(s, game, p.tx, p.ty, 3000);
       s.path = path;
       s.pathI = 0;
       if (!path) {
@@ -513,9 +513,26 @@ export class Settlers {
     return best;
   }
 
+  /**
+   * Weg ab der aktuellen Position. Steht der Siedler auf einer gesperrten Kachel (etwa in der freien Hälfte einer
+   * schmalen Mauerkachel), beginnt der Weg auf der nächstgelegenen freien Nachbarkachel – nie quer durch die Mauer.
+   */
+  pathFrom(s, game, tx, ty, maxNodes = 6000) {
+    const w = game.world;
+    if (w.passable(s.tx, s.ty, 'friendly')) return w.findPath(s.tx, s.ty, tx, ty, maxNodes);
+    const nb = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+      .map(([dx, dy]) => [s.tx + dx, s.ty + dy])
+      .filter(([x, y]) => w.passable(x, y, 'friendly'))
+      .sort((a, b) => Math.hypot((a[0] + 0.5) * TILE - s.x, (a[1] + 0.5) * TILE - s.y) - Math.hypot((b[0] + 0.5) * TILE - s.x, (b[1] + 0.5) * TILE - s.y));
+    if (!nb.length) return w.findPath(s.tx, s.ty, tx, ty, maxNodes);
+    const [sx, sy] = nb[0];
+    const rest = w.findPath(sx, sy, tx, ty, maxNodes);
+    return rest ? [[sx, sy], ...rest] : null;
+  }
+
   /** Weg zu einer Kachel planen und Aufgabe setzen. */
   goTo(s, game, task, tx, ty) {
-    const path = game.world.findPath(s.tx, s.ty, tx, ty);
+    const path = this.pathFrom(s, game, tx, ty);
     if (!path) {
       s.task = { type: 'idle', t: 1 };
       s.path = null;
@@ -567,8 +584,15 @@ export class Settlers {
       s.stuck += dt;
       if (s.stuck > 1) {
         s.stuck = 0;
+        // Erst zur Mitte der eigenen Kachel zurück (löst das Hängen an Ecken), danach neu planen
+        if (!s.backToCenter && game.world.passable(s.tx, s.ty, 'friendly')) {
+          s.backToCenter = true;
+          s.path.splice(s.pathI, 0, [s.tx, s.ty]);
+          return false;
+        }
+        s.backToCenter = false;
         const goal = s.task && s.task.goal;
-        const path = goal && s.repaths < 2 ? game.world.findPath(s.tx, s.ty, goal[0], goal[1]) : null;
+        const path = goal && s.repaths < 2 ? this.pathFrom(s, game, goal[0], goal[1]) : null;
         if (path) {
           s.repaths++;
           s.path = path;
@@ -807,7 +831,7 @@ export class Settlers {
       s.timer = 0;
       const ap = game.buildings.accessPoint(f, f.x + (Math.random() - 0.5) * 80, f.y + (Math.random() - 0.5) * 80);
       if (ap) {
-        const path = game.world.findPath(s.tx, s.ty, ap[0], ap[1], 400);
+        const path = this.pathFrom(s, game, ap[0], ap[1], 400);
         if (path && path.length) {
           t.goal = ap;
           s.path = path;
