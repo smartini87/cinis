@@ -18,12 +18,17 @@ export default async function (page) {
     console.log(key, await page.evaluate(() => document.querySelector('.toasts').innerText.replace(/\n/g, ' | ') + ' #' + window.__game.buildings.list.length + ' ' + window.__game.buildings.selected));
     await page.keyboard.press('Escape');
   };
-  await place('Digit1', 4, -3);
-  await place('Digit2', -5, 3);
-  await place('Digit3', 3, 3);
-  await place('Digit4', -3, -4);
-  await place('Digit5', 0, -5);
-  await page.keyboard.press('Digit1');
+  await place('Digit1', 4, -3);   // Siedlung: Hütte
+  await place('Digit2', -5, 3);   // Farm
+  await place('Digit3', 3, 3);    // Brunnen
+  await page.keyboard.press('KeyB'); // Kategorie „Wehr“
+  await page.waitForTimeout(80);
+  await place('Digit1', -3, -4);  // Mauer
+  await place('Digit3', 0, -5);   // Turm
+  await page.keyboard.press('KeyB'); // weiter zu „Handwerk“ (ab Stufe 2), sonst zurück zu „Siedlung“
+  await page.waitForTimeout(80);
+  const cat = await page.evaluate(() => window.__game.buildCat);
+  if (cat === 0) await page.keyboard.press('Digit1');
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'tools/out/build.png' });
   await page.keyboard.press('Escape');

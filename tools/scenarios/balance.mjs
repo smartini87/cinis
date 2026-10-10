@@ -37,12 +37,25 @@ export default async function (page) {
     const wallSpots = ring(9, 9).map(([x, y]) => [x, y, Math.abs(x - cx) === 9 && Math.abs(y - cy) < 9 ? 1 : 0]);
     const gateSpots = wallSpots.filter(([x, y]) => x === cx || y === cy);
     const homeSpots = ring(2, 4);
+    const fireSpots = ring(6, 6).filter(([x, y]) => (x + y) % 4 === 0);
+    const trapSpots = ring(10, 11).filter(([x, y]) => x === cx || y === cy || Math.abs(x - cx) === Math.abs(y - cy));
     // Bolzen an der Flamme nachproduzieren (Türme verbrauchen pro Schuss einen)
     const ammo = () => {
       const want = 30 + B.count('tower') * 12;
       for (let i = 0; i < 20 && g.stock.bolts < want && free('wood') > 25 && free('stone') > 15; i++) craft(g, recipe('bolts'));
     };
+    // Flamme: entfachen, wenn danach Brennstoff für 3 Nächte da ist; bei niedriger Glut nachlegen
+    const flame = () => {
+      const f = g.flame;
+      if (f.next && f.canUpgrade(g)) {
+        const after = { ...g.stock };
+        for (const [k, n] of Object.entries(f.next.cost)) after[k] -= n;
+        if (Object.entries(f.next.fuel).every(([k, n]) => (after[k] || 0) >= n * 3)) f.upgrade(g);
+      }
+      if (f.vigor < 70 && f.fuelCovered(g.stock, 2)) f.feed(g);
+    };
     const build = () => {
+      flame();
       ammo();
       const pop = g.settlers.colony.length;
       // Baustellen, die seit mehr als einem Tag stocken (z. B. unerreichbar), wieder abreißen
@@ -59,6 +72,11 @@ export default async function (page) {
       while (free('wood') > 40 && free('stone') > 30 && tryPlace('tower', towerSpots)) {}
       while (free('stone') > 20 && tryPlace('gate', gateSpots)) {}
       while (free('stone') > 20 && tryPlace('wall', wallSpots)) {}
+      if (g.isAvailable('workbench')) tryPlace('workbench', B.countAll('workbench') ? [] : ring(3, 6));
+      if (g.isAvailable('storehouse') && !B.countAll('storehouse')) tryPlace('storehouse', ring(6, 8));
+      if (g.isAvailable('firebowl')) while (B.countAll('firebowl') < 4 + g.flame.level && free('coal') > 6 && tryPlace('firebowl', fireSpots)) {}
+      if (g.isAvailable('trap')) while (B.countAll('trap') < 12 && free('iron') > 2 && tryPlace('trap', trapSpots)) {}
+      if (g.isAvailable('tower2')) for (const t of B.ofType('tower').slice(0, 2)) if (free('iron') > 8 && canAfford(B.costAt('tower2', t.tx, t.ty))) B.place(g, 'tower2', t.tx, t.ty);
     };
 
     // ---------------------------------------------------------------- Autopilot-Ausflüge
@@ -143,7 +161,7 @@ export default async function (page) {
     const rows = [];
     let minCenter = 1e9;
     g.onDawn = (day) => {
-      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), sites: B.sites.length, towers: B.count('tower'), bolts: g.stock.bolts, walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
+      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, lvl: g.flame.level, vigor: Math.round(g.flame.vigor), huts: B.count('hut'), sites: B.sites.length, towers: B.count('tower'), bolts: g.stock.bolts, walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), coal: Math.round(g.stock.coal), iron: Math.round(g.stock.iron), bowls: B.count('firebowl'), traps: B.count('trap'), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
       minCenter = 1e9;
       origDawn(day);
       build();

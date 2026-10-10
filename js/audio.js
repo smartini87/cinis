@@ -232,6 +232,14 @@ export class SoundEngine {
       case 'trade':
         for (let i = 0; i < 3; i++) this.tone(1200 + i * 300, 0.08, { type: 'triangle', vol: v(0.07), delay: i * 0.06 });
         break;
+      case 'trap':
+        this.noise(0.1, { vol: v(0.3), freq: 2200, type: 'bandpass', q: 2 });
+        this.tone(180, 0.15, { type: 'square', vol: v(0.08), slide: 90 });
+        break;
+      case 'levelUp':
+        for (let i = 0; i < 4; i++) this.tone([392, 523, 659, 784][i], 0.5, { type: 'triangle', vol: v(0.1), delay: i * 0.12 });
+        this.noise(1.2, { vol: v(0.12), freq: 500, type: 'lowpass', attack: 0.3 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

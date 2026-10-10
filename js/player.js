@@ -222,9 +222,11 @@ export class Player {
     else if (!held) this.resetGather();
     if (held && !this.atk && this.actionT > 0 && this.gatherKey) this.continueGather(dt, game);
 
-    // Automatisch an der Ewigen Flamme abliefern
-    const center = game.buildings.center;
-    if (center && this.carried > 0 && game.buildings.distTo(center, this.x, this.y) < DEPOSIT_RANGE) this.deposit(game);
+    // Automatisch an der Ewigen Flamme bzw. einem Lagerhaus abliefern
+    if (this.carried > 0) {
+      const dep = game.buildings.nearestDepot(this.x, this.y);
+      if (dep && game.buildings.distTo(dep, this.x, this.y) < DEPOSIT_RANGE) this.deposit(game);
+    }
   }
 
   // ---------------------------------------------------------------- Energie, Dash, Sprint

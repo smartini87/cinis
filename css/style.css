@@ -359,3 +359,25 @@ html, body {
 .res-panel.compact .pop-row { grid-column: 1 / span 2; }
 .res-panel.compact .pop-row .lbl { display: inline; }
 .res-panel.compact .icon { width: 18px; height: 18px; }
+
+/* ---------------------------------------------------------------- Flamme: Stufe, Glut, Bauleisten-Reiter */
+.vigor-row { margin-top: 3px; }
+.lvl-badge { font-size: 11px; color: #1d1712; background: #ffd36a; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
+.vigor-bar .fill { background: linear-gradient(#ffe08a, #e8742a); }
+.vigor-bar .fill.low { animation: pulse 0.8s infinite; background: linear-gradient(#f07050, #8a1c1c); }
+.fuel-txt { font-size: 11px; white-space: nowrap; }
+.fuel-txt.ok { color: #9fd08a; }
+.fuel-txt.warn { color: #f0c060; }
+.fuel-txt.bad { color: #ff7a60; }
+.flame-box { text-align: left; }
+.flame-sub { margin: 10px 0 0; color: #d9cba8; font-weight: normal; font-size: 15px; letter-spacing: 1px; }
+.cat-tabs { display: flex; gap: 4px; margin-bottom: 4px; justify-content: center; }
+.cat-tab {
+  font: inherit; font-size: 12px; padding: 1px 10px; background: #2a231d; color: #d9cba8; border: 1px solid #4a3c28;
+  border-radius: 3px; cursor: pointer; pointer-events: auto;
+}
+.cat-tab.active { border-color: #ffd36a; color: #ffd36a; }
+.build-row { display: flex; gap: 6px; }
+
+.buildbar { flex-direction: column; }
+@media (max-width: 640px) { .build-row { gap: 3px; } .cat-tab { font-size: 10px; padding: 1px 6px; } }

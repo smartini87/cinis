@@ -3,7 +3,8 @@
 
 import { RES, RES_KEYS } from './config.js';
 import { iconURL, buildingPreviewURL } from './sprites.js';
-import { BUILDING_DEFS, BUILDABLE } from './buildings.js';
+import { BUILDING_DEFS, BUILDABLE, BUILD_CATEGORIES } from './buildings.js';
+import { FLAME_LEVELS, MAX_LEVEL } from './flame.js';
 import { FOCI } from './settlers.js';
 import { SETTLER, WIN_NIGHTS, TILE } from './config.js';
 import { DAY_LEN, CYCLE } from './time.js';
@@ -163,6 +164,13 @@ export class UI {
     fimg.alt = 'Flamme';
     this.flameBar = el('div', 'fill', el('div', 'bar flame-bar', flame));
     this.flameTxt = el('span', 'flame-txt', flame);
+    flame.title = 'Zustand des Tempels der Flamme (Lebenspunkte)';
+    // Flammenstufe, Glut und Brennstoffbedarf pro Nacht
+    const fl = el('div', 'flame-row vigor-row', day);
+    this.lvlEl = el('span', 'lvl-badge', fl, 'Stufe 1');
+    this.vigorBar = el('div', 'fill', el('div', 'bar vigor-bar', fl));
+    this.fuelEl = el('span', 'fuel-txt', fl);
+    fl.title = 'Glut der Flamme: Jede Nacht verbrennt sie Brennstoff aus dem Lager. Fehlt er, schrumpft sie – bei 0 erlischt sie.';
     // Lebenspunkte und Energie des Spielers
     const hpPanel = (this.hpPanel = el('div', 'panel hp-panel', hud));
     const hp = el('div', 'stat-row', hpPanel);
@@ -214,9 +222,23 @@ export class UI {
     this.carryTxt = el('div', 'carry-txt', carry);
     // Bauleiste (unten Mitte)
     this.buildBar = el('div', 'panel buildbar', hud);
+    // Kategorie-Reiter (B wechselt)
+    this.catTabs = el('div', 'cat-tabs', this.buildBar);
+    this.catBtns = BUILD_CATEGORIES.map((c, i) => {
+      const t = el('button', 'cat-tab', this.catTabs, c.name);
+      t.type = 'button';
+      t.title = `${c.name} (B wechselt die Kategorie)`;
+      t.addEventListener('click', () => {
+        this.game.buildCat = i;
+        this.game.audio.play('click');
+      });
+      return t;
+    });
+    this.buildRow = el('div', 'build-row', this.buildBar);
+    this.buildKeys = {};
     this.buildBtns = {};
     for (const type of [...BUILDABLE, 'demolish']) {
-      const btn = el('button', 'bslot', this.buildBar);
+      const btn = el('button', 'bslot', this.buildRow);
       btn.type = 'button';
       if (type === 'demolish') {
         el('div', 'demo-icon', btn, '⛏');
@@ -239,7 +261,7 @@ export class UI {
           ic.alt = RES[k].name;
           el('span', '', c, String(def.cost[k]));
         }
-        el('span', 'bkey', btn, def.key);
+        this.buildKeys[type] = el('span', 'bkey', btn, '');
         btn.title = `${def.name}: ${def.desc}`;
       }
       btn.addEventListener('click', () => {
@@ -394,11 +416,39 @@ export class UI {
     return map;
   }
 
-  /** Gesperrtes ausblenden, Freigeschaltetes zeigen. */
+  /** Gesperrtes ausblenden, Freigeschaltetes zeigen (Gebäude: nur die aktive Kategorie). */
   applyUnlocks() {
-    const pr = this.game.progress;
+    const g = this.game, pr = g.progress;
     if (!pr) return;
-    for (const [key, els] of Object.entries(this.unlockElements())) for (const e of els) if (e) e.hidden = !pr.has(key);
+    for (const [key, els] of Object.entries(this.unlockElements())) {
+      if (key.startsWith('b:')) continue;
+      for (const e of els) if (e) e.hidden = !pr.has(key);
+    }
+    this.applyBuildBar();
+  }
+
+  /** Bauleiste: Reiter der Kategorien mit verfügbaren Gebäuden, Knöpfe der aktiven Kategorie mit Tasten 1–9. */
+  applyBuildBar() {
+    const g = this.game;
+    if (!g.flame) return;
+    let visibleCats = 0;
+    BUILD_CATEGORIES.forEach((c, i) => {
+      const any = c.types.some((t) => g.isAvailable(t));
+      if (any) visibleCats++;
+      this.set('cat' + i, this.catBtns[i], !any, 'hidden');
+      this.set('catc' + i, this.catBtns[i], 'cat-tab' + (g.buildCat === i ? ' active' : ''), 'className');
+    });
+    this.set('catTabs', this.catTabs, visibleCats < 2, 'hidden');
+    if (!BUILD_CATEGORIES[g.buildCat].types.some((t) => g.isAvailable(t))) {
+      const first = BUILD_CATEGORIES.findIndex((c) => c.types.some((t) => g.isAvailable(t)));
+      if (first >= 0) g.buildCat = first;
+    }
+    const choices = g.buildChoices();
+    for (const type of BUILDABLE) {
+      const i = choices.indexOf(type);
+      this.set('bv' + type, this.buildBtns[type], i < 0, 'hidden');
+      if (i >= 0) this.set('bk' + type, this.buildKeys[type], String(i + 1));
+    }
   }
 
   /** Frisch freigeschaltetes Element mit kurzer Animation einblenden. */
@@ -561,12 +611,75 @@ export class UI {
     this.set('popLbl', this.popLbl, needy ? `Siedler · ${needy} leiden!` : hungry ? `Siedler · ${hungry} bedürftig` : 'Siedler');
     this.set('popCls', this.popLbl, needy ? 'lbl danger' : 'lbl', 'className');
     for (const f of FOCI) this.set('f' + f.id, this.focusBtns[f.id], st.focus === f.id ? 'fbtn active' : 'fbtn', 'className');
+    this.applyBuildBar();
+    this.updateFlameRow(g);
     const bs = g.buildings;
     for (const type of [...BUILDABLE, 'demolish']) {
       const btn = this.buildBtns[type];
       const cls = 'bslot' + (bs.selected === type ? ' active' : '') + (type !== 'demolish' && !bs.canAfford(g, BUILDING_DEFS[type].cost) ? ' poor' : '');
       this.set('b' + type, btn, cls, 'className');
     }
+  }
+
+  /** Flammenstufe, Glut und Bedarf pro Nacht (grün gedeckt, gelb knapp, rot fehlt). */
+  updateFlameRow(g) {
+    const f = g.flame;
+    this.set('lvl', this.lvlEl, `Stufe ${f.level}`);
+    this.set('vigW', this.vigorBar.style, `${f.k * 100}%`, 'width');
+    this.set('vigC', this.vigorBar, 'fill' + (f.vigor < 35 ? ' low' : ''), 'className');
+    const parts = Object.entries(f.def.fuel).map(([k, n]) => `${n} ${RES[k].name}`);
+    const cover = f.fuelCovered(g.stock, 3) ? 'ok' : f.fuelCovered(g.stock, 1) ? 'warn' : 'bad';
+    this.set('fuel', this.fuelEl, `${parts.join(' + ')} / Nacht`);
+    this.set('fuelC', this.fuelEl, 'fuel-txt ' + cover, 'className');
+  }
+
+  /** Fenster der Ewigen Flamme: Stufe und Glut, Upgrade mit Vorschau, Brennstoff nachlegen, Herstellen. */
+  showFlame() {
+    const g = this.game, f = g.flame, B = g.buildings;
+    const fuel = (def) => Object.entries(def.fuel).map(([k, n]) => `${n} ${RES[k].name}`).join(' + ');
+    const nx = f.next;
+    let html = `<h2>Die Ewige Flamme · Stufe ${f.level}</h2>
+      <p class="sub">Glut ${Math.round(f.vigor)} % · Licht ${Math.round(f.light / 16)} Felder · Bauradius ${f.territory} · bis ${f.popCap} Siedler · Brennstoff pro Nacht: ${fuel(f.def)}</p>`;
+    const card = this.showOverlay('crafting flame-panel', html, [{ label: 'Schließen (Esc)', cls: 'primary', onClick: () => g.closePanel() }]);
+    const box = el('div', 'flame-box');
+    card.insertBefore(box, card.querySelector('.btn-row'));
+    if (nx) {
+      const up = el('div', 'craft-row', box);
+      const mid = el('div', 'craft-mid', up);
+      el('div', 'craft-name', mid, `Entfachen: Stufe ${f.level + 1}`);
+      const unlocks = Object.entries(BUILDING_DEFS).filter(([, d]) => d.unlock && d.unlock.level === f.level + 1).map(([, d]) => d.name);
+      el('div', 'craft-desc', mid, `Licht ${Math.round(nx.light / 16)} Felder · Bauradius ${nx.territory} · bis ${nx.pop} Siedler${nx.aura ? ` · Schutzaura ${nx.aura}/s` : ''}${unlocks.length ? ` · neu: ${unlocks.join(', ')}` : ''}<br><b>Neuer Bedarf pro Nacht: ${fuel(nx)}</b>`);
+      const cost = el('div', 'craft-cost', mid);
+      for (const [k, n] of Object.entries(nx.cost)) {
+        const have = (g.stock[k] || 0) + g.player.inv.count(k);
+        const c = el('span', 'c' + (have >= n ? '' : ' miss'), cost);
+        const ci = el('img', 'ci', c);
+        ci.src = iconURL(k);
+        el('span', '', c, `${n}`);
+        c.title = `${RES[k].name}: ${Math.floor(have)} vorhanden`;
+      }
+      const btn = el('button', 'mbtn small', up, 'Entfachen');
+      btn.type = 'button';
+      btn.disabled = !f.canUpgrade(g);
+      btn.addEventListener('click', () => {
+        if (f.upgrade(g)) this.showFlame();
+      });
+    } else el('div', 'craft-desc', box, `Die Flamme brennt auf der höchsten Stufe (${MAX_LEVEL}).`);
+    const feed = el('div', 'craft-row', box);
+    const fm = el('div', 'craft-mid', feed);
+    el('div', 'craft-name', fm, 'Brennstoff nachlegen');
+    el('div', 'craft-desc', fm, 'Füllt die Glut aus Lager und Gepäck auf (Holz +2, Kohle +5, Harz +6, Kräuteröl +12 je Einheit).');
+    const fb = el('button', 'mbtn small', feed, 'Nachlegen');
+    fb.type = 'button';
+    fb.disabled = f.vigor >= 100;
+    fb.addEventListener('click', () => {
+      const gain = f.feed(g);
+      this.toast(gain > 0 ? `Die Glut steigt auf ${Math.round(f.vigor)} %.` : 'Kein Brennstoff vorhanden.', gain > 0 ? 'good' : 'warn');
+      if (gain > 0) g.audio.play('torch');
+      this.showFlame();
+    });
+    el('h3', 'flame-sub', box, 'Herstellen');
+    this.fillRecipes(box, 'flame', () => this.showFlame());
   }
 
   /** Gepäck-Leiste: Belegung, Hotbar, Kurzliste der Rohstoffe. */
@@ -628,12 +741,19 @@ export class UI {
 
   /** Herstellungs-Menü einer Station (Flamme, Werkbank, Schmiede). */
   showCrafting(station) {
-    const g = this.game, B = g.buildings, p = g.player;
+    const g = this.game;
     const card = this.showOverlay('crafting', `<h2>${STATION_NAMES[station]}</h2><p class="sub">Bezahlt wird aus dem Lager und deinem Gepäck.</p>`, [
       { label: 'Schließen (Esc)', cls: 'primary', onClick: () => g.closePanel() },
     ]);
-    const list = el('div', 'craft-list');
-    card.insertBefore(list, card.querySelector('.btn-row'));
+    const box = el('div', 'flame-box');
+    card.insertBefore(box, card.querySelector('.btn-row'));
+    this.fillRecipes(box, station, () => this.showCrafting(station));
+  }
+
+  /** Rezeptliste einer Station in parent einfügen; refresh baut das Fenster nach dem Herstellen neu. */
+  fillRecipes(parent, station, refresh) {
+    const g = this.game, B = g.buildings, p = g.player;
+    const list = el('div', 'craft-list', parent);
     for (const r of RECIPES.filter((x) => x.station === station)) {
       const unlocked = recipeUnlocked(g, r);
       const row = el('div', 'craft-row' + (unlocked ? '' : ' locked'), list);
@@ -661,7 +781,7 @@ export class UI {
         const err = craft(g, r);
         if (err) this.toast(err, 'warn', 'craft');
         else this.toast(`Hergestellt: ${recipeName(r)}`, 'good');
-        this.showCrafting(station);
+        refresh();
       });
     }
   }

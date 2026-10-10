@@ -516,7 +516,8 @@ export class World {
     }
     const nodeAt = this.nodeAt, nodes = this.nodes;
     const solidNode = (i) => nodeAt[i] >= 0 && !!nodeSolid(nodes[nodeAt[i]]);
-    const free = (x, y) => this.walkable(x, y) && !ba[y * W + x] && !solidNode(y * W + x) && !this.props[y * W + x];
+    const isB = (i) => ba[i] && ba[i].type !== 'trap';
+    const free = (x, y) => this.walkable(x, y) && !isB(y * W + x) && !solidNode(y * W + x) && !this.props[y * W + x];
     while (heap.size) {
       const cur = heap.pop();
       if (closed[cur]) continue;
@@ -532,7 +533,7 @@ export class World {
           if (dx && dy && (!free(cx + dx, cy) || !free(cx, cy + dy))) continue;
           let c = tiles[ni] === T.SHALLOW ? 1.8 : 1;
           const b = ba[ni];
-          if (b && b.type !== 'center') c += b.type === 'wall' ? 14 : b.type === 'gate' ? 12 : 8;
+          if (b && b.type !== 'center' && b.type !== 'trap') c += b.type === 'wall' ? 14 : b.type === 'gate' ? 12 : 8;
           const nd = flow[cur] + c * (dx && dy ? 1.414 : 1);
           if (nd < flow[ni]) {
             flow[ni] = nd;

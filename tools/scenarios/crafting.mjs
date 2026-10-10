@@ -20,6 +20,7 @@ export default async function (page) {
     // 2) Werkbank bauen und mit E öffnen
     for (const n of w.nodes) if (Math.hypot(n.tx - w.cx, n.ty - w.cy) < 8) w.removeNode(n);
     Object.assign(g.stock, { wood: 200, stone: 200, iron: 10, cloth: 10, herbs: 10, resin: 5, hide: 10, coal: 10 });
+    g.flame.level = 2; // Werkbank ab Flammenstufe 2
     const wb = B.place(g, 'workbench', w.cx + 4, w.cy + 4);
     B.finishAllSites(g);
     p.x = wb.x; p.y = wb.y + 18; p.vx = p.vy = 0;

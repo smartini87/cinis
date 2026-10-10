@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
@@ -46,12 +46,13 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `items.js` | Gegenstände (`ITEMS`) und `itemInfo(id)` für Rohstoffe und Gegenstände |
 | `inventory.js` | Slot-Inventar (`add/remove/count/room`, Kurzzugriffe `inv.wood`) |
 | `recipes.js` | Rezepte je Station (`RECIPES`, `craft`, `recipeUnlocked`) |
+| `flame.js` | Ewige Flamme als Fortschritt: `FLAME_LEVELS` (Kosten, Licht, Bauradius, Siedler, Aura, Brennstoff), Glut (`vigor`), `burnForNight`, `feed`, `upgrade` |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
 
 ## Balancing-Stellschrauben
-- `js/config.js` (Spieler, Siedler, Turm, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP) in `buildings.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.
+- `js/config.js` (Spieler, Siedler, Turm, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP/Freischaltung) in `buildings.js`, `FLAME_LEVELS` in `flame.js`, `RECIPES` in `recipes.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.
 
 ## Konventionen
 - Welteinheiten: 1 Kachel = `TILE` (16) Weltpixel; Entitäten haben `x,y` = Fußpunkt in Welteinheiten.
@@ -71,6 +72,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - Siedler mit `mode` ('waiting'/'follow') gehören nicht zur Kolonie – Kolonie immer über `settlers.colony`.
 - Spieler-Inventar nur über `player.inv` (Slots). Beute an den Spieler über `pois.give(game, x, y, items)` (Überschuss wird zum Beutehaufen).
 - Panels (Inventar, Herstellen, Handel) pausieren über `game.openPanel/closePanel`.
+- Baubarkeit: `game.isAvailable(type)` = Einstieg freigeschaltet (`progress.has('b:x')`) und `unlockMet` (Flammenstufe/Bauplan). Bauleiste in `BUILD_CATEGORIES`.
 - Neue Gebäude/HUD-Teile/Mechaniken immer über `progress` freischalten (`UNLOCKS`-Eintrag); gesperrte Gebäude erscheinen nicht in der Bauleiste und lassen sich nicht platzieren.
 - Treffbares: `game.forEachHittable` / `game.hittables()` (Gegner + Tiere), Treffer immer über `game.hitUnit`. Kampflärm `game.noise(x, y, r)`, Licht `game.lightAt(x, y)`.
 - Dash per Shift-Flanke in `handleFrameInput` → `player.requestDash`; Bewegung über `moveEntity` (Substeps), Tore passierbar.

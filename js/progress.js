@@ -2,7 +2,7 @@
 // HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie relevant werden (mit kurzer Einblendung und
 // einem Satz Erklärung). Ein Ziel-Banner mit Fortschritt und ein goldener Marker führen durch den Start.
 
-import { TILE } from './config.js';
+import { TILE, RES } from './config.js';
 import { fmtTime } from './util.js';
 import { BUILDING_DEFS } from './buildings.js';
 
@@ -101,6 +101,16 @@ export const QUESTS = [
     start: ['b:wall', 'b:gate', 'b:tower', 'demolish'],
     text: () => 'Sichere die Flamme: Baue einen Turm',
     done: (g) => g.buildings.count('tower') > 0,
+    target: (g) => g.buildings.center,
+  },
+  {
+    id: 'upgrade',
+    text: () => 'Entfache die Flamme auf Stufe 2 (E an der Flamme)',
+    progress: (g) => {
+      const c = g.flame.next && g.flame.next.cost;
+      return c ? Object.entries(c).map(([k, n]) => `${RES[k].name} ${Math.min(n, Math.floor((g.stock[k] || 0) + g.player.inv.count(k)))}/${n}`).join(' · ') : '';
+    },
+    done: (g) => g.flame.level >= 2,
     target: (g) => g.buildings.center,
   },
   {

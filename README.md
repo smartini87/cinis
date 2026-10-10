@@ -25,7 +25,7 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | Bewegen | WASD / Pfeiltasten | linke Bildschirmseite ziehen (Joystick) |
 | Dash / Sprint | Shift drücken = Dash (kurzer Schub, kurz unverwundbar); Shift halten = Sprinten | Knopf „Dash“ (halten = Sprint) |
 | Sammeln & angreifen | Leertaste, E oder linke Maustaste **halten** (zielt auf den Mauszeiger) | Ziel antippen und halten |
-| Gebäude wählen | 1 – 6 oder Klick auf die Bauleiste | Bauleiste antippen |
+| Gebäude wählen | 1 – 9 in der aktiven Kategorie, B wechselt die Kategorie, oder Klick auf die Bauleiste | Bauleiste antippen |
 | Gebäude setzen | Linksklick (Mauern: Maustaste halten und eine Linie ziehen) | Bauplatz antippen |
 | Mauer/Tor drehen | R oder Mausrad im Baumodus (Auto, waagerecht, senkrecht, diagonal ↘, diagonal ↗) | – |
 | Bauen abbrechen | Rechtsklick oder Esc | Gebäude in der Bauleiste erneut antippen |
@@ -84,7 +84,7 @@ HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, j
 **Gepäck:** Du hast 16 Plätze. Rohstoffe stapeln sich bis 20 pro Platz, Werkzeuge und Ausrüstung brauchen je einen. In der Nähe der Flamme lieferst du Rohstoffe automatisch ab, Gegenstände behältst du. Mit I öffnest du das Gepäck (pausiert das Spiel). Die Leiste unten links zeigt Waffe, Rüstung/Stiefel, Fackeln (T) und Verbände (Q). Baukosten werden zuerst aus dem Lager und dann aus deinem Gepäck bezahlt.
 
 ### Herstellen
-An der Ewigen Flamme und an der Werkbank (Taste 7) stellst du mit **E** her. Bezahlt wird aus Lager und Gepäck.
+An der Ewigen Flamme, der Werkbank (ab Flammenstufe 2) und der Schmiede stellst du mit **E** her. Bezahlt wird aus Lager und Gepäck.
 
 | Station | Rezept | Kosten | Wirkung |
 |---|---|---|---|
@@ -92,9 +92,10 @@ An der Ewigen Flamme und an der Werkbank (Taste 7) stellst du mit **E** her. Bez
 | Flamme | Verband ×2 | 1 Stoff, 1 Kräuter | Q: +40 LP |
 | Werkbank | Fackel ×2 | 2 Holz, 1 Stoff, 1 Harz | T: 3 Minuten Licht, Wölfe meiden dich |
 | Werkbank | Axt / Spitzhacke | Holz, Stein, 1 Eisen | Holz bzw. Stein 80 % schneller |
-| Werkbank | Stiefel | 3 Fell, 2 Stoff | +40 Energie, +30 % Erholung |
-| Werkbank | Eisenschwert | 6 Eisen, 2 Holz, 2 Kohle | Schaden 32 statt 20 |
-| Werkbank | Rüstung | 5 Eisen, 3 Fell, 2 Stoff | 30 % weniger Schaden |
+| Werkbank (ab Stufe 3) | Stiefel | 3 Fell, 2 Stoff | +40 Energie, +30 % Erholung |
+| Schmiede | Eisenschwert | 6 Eisen, 2 Holz, 2 Kohle | Schaden 32 statt 20 |
+| Schmiede | Rüstung | 5 Eisen, 3 Fell, 2 Stoff | 30 % weniger Schaden |
+| Schmiede | Bolzen ×25 | 1 Eisen, 3 Holz, 1 Kohle | Turm-Munition (ins Lager) |
 | Werkbank | Kräuteröl | 3 Kräuter, 1 Harz | Brennstoff hoher Flammenstufen |
 
 Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; das kostet anteilig Baumaterial aus dem Lager.
@@ -132,6 +133,32 @@ Erlegte Tiere geben ihre Beute direkt in dein Inventar. Jagbare Tiere in Reichwe
 
 ### Energie und Dash
 Die Energieleiste steht unter deinen Lebenspunkten. Ein Dash kostet 30 Energie, ein Sprint verbraucht Energie, solange du ihn hältst. Nach einer kurzen Pause lädt sich die Leiste wieder auf. Reicht die Energie nicht, blinkt die Leiste und der Dash bleibt aus. Auch beim Dash blockieren Mauern, Tore dagegen nicht.
+
+### Die Ewige Flamme: Stufen und Brennstoff
+Die Flamme hat 8 Stufen. Mit **E an der Flamme** öffnest du ihr Fenster: Stufe, Glut, Bedarf, Upgrade („Entfachen“), Brennstoff nachlegen und Grundrezepte. Jede Stufe vergrößert Licht und Bauradius, erlaubt mehr Siedler und verbrennt Gegner in ihrer Nähe (Schutzaura ab Stufe 2). Dafür verlangt sie **mehr und andere Brennstoffe**, die sie jede Abenddämmerung aus dem Lager nimmt:
+
+| Stufe | Upgrade-Kosten | Brennstoff pro Nacht | Siedler | Neu baubar |
+|---|---|---|---|---|
+| 1 | – | 6 Holz | 8 | Hütte, Farm, Brunnen, Mauer, Tor, Turm |
+| 2 | 40 Holz, 25 Stein | 10 Holz | 12 | Werkbank |
+| 3 | 50 Holz, 40 Stein, 4 Eisen | 10 Holz + 3 Kohle | 16 | Lagerhaus, Feuerschale |
+| 4 | 60 Holz, 50 Stein, 8 Eisen, 6 Kohle | 12 Holz + 5 Kohle | 20 | Schmiede (mit Bauplan) |
+| 5 | 70 Stein, 12 Eisen, 12 Kohle, 4 Harz | 8 Kohle + 2 Harz | 24 | Wachturm II |
+| 6 | 80 Stein, 16 Eisen, 16 Kohle, 6 Harz, 6 Stoff | 10 Kohle + 3 Harz | 28 | – |
+| 7 | 100 Stein, 22 Eisen, 20 Kohle, 8 Harz, 3 Öl | 12 Kohle + 3 Harz + 1 Kräuteröl | 32 | – |
+| 8 | 120 Stein, 30 Eisen, 25 Kohle, 10 Harz, 6 Öl | 14 Kohle + 4 Harz + 2 Kräuteröl | 40 | – |
+
+Fehlt Brennstoff, verliert die Flamme Glut (bis zu 40 % pro Nacht). Licht, Bauradius und Schutzaura schrumpfen mit. Ist der Brennstoff voll bezahlt, erholt sie sich um 15 %. **Bei Glut 0 erlischt die Flamme, das Spiel ist verloren.** Das HUD zeigt Stufe, Glut und den Bedarf pro Nacht: grün heißt drei Nächte gedeckt, gelb nur die nächste, rot fehlt. Höher entfachen macht dich stärker, kostet aber mehr Unterhalt.
+
+**Baupläne:** Die Falle gibt es nur mit Bauplan. Die Schmiede braucht Stufe 4 **und** einen Bauplan. Die Feuerschale kommt mit Stufe 3 oder früher mit Bauplan. Baupläne liegen in den Truhen befreiter Aschgänger-Lager oder sind beim Händler zu haben. Gebäude erscheinen erst in der Bauleiste, wenn sie freigeschaltet sind. Die Bauleiste ist in Kategorien geteilt (Siedlung, Wehr, Handwerk); **B** wechselt die Kategorie, **1–9** wählt.
+
+| Gebäude | Wirkung |
+|---|---|
+| Lagerhaus | Zweite Annahmestelle für Rohstoffe, kürzere Wege für dich und die Siedler |
+| Falle | Flach am Boden: Gegner nehmen 40 Schaden und werden 3 s langsamer. Hält 3 Auslösungen. |
+| Feuerschale | Licht und Brennschaden ringsum; verbrennt jede Nacht 1 Kohle |
+| Schmiede | Eisenschwert, Rüstung, Bolzen ×25 |
+| Wachturm II | 8 Felder Reichweite, Doppelschuss; auf einen Turm gesetzt zahlst du nur die Differenz |
 
 ### Orte in der Wildnis
 Die Welt um die Flamme ist in drei Ringe geteilt: Je weiter draußen, desto gefährlicher und lohnender. Entdeckte Orte erscheinen auf der Minikarte (Unerkundetes liegt im Nebel). Liegen sie in der Nähe, aber außerhalb der Sicht, zeigt ein Pfeil am Bildschirmrand dorthin.

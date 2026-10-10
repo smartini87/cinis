@@ -16,7 +16,9 @@ export default async function (page) {
     g.speed = 0;
     return { cx: w.cx, cy: w.cy };
   });
-  await page.keyboard.press('Digit4');
+  await page.keyboard.press('KeyB');   // Kategorie „Wehr“
+  await page.waitForTimeout(60);
+  await page.keyboard.press('Digit1'); // Mauer
   const a = await toScreen((base.cx - 6 + 0.5) * 16, (base.cy - 5 + 0.5) * 16);
   const b = await toScreen((base.cx - 2 + 0.5) * 16, (base.cy - 5 + 0.5) * 16);
   await page.mouse.move(a.x, a.y);

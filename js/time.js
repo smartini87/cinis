@@ -116,8 +116,9 @@ export class Lighting {
     for (const b of game.buildings.list) {
       if (b.site) continue;
       if (b.type === 'center') {
-        if (b.hp > 0) light(b.x, b.y - 8, 150 * flick, 1);
+        if (b.hp > 0) light(b.x, b.y - 8, game.flame.light * flick, 1);
       }
+      else if (b.type === 'firebowl' && b.lit !== false) light(b.x, b.y - 6, 90 * flick, 0.9);
       else if (b.type === 'hut') light(b.x, b.y, 44 * flick, 0.75);
       else if (b.type === 'tower') light(b.x, b.y - 14, 58 * flick, 0.8);
     }
@@ -135,7 +136,7 @@ export class Lighting {
     const c = game.buildings.center;
     if (c && c.hp > 0) {
       const s = camera.worldToScreen(c.x, c.y - 10);
-      const r = 110 * camera.zoom * flick;
+      const r = game.flame.light * 0.73 * camera.zoom * flick;
       const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
       grd.addColorStop(0, `rgba(255,140,50,${0.22 * dark})`);
       grd.addColorStop(1, 'rgba(255,140,50,0)');

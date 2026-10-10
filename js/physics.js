@@ -23,6 +23,7 @@ export function nodeSolid(n) {
 
 /** Ist das Gebäude für diese Maske passierbar? (Tore nur für eigene Leute) */
 export function buildingPassable(b, mask) {
+  if (b.type === 'trap') return true; // Fallen liegen flach am Boden
   return b.type === 'gate' && mask === 'friendly' && !b.site;
 }
 

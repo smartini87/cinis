@@ -6,7 +6,7 @@ import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
 import { Player } from './player.js';
-import { Buildings, BUILDABLE } from './buildings.js';
+import { Buildings } from './buildings.js';
 import { Effects } from './particles.js';
 import { Settlers } from './settlers.js';
 import { Enemies } from './enemies.js';
@@ -23,6 +23,9 @@ import { Wildlife } from './wildlife.js';
 import { Progress } from './progress.js';
 import { Intro } from './intro.js';
 import { Pois, POI_TYPES } from './pois.js';
+import { Flame } from './flame.js';
+import { BUILDING_DEFS, BUILD_CATEGORIES, unlockMet } from './buildings.js';
+import { RECIPES, recipeName, recipeUnlocked } from './recipes.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -62,13 +65,14 @@ class Game {
       // Herstellungs-Stationen (nur mit E, damit Leertaste/Klick beim Kämpfen nichts öffnet)
       const p = g.player, c = g.buildings.center;
       if (c && Math.abs(c.x - p.x) < 48 && Math.abs(c.y - p.y) < 48) {
-        out.push({ kind: 'station', obj: c, x: c.x, y: c.y + 20, label: 'Ewige Flamme: herstellen', promptH: 70, reach: 40, prio: 6, eOnly: true,
-          hit: (mx, my) => g.buildings.distTo(c, mx, my) === 0, act: (gg) => gg.openCrafting('flame') });
+        out.push({ kind: 'station', obj: c, x: c.x, y: c.y + 20, label: 'Ewige Flamme: Stufe, Brennstoff, Herstellen', promptH: 70, reach: 40, prio: 6, eOnly: true,
+          hit: (mx, my) => g.buildings.distTo(c, mx, my) === 0, act: (gg) => gg.openPanel('flame', () => gg.ui.showFlame()) });
       }
       for (const b of g.buildings.list) {
-        if (b.type !== 'workbench' || b.site || Math.abs(b.x - p.x) > 30 || Math.abs(b.y - p.y) > 30) continue;
-        out.push({ kind: 'station', obj: b, x: b.x, y: b.y + 6, label: 'Werkbank: herstellen', promptH: 26, reach: 26, eOnly: true,
-          hit: (mx, my) => g.buildings.distTo(b, mx, my) === 0, act: (gg) => gg.openCrafting('workbench') });
+        if ((b.type !== 'workbench' && b.type !== 'forge') || b.site || Math.abs(b.x - p.x) > 40 || Math.abs(b.y - p.y) > 40) continue;
+        const name = b.type === 'forge' ? 'Schmiede' : 'Werkbank';
+        out.push({ kind: 'station', obj: b, x: b.x, y: b.y + (b.size * 16) / 2 - 2, label: `${name}: herstellen`, promptH: b.size * 16 + 10, reach: b.size * 8 + 20, eOnly: true,
+          hit: (mx, my) => g.buildings.distTo(b, mx, my) === 0, act: (gg) => gg.openCrafting(b.type) });
       }
     });
     this.interact.addProvider((g, out) => {
@@ -249,6 +253,9 @@ class Game {
     this.world.renderTerrain();
     this.buildings = new Buildings(this.world);
     this.buildings.add('center', this.world.cx - 1, this.world.cy - 1);
+    this.flame = new Flame();
+    this.buildings.territoryCenter = this.flame.territory;
+    this.buildCat = 0;
     this.stock = { ...START_STOCK };
     this.stats = { built: 0, kills: 0, gathered: 0, lost: 0 };
     this.progress = new Progress(this);
@@ -346,8 +353,9 @@ class Game {
     }
     // Abbrechen zuerst auswerten, damit Esc + neue Auswahl im selben Frame korrekt sind
     if ((inp.wasPressed('Escape') || inp.mouse.rightClicked) && this.buildings.selected) this.buildings.select(null);
-    BUILDABLE.forEach((type, i) => {
-      if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1)) && this.progress.has('b:' + type)) this.buildings.select(type);
+    if (inp.wasPressed('KeyB') && this.progress.has('buildbar')) this.cycleBuildCategory();
+    this.buildChoices().forEach((type, i) => {
+      if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1))) this.buildings.select(type);
     });
     if (inp.wasPressed('KeyX') && this.progress.has('demolish')) this.buildings.select('demolish');
     // Mauern und Tore drehen: R oder Mausrad im Baumodus (sonst zoomt das Mausrad)
@@ -415,12 +423,13 @@ class Game {
 
   /** Feste Lichtquellen (für lightAt und Wildlife); zwischengespeichert bis zur nächsten Belegungsänderung. */
   lightSources() {
-    const c = this.buildings.center, key = `${this.buildings.version}/${c && c.hp > 0 ? 1 : 0}/${this.pois.version}`;
+    const c = this.buildings.center, key = `${this.buildings.version}/${c && c.hp > 0 ? 1 : 0}/${this.pois.version}/${Math.round(this.flame.light)}`;
     if (this._lights && this._lightsKey === key) return this._lights;
     const out = [];
     for (const b of this.buildings.list) {
       if (b.site) continue;
-      if (b.type === 'center' && b.hp > 0) out.push({ x: b.x, y: b.y - 8, r: 150, k: 1 });
+      if (b.type === 'center' && b.hp > 0) out.push({ x: b.x, y: b.y - 8, r: this.flame.light, k: 1 });
+      else if (b.type === 'firebowl' && b.lit !== false) out.push({ x: b.x, y: b.y - 6, r: 90, k: 0.9 });
       else if (b.type === 'hut') out.push({ x: b.x, y: b.y, r: 44, k: 0.75 });
       else if (b.type === 'tower') out.push({ x: b.x, y: b.y - 14, r: 58, k: 0.8 });
     }
@@ -461,6 +470,7 @@ class Game {
     this.buildings.update(dt, this);
     this.settlers.update(dt, this);
     this.enemies.update(dt, this);
+    this.flame.update(dt, this);
     this.wildlife.update(dt, this);
     this.pois.update(dt, this);
     for (let i = this.noises.length - 1; i >= 0; i--) if ((this.noises[i].t -= dt) <= 0) this.noises.splice(i, 1);
@@ -529,6 +539,9 @@ class Game {
 
   // ---------------------------------------------------------------- Spielereignisse
   onDusk(day) {
+    this.flame.burnForNight(this);
+    if (this.over) return;
+    this.buildings.lightFirebowls(this);
     this.enemies.planNight(day, this);
     this.pois.onDusk(day, this);
     this.ui.toast(`Die Dämmerung naht. Nacht ${day}: ${this.enemies.describePlan()}`, 'warn');
@@ -554,7 +567,51 @@ class Game {
   }
 
   onCenterDestroyed() {
+    this.overReason = 'destroyed';
     this.endGame('defeat');
+  }
+
+  /** Glut bei null: die Flamme erlischt. */
+  onFlameOut() {
+    this.overReason = 'out';
+    this.ui.toast('Die Ewige Flamme ist erloschen.', 'danger');
+    this.endGame('defeat');
+  }
+
+  /** Ist ein Gebäude baubar (Einstieg freigeschaltet, Flammenstufe/Bauplan erfüllt)? */
+  isAvailable(type) {
+    return this.progress.has('b:' + type) && unlockMet(this, type);
+  }
+
+  /** Neue Flammenstufe: neu verfügbare Gebäude und Rezepte ankündigen. */
+  onFlameLevel(level) {
+    const news = [];
+    for (const [type, def] of Object.entries(BUILDING_DEFS)) {
+      if (def.unlock && def.unlock.level === level && this.isAvailable(type)) {
+        news.push(def.name);
+        this.ui.reveal('b:' + type);
+      }
+    }
+    for (const r of RECIPES) if (r.unlock && r.unlock.level === level && recipeUnlocked(this, r)) news.push(recipeName(r));
+    this.ui.applyUnlocks();
+    if (news.length) this.ui.toast(`<b>Neu:</b> ${news.join(', ')}`, 'unlock');
+  }
+
+  /** Bau-Kategorie wechseln (B) – nur Kategorien mit verfügbaren Gebäuden. */
+  cycleBuildCategory() {
+    for (let i = 1; i <= BUILD_CATEGORIES.length; i++) {
+      const c = (this.buildCat + i) % BUILD_CATEGORIES.length;
+      if (BUILD_CATEGORIES[c].types.some((t) => this.isAvailable(t))) {
+        this.buildCat = c;
+        this.audio.play('click');
+        return;
+      }
+    }
+  }
+
+  /** In der aktiven Kategorie verfügbare Gebäude (Reihenfolge = Tasten 1–9). */
+  buildChoices() {
+    return BUILD_CATEGORIES[this.buildCat].types.filter((t) => this.isAvailable(t));
   }
 
   endGame(result) {

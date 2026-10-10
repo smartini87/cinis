@@ -135,6 +135,8 @@ export class Enemies {
         e.kvy *= k;
       }
       e.prep = 0;
+      if (e.slowT > 0) e.slowT -= dt;
+      this.checkTrap(e, game);
       // Wächter in den Lagern stehen im Rauch ihrer Feuer und verbrennen nicht
       e.burn = sunny && !(e.guard && e.guard.shade);
       if (e.burn) {
@@ -170,6 +172,24 @@ export class Enemies {
       }
     }
     return best;
+  }
+
+  /** Falle unter dem Gegner auslösen: Schaden und Verlangsamung, nach 3 Auslösungen kaputt. */
+  checkTrap(e, game) {
+    const w = game.world, tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
+    if (!w.inBounds(tx, ty)) return;
+    const b = w.buildingAt[ty * w.w + tx];
+    if (!b || b.type !== 'trap' || b.site || b.dead || (b.cd || 0) > game.time) return;
+    b.cd = game.time + 0.8;
+    b.uses--;
+    e.slowT = 3;
+    game.effects.burst(e.x, e.y - 4, { n: 8, color: ['#9aa0a6', '#8a1c1c'], speed: 40, life: 0.4 });
+    game.audio.play('trap', 0.6);
+    this.hit(e, 40, game);
+    if (b.uses <= 0) {
+      b.flash = 0.2;
+      game.buildings.remove(b);
+    }
   }
 
   /** Elite: deutlich zäher und stärker, glühende Aura. */
@@ -317,7 +337,7 @@ export class Enemies {
       return;
     }
     const b = world.buildingAt[bestI];
-    if (b && !b.dead) {
+    if (b && !b.dead && b.type !== 'trap') {
       if (buildings.distTo(b, e.x, e.y) <= e.r + 4) {
         this.tryAttack(e, def, game, () => damageBuilding(game, b, e.dmg * def.bld), b.x);
         return;
@@ -334,7 +354,7 @@ export class Enemies {
       for (let dx = -1; dx <= 1; dx++) {
         if (!world.inBounds(tx + dx, ty + dy)) continue;
         const b = world.buildingAt[world.idx(tx + dx, ty + dy)];
-        if (!b || b.dead || b.type === 'center') continue;
+        if (!b || b.dead || b.type === 'center' || b.type === 'trap') continue;
         const d = buildings.distTo(b, e.x, e.y);
         if (d > e.r + 6) continue; // nur, was direkt anliegt
         const score = d + (c ? Math.hypot(b.x - c.x, b.y - c.y) * 0.2 : 0);
@@ -351,7 +371,7 @@ export class Enemies {
   step(e, dx, dy, dt, world) {
     const d = Math.hypot(dx, dy);
     if (d < 0.5) return false;
-    const sp = e.speed * dt;
+    const sp = e.speed * dt * (e.slowT > 0 ? 0.4 : 1);
     e.walk += dt * (e.type === 'dog' ? 16 : 9);
     if (Math.abs(dx) > 0.5) e.flip = dx < 0;
     return world.moveEntity(e, (dx / d) * sp, (dy / d) * sp, e.r, 'enemy');

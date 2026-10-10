@@ -400,6 +400,72 @@ function makeWorkbench() {
   return c;
 }
 
+function makeStorehouse() {
+  // Lagerhaus: Holzschuppen mit Fässern (32 x 34)
+  const [c, g] = canvas(32, 34);
+  px(g, 2, 14, 28, 18, '#8a6240');
+  for (let x = 2; x < 30; x += 4) px(g, x, 14, 1, 18, '#6b4a2a');
+  px(g, 11, 20, 10, 12, '#3d2a1c');
+  for (let y = 0; y < 12; y++) px(g, 16 - (8 + y), 2 + y, (8 + y) * 2, 1, y % 3 === 0 ? '#5b3f2a' : '#7a5233');
+  px(g, 3, 26, 5, 6, '#a07c52');
+  px(g, 3, 28, 5, 1, '#5b3f2a');
+  px(g, 24, 27, 5, 5, '#a07c52');
+  px(g, 2, 32, 28, 1, '#3d2a1c');
+  return c;
+}
+
+function makeForge() {
+  // Schmiede: Steinbau mit Esse und Amboss (32 x 36)
+  const [c, g] = canvas(32, 36);
+  px(g, 2, 14, 28, 20, '#8a857a');
+  for (let y = 16; y < 34; y += 4) px(g, 2, y, 28, 1, '#6f6b63');
+  px(g, 22, 0, 6, 16, '#6f6b63');
+  px(g, 22, 0, 6, 2, '#3b3634');
+  px(g, 5, 23, 9, 9, '#2a2018');
+  px(g, 6, 25, 7, 6, '#b8401c');
+  px(g, 18, 26, 8, 3, '#3b3634');
+  px(g, 20, 29, 4, 4, '#3b3634');
+  px(g, 2, 12, 28, 3, '#5b3f2a');
+  px(g, 2, 34, 28, 1, '#3b3634');
+  return c;
+}
+
+function makeTower2() {
+  // Wachturm II: höher, Steinkrone (22 x 52)
+  const [c, g] = canvas(22, 52);
+  px(g, 3, 16, 16, 36, '#9a958a');
+  for (let y = 18; y < 52; y += 4) px(g, 3, y, 16, 1, '#7a766d');
+  px(g, 3, 16, 2, 36, '#b9b4a8');
+  px(g, 17, 16, 2, 36, '#7a766d');
+  px(g, 9, 30, 4, 7, '#2a2420');
+  px(g, 1, 10, 20, 6, '#a8a498');
+  px(g, 1, 10, 20, 1, '#d0ccc0');
+  for (let x = 1; x < 21; x += 5) px(g, x, 6, 3, 4, '#a8a498');
+  return c;
+}
+
+function makeFirebowl() {
+  // Feuerschale: Bronzeschale auf Dreibein (12 x 14)
+  const [c, g] = canvas(12, 14);
+  px(g, 1, 3, 10, 3, '#8a5a2a');
+  px(g, 1, 3, 10, 1, '#c08a4a');
+  px(g, 2, 6, 8, 1, '#6a4420');
+  px(g, 2, 7, 1, 7, '#5b3f2a');
+  px(g, 9, 7, 1, 7, '#5b3f2a');
+  px(g, 5, 7, 2, 7, '#5b3f2a');
+  return c;
+}
+
+function makeTrap(sprung) {
+  // Falle: Holzrahmen mit Eisenspitzen (14 x 8)
+  const [c, g] = canvas(14, 8);
+  px(g, 0, 4, 14, 3, '#6b4a2a');
+  px(g, 0, 4, 14, 1, '#8d6240');
+  if (!sprung) for (let x = 1; x < 14; x += 3) px(g, x, 1, 1, 3, '#c8ccd0');
+  else for (let x = 1; x < 14; x += 3) px(g, x, 3, 2, 1, '#8a8580');
+  return c;
+}
+
 // ------------------------------------------------------------------ Icons (HUD)
 function makeIcon(kind) {
   const [c, g] = canvas(12, 12);
@@ -711,6 +777,12 @@ export function buildSprites() {
   Sprites.herbEmpty = inkSprite(makeHerb(false));
   Sprites.ashpile = inkSprite(makeAshpile());
   Sprites.workbench = inkSprite(makeWorkbench());
+  Sprites.storehouse = inkSprite(makeStorehouse());
+  Sprites.forge = inkSprite(makeForge());
+  Sprites.tower2 = inkSprite(makeTower2());
+  Sprites.firebowl = inkSprite(makeFirebowl());
+  Sprites.trap = inkSprite(makeTrap(false), { edge: 0.3 });
+  Sprites.trapSprung = inkSprite(makeTrap(true), { edge: 0.3 });
 }
 
 /** Data-URL eines Icons für das DOM-HUD. */
@@ -970,7 +1042,7 @@ export function drawBallista(ctx, x, y, angle, recoil) {
 
 /** Kleines Vorschaubild eines Gebäudes für die Bauleiste. */
 export function buildingPreviewURL(type) {
-  let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower, workbench: Sprites.workbench }[type];
+  let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower, workbench: Sprites.workbench, storehouse: Sprites.storehouse, forge: Sprites.forge, tower2: Sprites.tower2, firebowl: Sprites.firebowl, trap: Sprites.trap }[type];
   if (type === 'gate') {
     const [gc, gg] = canvas(16, 24);
     drawGate(gg, 0, 24, 0, 0);

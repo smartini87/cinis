@@ -4,7 +4,7 @@
 import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE } from './config.js';
 import { dist } from './util.js';
 import { T } from './world.js';
-import { Sprites, drawFlame, drawCrops, drawBallista, drawGate, drawWall } from './sprites.js';
+import { Sprites, drawFlame, drawCrops, drawBallista, drawGate, drawWall, drawCampfire } from './sprites.js';
 
 export const BUILDING_DEFS = {
   center: { name: 'Ewige Flamme', size: 3, hp: 1200, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
@@ -14,9 +14,32 @@ export const BUILDING_DEFS = {
   wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
   tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
   gate: { name: 'Tor', size: 1, hp: 420, cost: { wood: 8, stone: 6 }, key: '6', desc: 'Eigene Leute gehen hindurch, Gegner nicht. Lässt sich in Mauern setzen.' },
-  workbench: { name: 'Werkbank', size: 1, hp: 200, cost: { wood: 24, stone: 8 }, key: '7', desc: 'Hier stellst du Werkzeuge, Fackeln, Ausrüstung und Kräuteröl her (E).' },
+  workbench: { name: 'Werkbank', size: 1, hp: 200, cost: { wood: 24, stone: 8 }, unlock: { level: 2 }, desc: 'Hier stellst du Werkzeuge, Fackeln, Stiefel und Kräuteröl her (E).' },
+  storehouse: { name: 'Lagerhaus', size: 2, hp: 260, cost: { wood: 40, stone: 30 }, unlock: { level: 3 }, desc: 'Zweites Lager: Du und deine Siedler liefern auch hier ab – kürzere Wege.' },
+  trap: { name: 'Falle', size: 1, hp: 60, cost: { wood: 6, iron: 2 }, unlock: { blueprint: 'trap' }, desc: 'Gegner, die darüber laufen, nehmen Schaden und werden langsamer. Hält 3 Auslösungen.' },
+  firebowl: { name: 'Feuerschale', size: 1, hp: 150, cost: { stone: 8, iron: 1, coal: 2 }, unlock: { level: 3, blueprint: 'firebowl', any: true }, desc: 'Licht und Brennschaden an Gegnern ringsum. Verbrennt jede Nacht 1 Kohle.' },
+  forge: { name: 'Schmiede', size: 2, hp: 320, cost: { wood: 20, stone: 40, iron: 10 }, unlock: { level: 4, blueprint: 'forge' }, desc: 'Eisenschwert und Rüstung schmieden (E).' },
+  tower2: { name: 'Wachturm II', size: 1, hp: 420, cost: { wood: 20, stone: 30, iron: 6 }, unlock: { level: 5 }, upgradeOf: 'tower', desc: '8 Felder Reichweite, Doppelschuss. Auf einen Turm gesetzt kostet er nur die Differenz.' },
 };
-export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate', 'workbench'];
+/** Reihenfolge aller baubaren Gebäude */
+export const BUILDABLE = ['hut', 'farm', 'well', 'storehouse', 'wall', 'gate', 'tower', 'tower2', 'trap', 'firebowl', 'workbench', 'forge'];
+/** Kategorien der Bauleiste (B wechselt, 1–9 wählt innerhalb) */
+export const BUILD_CATEGORIES = [
+  { id: 'home', name: 'Siedlung', types: ['hut', 'farm', 'well', 'storehouse'] },
+  { id: 'defense', name: 'Wehr', types: ['wall', 'gate', 'tower', 'tower2', 'trap', 'firebowl'] },
+  { id: 'craft', name: 'Handwerk', types: ['workbench', 'forge'] },
+];
+BUILDING_DEFS.gate.upgradeOf = 'wall';
+BUILDING_DEFS.firebowl.light = 90;
+
+/** Erfüllt der Spielstand die Freischaltbedingung (Flammenstufe/Bauplan) eines Gebäudes? */
+export function unlockMet(game, type) {
+  const u = BUILDING_DEFS[type].unlock;
+  if (!u) return true;
+  const lvl = !u.level || (game.flame ? game.flame.level : 1) >= u.level;
+  const bp = !u.blueprint || game.progress.blueprints.has(u.blueprint);
+  return u.any ? (u.level && lvl) || (u.blueprint && bp) : lvl && bp;
+}
 
 export const WELL_INTERVAL = 9;    // Sekunden pro Wasser
 export const SITE_HP = 0.25;       // Baustellen haben ein Viertel der Lebenspunkte (steigt mit dem Material)
@@ -37,6 +60,7 @@ export class Buildings {
     this.rotation = 'auto';   // Mauer/Tor: 'auto' (Ziehrichtung/Nachbarn) oder 0 waagerecht, 1 senkrecht, 2 ↘, 3 ↗
     this.changed = true;      // Belegung geändert (Wegfindung neu berechnen)
     this.version = 0;         // zählt jede Änderung der Gebäudeliste (Caches)
+    this.territoryCenter = TERRITORY_CENTER; // Bauradius um die Flamme (wächst mit der Flammenstufe)
   }
 
   /** Gebäude anlegen und Kacheln belegen (ohne Kostenprüfung). */
@@ -49,6 +73,7 @@ export class Buildings {
       flash: 0, timer: 0, growth: 0, worker: null, aim: -Math.PI / 2, cooldown: 0, recoil: 0,
       sleepers: [], rot: 0, open: 0,
     };
+    if (type === 'trap') b.uses = 3;
     if (type === 'gate') b.rot = rot ?? this.gateRotation(tx, ty);
     if (type === 'wall') b.rot = rot ?? this.wallRotation(tx, ty);
     this.setTiles(b, b);
@@ -179,7 +204,7 @@ export class Buildings {
   inTerritory(tx, ty, size) {
     const mx = tx + size / 2, my = ty + size / 2;
     for (const b of this.list) {
-      const r = b.type === 'center' ? TERRITORY_CENTER : TERRITORY_BUILDING;
+      const r = b.type === 'center' ? this.territoryCenter : TERRITORY_BUILDING;
       if (Math.hypot(b.tx + b.size / 2 - mx, b.ty + b.size / 2 - my) <= r) return true;
     }
     return false;
@@ -195,8 +220,9 @@ export class Buildings {
         if (t === T.WATER || t === T.SHALLOW) return { ok: false, reason: 'Nicht im Wasser bauen' };
         if (w.props[w.idx(x, y)]) return { ok: false, reason: 'Platz ist belegt' };
         const occ = w.buildingAt[w.idx(x, y)];
-        if (occ && !(type === 'gate' && occ.type === 'wall')) return { ok: false, reason: 'Platz ist belegt' };
-        if (occ && occ.rot >= 2) return { ok: false, reason: 'Tore nur in geraden Mauern' };
+        const up = BUILDING_DEFS[type].upgradeOf;
+        if (occ && !(up && occ.type === up && !occ.site)) return { ok: false, reason: 'Platz ist belegt' };
+        if (occ && type === 'gate' && occ.rot >= 2) return { ok: false, reason: 'Tore nur in geraden Mauern' };
         const n = w.nodeAtTile(x, y);
         if (n && !n.removed && (n.amount > 0 || n.type === 'rock')) return { ok: false, reason: `${n.type === 'tree' ? 'Baum' : n.type === 'rock' ? 'Trümmer' : 'Strauch'} im Weg – erst abbauen` };
       }
@@ -207,17 +233,37 @@ export class Buildings {
 
   /** Kosten am Bauplatz: Ein Tor in einer Mauer kostet nur die Differenz. */
   costAt(type, tx, ty) {
-    const cost = BUILDING_DEFS[type].cost;
+    const def = BUILDING_DEFS[type], cost = def.cost;
     const occ = this.world.inBounds(tx, ty) ? this.world.buildingAt[this.world.idx(tx, ty)] : null;
-    if (type !== 'gate' || !occ || occ.type !== 'wall') return cost;
+    if (!def.upgradeOf || !occ || occ.type !== def.upgradeOf) return cost;
     const out = {};
-    for (const k of RES_KEYS) if (cost[k]) out[k] = Math.max(0, cost[k] - (BUILDING_DEFS.wall.cost[k] || 0));
+    for (const k of RES_KEYS) if (cost[k]) out[k] = Math.max(0, cost[k] - (BUILDING_DEFS[def.upgradeOf].cost[k] || 0));
     return out;
+  }
+
+  /** Lager-Annahmestellen: die Flamme und fertige Lagerhäuser. */
+  depots() {
+    const out = this.center ? [this.center] : [];
+    for (const b of this.list) if (b.type === 'storehouse' && !b.site) out.push(b);
+    return out;
+  }
+
+  /** Nächste Annahmestelle zu einem Punkt. */
+  nearestDepot(x, y) {
+    let best = this.center, bd = Infinity;
+    for (const b of this.depots()) {
+      const d = this.distTo(b, x, y);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
   }
 
   place(game, type, tx, ty, rot = null) {
     const def = BUILDING_DEFS[type];
-    if (!game.progress.has('b:' + type)) {
+    if (!game.progress.has('b:' + type) || !unlockMet(game, type)) {
       game.ui.toast(`${def.name} ist noch nicht freigeschaltet.`, 'warn', 'locked');
       return null;
     }
@@ -232,7 +278,7 @@ export class Buildings {
     const old = this.world.buildingAt[this.world.idx(tx, ty)];
     if (old) {
       if (rot === null && type === 'gate') rot = old.rot; // Tor übernimmt die Richtung der Mauer
-      this.remove(old); // Mauer wird durch das Tor ersetzt
+      this.remove(old); // Mauer wird zum Tor, Turm zum Wachturm II
     }
     // Stümpfe/leere Sträucher unter dem Bauplatz verschwinden
     for (let y = ty; y < ty + def.size; y++) {
@@ -302,7 +348,7 @@ export class Buildings {
         total += this.deliverTo(game, b, k, fromInv);
       }
     }
-    const nearFlame = this.center && Math.hypot(b.x - this.center.x, b.y - this.center.y) <= TERRITORY_CENTER * TILE;
+    const nearFlame = this.center && Math.hypot(b.x - this.center.x, b.y - this.center.y) <= this.territoryCenter * TILE;
     if (nearFlame && b.site) {
       for (const [k, n] of this.siteMissing(b, true)) {
         const fromStock = Math.min(n, Math.floor(game.stock[k] || 0));
@@ -479,7 +525,8 @@ export class Buildings {
       if (b.site) continue; // Baustellen arbeiten nicht und werden nicht repariert
       // Siedler reparieren tagsüber beschädigte Gebäude – das kostet anteilig Baumaterial aus dem Lager
       if (sunny && b.hp < b.maxHp) this.repair(b, dt, game);
-      if (b.type === 'tower') this.updateTower(b, dt, game);
+      if (b.type === 'tower' || b.type === 'tower2') this.updateTower(b, dt, game);
+      if (b.type === 'firebowl' && b.lit && !game.cycle.isSunny) this.updateFirebowl(b, dt, game);
       if (b.type === 'gate') this.updateGate(b, dt, game);
       if (b.type === 'well') {
         b.timer += dt;
@@ -526,12 +573,37 @@ export class Buildings {
     if (prev === 0 && b.open > 0 && game.camera.visible(b.x, b.y, 1, 1, 0)) game.audio.play('gate', 0.35);
   }
 
+  /** Feuerschale: Gegner in der Nähe nehmen Brennschaden. */
+  updateFirebowl(b, dt, game) {
+    const r = 2.5 * TILE;
+    for (const e of game.enemies.list) {
+      if (e.dead || Math.abs(e.x - b.x) > r || Math.abs(e.y - b.y) > r || Math.hypot(e.x - b.x, e.y - b.y) > r) continue;
+      e.hp -= 6 * dt;
+      if (Math.random() < dt * 5) game.effects.burst(e.x, e.y - 8, { n: 1, color: ['#ffb040', '#e8742a'], speed: 10, life: 0.5, up: 20, gravity: -20 });
+      if (e.hp <= 0) game.enemies.kill(e, game, false);
+    }
+  }
+
+  /** Abenddämmerung: Feuerschalen verbrennen je 1 Kohle; ohne Kohle bleiben sie dunkel. */
+  lightFirebowls(game) {
+    let dark = 0;
+    for (const b of this.list) {
+      if (b.type !== 'firebowl' || b.site) continue;
+      b.lit = game.stock.coal >= 1;
+      if (b.lit) game.stock.coal -= 1;
+      else dark++;
+    }
+    if (dark) game.ui.toast(`${dark} Feuerschale(n) bleiben ohne Kohle dunkel.`, 'warn', 'bowl');
+    this.version++;
+  }
+
   /** Ballistenturm: nächsten Gegner in Reichweite anvisieren und Bolzen feuern. */
   updateTower(b, dt, game) {
     b.cooldown -= dt;
     if (b.recoil > 0) b.recoil = Math.max(0, b.recoil - dt * 20);
     if (b.cooldown > 0) return;
-    let best = null, bd = TOWER.range;
+    const two = b.type === 'tower2';
+    let best = null, bd = two ? TOWER.range * 8 / 6 : TOWER.range;
     for (const e of game.enemies.list) {
       if (e.dead) continue;
       const d = dist(b.x, b.y, e.x, e.y);
@@ -558,6 +630,12 @@ export class Buildings {
     game.stock.bolts -= 1;
     b.aim = Math.atan2(best.y - 6 - (b.y - 22), best.x - b.x);
     game.combat.fireBolt(b.x, b.y - 22, best, TOWER.damage, TOWER.boltSpeed);
+    // Wachturm II: zweiter Bolzen (auf einen anderen Gegner, falls vorhanden)
+    if (two && game.stock.bolts >= 1) {
+      game.stock.bolts -= 1;
+      const other = game.enemies.list.find((e) => !e.dead && e !== best && dist(b.x, b.y, e.x, e.y) < bd + 40) || best;
+      game.combat.fireBolt(b.x + 3, b.y - 24, other, TOWER.damage, TOWER.boltSpeed);
+    }
     b.cooldown = TOWER.cooldown;
     b.recoil = 3;
     if (game.camera.visible(b.x, b.y, 1, 1, 64)) game.audio.play('bolt', 0.4);
@@ -569,8 +647,8 @@ export class Buildings {
     for (const b of this.list) {
       const x = b.tx * TILE, y = b.ty * TILE, s = b.size * TILE;
       if (!cam.visible(x, y - 40, s, s + 40)) continue;
-      // Farmen liegen flach am Boden und werden zuerst gezeichnet
-      const flat = b.type === 'farm';
+      // Farmen und Fallen liegen flach am Boden und werden zuerst gezeichnet
+      const flat = b.type === 'farm' || b.type === 'trap';
       const h = flat ? 0 : this.spriteHeight(b);
       out.push({ y: flat ? y : y + s - 2, draw: () => this.drawBuilding(ctx, b, time), occ: flat ? null : [x - 2, y + s - h, s + 4, h] });
     }
@@ -586,6 +664,11 @@ export class Buildings {
       case 'tower': return Sprites.tower.height - 2;
       case 'gate': return 24;
       case 'workbench': return Sprites.workbench.height;
+      case 'storehouse': return Sprites.storehouse.height - 2;
+      case 'forge': return Sprites.forge.height - 2;
+      case 'tower2': return Sprites.tower2.height - 2;
+      case 'firebowl': return Sprites.firebowl.height;
+      case 'trap': return 4;
       default: return b.size * TILE;
     }
   }
@@ -647,6 +730,34 @@ export class Buildings {
         break;
       case 'workbench':
         ctx.drawImage(Sprites.workbench, x - 1, bottom - Sprites.workbench.height + 1);
+        break;
+      case 'storehouse':
+        ctx.drawImage(Sprites.storehouse, x, bottom - Sprites.storehouse.height + 2);
+        break;
+      case 'forge':
+        ctx.drawImage(Sprites.forge, x, bottom - Sprites.forge.height + 2);
+        if (Math.sin(time * 3 + b.id) > 0.3) {
+          ctx.fillStyle = '#ffb040';
+          ctx.fillRect(x + 7, bottom - 9, 3, 2);
+        }
+        break;
+      case 'tower2':
+        ctx.drawImage(Sprites.tower2, x - 3, bottom - Sprites.tower2.height + 2);
+        drawBallista(ctx, x + 8, bottom - 40, b.aim, b.recoil);
+        if (b.noAmmo && Math.sin(time * 6) > 0) {
+          ctx.fillStyle = '#1d1712';
+          ctx.fillRect(x + 5, bottom - 60, 6, 8);
+          ctx.fillStyle = '#e04030';
+          ctx.fillRect(x + 7, bottom - 59, 2, 4);
+          ctx.fillRect(x + 7, bottom - 54, 2, 1);
+        }
+        break;
+      case 'firebowl':
+        ctx.drawImage(Sprites.firebowl, x + 2, bottom - Sprites.firebowl.height + 1);
+        if (b.lit !== false) drawFlame(ctx, x + 8, bottom - Sprites.firebowl.height + 3, 3, time + b.id);
+        break;
+      case 'trap':
+        ctx.drawImage(b.uses > 0 || b.uses === undefined ? Sprites.trap : Sprites.trapSprung, x + 1, bottom - Sprites.trap.height - 1);
         break;
     }
     if (b.spawn > 0) ctx.restore();

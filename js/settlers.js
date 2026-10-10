@@ -113,7 +113,9 @@ export class Settlers {
 
   /** Wohnplätze: jede fertige Hütte bietet BUILDING_DEFS.hut.beds Plätze. */
   capacity(game) {
-    return CENTER_BEDS + game.buildings.list.filter((b) => b.type === 'hut' && !b.site).length * BUILDING_DEFS.hut.beds;
+    const beds = CENTER_BEDS + game.buildings.list.filter((b) => b.type === 'hut' && !b.site).length * BUILDING_DEFS.hut.beds;
+    // Die Flamme schützt nur so viele Siedler, wie ihre Stufe erlaubt
+    return game.flame ? Math.min(beds, game.flame.popCap) : beds;
   }
 
   /** Freie Plätze für neue Siedler (Folgende sind schon eingeplant). */
@@ -124,7 +126,8 @@ export class Settlers {
   /** Wartenden Siedler im Lager ansprechen: folgt dem Spieler, sofern ein Platz frei ist. */
   recruit(s, game) {
     if (this.freeBeds(game) <= 0) {
-      game.ui.toast(game.buildings.count('hut') ? 'Alle Plätze sind belegt – du brauchst eine weitere Hütte (4 Plätze).' : 'Du brauchst eine Hütte für neue Siedler (4 Plätze).', 'warn', 'beds');
+      const capped = game.flame && this.capacity(game) >= game.flame.popCap;
+      game.ui.toast(capped ? `Die Flamme schützt höchstens ${game.flame.popCap} Siedler – entfache sie auf eine höhere Stufe.` : game.buildings.count('hut') ? 'Alle Plätze sind belegt – du brauchst eine weitere Hütte (4 Plätze).' : 'Du brauchst eine Hütte für neue Siedler (4 Plätze).', 'warn', 'beds');
       game.audio.play('error');
       return;
     }
@@ -375,10 +378,10 @@ export class Settlers {
     if (this.shouldShelter(s, game)) return this.goShelter(s, game);
     // 1) Bedürfnisse
     if ((s.hunger < SETTLER.needAt && stock.food > 0) || (s.thirst < SETTLER.needAt && stock.water > 0)) {
-      return this.goToBuilding(s, game, { type: 'eat' }, buildings.center);
+      return this.goToBuilding(s, game, { type: 'eat' }, buildings.nearestDepot(s.x, s.y));
     }
-    // 2) Getragenes abliefern
-    if (s.carry) return this.goToBuilding(s, game, { type: 'deliver' }, buildings.center);
+    // 2) Getragenes abliefern (Flamme oder nächstes Lagerhaus)
+    if (s.carry) return this.goToBuilding(s, game, { type: 'deliver' }, buildings.nearestDepot(s.x, s.y));
     // 3) Farmarbeit (am Feldrand, nie auf dem Feld)
     if (s.job === 'farm' && s.farm) return this.goToBuilding(s, game, { type: 'farm', farm: s.farm }, s.farm);
     // 4) Bauen: Material aus dem Lager zur Baustelle tragen
@@ -437,7 +440,7 @@ export class Settlers {
       }
     }
     if (!best) return false;
-    return this.goToBuilding(s, game, { type: 'fetch', site: best[0], res: best[1] }, game.buildings.center);
+    return this.goToBuilding(s, game, { type: 'fetch', site: best[0], res: best[1] }, game.buildings.nearestDepot(best[0].x, best[0].y));
   }
 
   /** Am Lager: Material für die Baustelle aufnehmen (wird an der Baustelle als unterwegs vermerkt). */
