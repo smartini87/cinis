@@ -7,6 +7,9 @@ export default async function (page) {
   await page.waitForTimeout(800);
   await page.screenshot({ path: 'tools/out/menu.png' });
   await page.getByRole('button', { name: 'Neues Spiel', exact: true }).click();
+  await page.waitForTimeout(500);
+  // Beim ersten Spiel läuft das Intro – überspringen
+  if ((await page.evaluate(() => window.__game.state)) === 'intro') await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tools/out/start.png' });
   const st = await page.evaluate(() => window.__game.state);
