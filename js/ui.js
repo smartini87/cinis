@@ -33,6 +33,51 @@ const HELP = `
 <tr><td>Touch</td><td>Links ziehen = laufen, tippen = Aktion/Bauen</td></tr>
 </table>`;
 
+/**
+ * Pfeil am Bildschirmrand, der auf einen Weltpunkt außerhalb der Sicht zeigt (Gegner, Flamme, POIs).
+ * style: { color, size, icon (Zeichen im Pfeil), pulse }. Liefert true, wenn gezeichnet.
+ */
+export function drawEdgeArrow(ctx, cam, wx, wy, style = {}) {
+  const s = cam.worldToScreen(wx, wy);
+  if (s.x >= 0 && s.y >= 0 && s.x <= cam.vw && s.y <= cam.vh) return false;
+  const dpr = window.devicePixelRatio || 1;
+  const cx = cam.vw / 2, cy = cam.vh / 2, margin = 26 * dpr;
+  const a = Math.atan2(s.y - cy, s.x - cx);
+  const k = Math.min((cx - margin) / Math.abs(Math.cos(a) || 1e-6), (cy - margin) / Math.abs(Math.sin(a) || 1e-6));
+  const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
+  const sz = 8 * dpr * (style.size || 1) * (style.pulse ? 1 + Math.sin(performance.now() / 180) * 0.12 : 1);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(a);
+  ctx.fillStyle = style.color || 'rgba(208,64,42,0.85)';
+  ctx.beginPath();
+  ctx.moveTo(sz, 0);
+  ctx.lineTo(-sz, -sz * 0.7);
+  ctx.lineTo(-sz * 0.5, 0);
+  ctx.lineTo(-sz, sz * 0.7);
+  ctx.closePath();
+  ctx.fill();
+  if (style.outline) {
+    ctx.strokeStyle = style.outline;
+    ctx.lineWidth = dpr;
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (style.icon) {
+    ctx.save();
+    const ix = x - Math.cos(a) * sz * 2.1, iy = y - Math.sin(a) * sz * 2.1;
+    ctx.font = `bold ${Math.round(11 * dpr)}px Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(style.icon, ix + dpr, iy + dpr);
+    ctx.fillStyle = style.color || '#fff';
+    ctx.fillText(style.icon, ix, iy);
+    ctx.restore();
+  }
+  return true;
+}
+
 /** Kurzhelfer zum Erzeugen von DOM-Elementen. */
 function el(tag, cls, parent, html) {
   const e = document.createElement(tag);
@@ -219,6 +264,16 @@ export class UI {
       const r = e.type === 'boss' ? 4 : 3;
       m.fillRect(Math.floor((e.x / TILE) * k) - r / 2, Math.floor((e.y / TILE) * k) - r / 2, r, r);
     }
+    // Flamme als pulsierender Ring (wichtigster Ort)
+    const c = g.buildings.center;
+    if (c) {
+      const fx = (c.x / TILE) * k, fy = (c.y / TILE) * k, pr = 5 + Math.sin(g.time * 4) * 1.5;
+      m.strokeStyle = 'rgba(255,200,90,0.9)';
+      m.lineWidth = 1.5;
+      m.beginPath();
+      m.arc(fx, fy, pr, 0, Math.PI * 2);
+      m.stroke();
+    }
     const p = g.player;
     if (!p.dead) {
       m.fillStyle = '#fff';
@@ -400,11 +455,7 @@ export class UI {
     if (p.carried >= p.capacity) return 'Voll beladen – zurück zur Ewigen Flamme, um abzuliefern.';
     if (g.enemies.list.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 40)) return `${key} Angreifen`;
     const t = p.target;
-    if (t) {
-      if (t.kind === 'water') return `${key} Wasser schöpfen`;
-      const verbs = { tree: 'Holz fällen', rock: 'Stein brechen', bush: 'Feigen pflücken' };
-      return `${key} ${verbs[t.node.type]}`;
-    }
+    if (t && t.label) return `${touch ? 'Tippen' : '[E/Leertaste]'} ${t.label}`;
     return '';
   }
 

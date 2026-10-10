@@ -564,10 +564,14 @@ export class World {
         } else if (t === T.GRASS && h > 0.975) {
           c = [150, 140, 70]; // vereinzelte Halme
         }
+        // Boden zurücknehmen (entsättigt, dunkler), damit Figuren, Gebäude und Interactables herausstechen
+        const wet = t === T.WATER || t === T.SHALLOW;
+        const sat = wet ? 0.95 : 0.75, dim = wet ? 0.96 : 0.88;
+        const l = (c[0] + c[1] + c[2]) / 3;
         const o = (py * W + px) * 4;
-        d[o] = clamp(c[0] * k, 0, 255);
-        d[o + 1] = clamp(c[1] * k, 0, 255);
-        d[o + 2] = clamp(c[2] * k, 0, 255);
+        d[o] = clamp((l + (c[0] - l) * sat) * k * dim, 0, 255);
+        d[o + 1] = clamp((l + (c[1] - l) * sat) * k * dim, 0, 255);
+        d[o + 2] = clamp((l + (c[2] - l) * sat) * k * dim, 0, 255);
         d[o + 3] = 255;
       }
     }

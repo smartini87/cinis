@@ -5,7 +5,7 @@ import {
   PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
-import { drawHumanoid } from './sprites.js';
+import { drawHumanoid, OUTLINE } from './sprites.js';
 import { dist } from './util.js';
 
 /** Partikelfarben beim Abbauen */
@@ -84,7 +84,7 @@ export class Player {
     if (this.moving) this.walk += dt * 12 * Math.min(1, sp / this.speed);
     else this.walk = 0;
 
-    this.target = this.findTarget(game);
+    this.target = game.interact.update(game);
     this.actionT -= dt;
     this.swing = Math.max(0, this.swing - dt);
     const mouseAct = input.mouse.down && game.mouseActionAllowed();
@@ -107,49 +107,6 @@ export class Player {
     }
   }
 
-  /** Bestes Sammelziel bestimmen: Mauszeiger > Blickrichtung > nächstes Wasser. */
-  findTarget(game) {
-    const { world, camera, input } = game;
-    const reach = PLAYER_REACH;
-    const valid = (n) => n && !n.removed && n.amount > 0;
-    if (input.mouse.inside) {
-      const w = camera.screenToWorld(input.mouse.x, input.mouse.y);
-      const tx = Math.floor(w.x / TILE), ty = Math.floor(w.y / TILE);
-      const n = world.nodeAtTile(tx, ty);
-      if (valid(n) && dist(this.x, this.y, n.x, n.y) <= reach + 6) return { kind: 'node', node: n, x: n.x, y: n.y };
-      if (world.isWaterTile(tx, ty) && this.distToTile(tx, ty) <= 10) return { kind: 'water', x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE, tx, ty };
-    }
-    let best = null, bestScore = Infinity;
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        const n = world.nodeAtTile(this.tx + dx, this.ty + dy);
-        if (!valid(n)) continue;
-        const d = dist(this.x, this.y, n.x, n.y);
-        if (d > reach) continue;
-        const dot = ((n.x - this.x) * this.aimX + (n.y - this.y) * this.aimY) / Math.max(d, 1);
-        const score = d - dot * 10;
-        if (score < bestScore) {
-          bestScore = score;
-          best = n;
-        }
-      }
-    }
-    if (best) return { kind: 'node', node: best, x: best.x, y: best.y };
-    let bestW = null, bestD = 10;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const tx = this.tx + dx, ty = this.ty + dy;
-        if (!world.isWaterTile(tx, ty)) continue;
-        const d = this.distToTile(tx, ty);
-        if (d <= bestD) {
-          bestD = d;
-          bestW = { kind: 'water', x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE, tx, ty };
-        }
-      }
-    }
-    return bestW;
-  }
-
   distToTile(tx, ty) {
     const x0 = tx * TILE, y0 = ty * TILE;
     const dx = Math.max(x0 - this.x, 0, this.x - (x0 + TILE)), dy = Math.max(y0 - this.y, 0, this.y - (y0 + TILE));
@@ -170,6 +127,10 @@ export class Player {
     const t = this.target;
     if (!t) return;
     this.faceTowards(t.x, t.y);
+    if (t.act) {
+      t.act(game);
+      return;
+    }
     if (this.carried >= this.capacity) {
       ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
       return;
@@ -261,8 +222,8 @@ export class Player {
   draw(ctx, sil = null) {
     if (this.dead) return;
     drawHumanoid(ctx, this.x, this.y, {
-      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0, silhouette: sil,
-      tunic: '#a8322c', skin: '#c99a6e', helmet: '#b8a04a', plume: '#c0392b', belt: '#6b4a2a',
+      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0, silhouette: sil, outline: OUTLINE.player,
+      tunic: '#c8302a', skin: '#d6a676', helmet: '#e0b84a', plume: '#e8402c', belt: '#5a3a1e',
     });
     if (this.swing > 0 && !sil) {
       // Werkzeug-/Waffenschwung in Blickrichtung

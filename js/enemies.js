@@ -3,7 +3,8 @@
 
 import { TILE, SUN_BURN } from './config.js';
 import { NIGHT_LEN } from './time.js';
-import { drawEnemy } from './sprites.js';
+import { drawEnemy, OUTLINE } from './sprites.js';
+import { drawEdgeArrow } from './ui.js';
 import { damageBuilding, damageUnit } from './combat.js';
 import { dist } from './util.js';
 
@@ -277,7 +278,7 @@ export class Enemies {
   }
 
   drawOne(ctx, e, time) {
-    drawEnemy(ctx, e, time);
+    drawEnemy(ctx, e, time, null, OUTLINE.enemy);
     if (e.hp < e.maxHp) {
       const w = e.type === 'boss' ? 20 : e.type === 'brute' ? 14 : 10;
       const top = e.type === 'boss' ? 36 : e.type === 'brute' ? 28 : 21;
@@ -290,30 +291,10 @@ export class Enemies {
 
   /** Pfeile am Bildschirmrand, die auf Gegner außerhalb der Sicht zeigen. */
   drawIndicators(ctx, cam) {
-    const cx = cam.vw / 2, cy = cam.vh / 2;
-    const margin = 26 * (window.devicePixelRatio || 1);
     let n = 0;
     for (const e of this.list) {
       if (n > 12) break;
-      const s = cam.worldToScreen(e.x, e.y - 8);
-      if (s.x >= 0 && s.y >= 0 && s.x <= cam.vw && s.y <= cam.vh) continue;
-      n++;
-      const a = Math.atan2(s.y - cy, s.x - cx);
-      const k = Math.min((cx - margin) / Math.abs(Math.cos(a) || 1e-6), (cy - margin) / Math.abs(Math.sin(a) || 1e-6));
-      const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(a);
-      const sz = 8 * (window.devicePixelRatio || 1) * (e.type === 'boss' ? 1.6 : 1);
-      ctx.fillStyle = e.type === 'boss' ? 'rgba(255,90,40,0.95)' : 'rgba(208,64,42,0.85)';
-      ctx.beginPath();
-      ctx.moveTo(sz, 0);
-      ctx.lineTo(-sz, -sz * 0.7);
-      ctx.lineTo(-sz * 0.5, 0);
-      ctx.lineTo(-sz, sz * 0.7);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      if (drawEdgeArrow(ctx, cam, e.x, e.y - 8, e.type === 'boss' ? { color: 'rgba(255,90,40,0.95)', size: 1.6 } : { color: 'rgba(208,64,42,0.85)' })) n++;
     }
   }
 }

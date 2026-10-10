@@ -32,6 +32,88 @@ function blob(g, cx, cy, rx, ry, color, seed = 0, rough = 0) {
   }
 }
 
+// ------------------------------------------------------------------ Lesbarkeit: Konturen, Farbe, Silhouetten
+/**
+ * Macht ein Sprite kräftiger (Sättigung/Kontrast) und dunkelt die äußersten Pixel ab (1-px-Innenkontur),
+ * damit Gebäude und Interactables sich vom entsättigten Boden abheben.
+ */
+function inkSprite(c, { sat = 1.18, con = 1.06, edge = 0.55 } = {}) {
+  const g = c.getContext('2d');
+  const img = g.getImageData(0, 0, c.width, c.height), d = img.data, W = c.width, H = c.height;
+  const alpha = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : d[(y * W + x) * 4 + 3]);
+  const edgeMask = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (alpha(x, y) < 200) continue;
+      if (alpha(x - 1, y) < 100 || alpha(x + 1, y) < 100 || alpha(x, y - 1) < 100 || alpha(x, y + 1) < 100) edgeMask[y * W + x] = 1;
+    }
+  }
+  for (let i = 0; i < W * H; i++) {
+    const o = i * 4;
+    if (d[o + 3] === 0) continue;
+    let r = d[o], gg = d[o + 1], b = d[o + 2];
+    const l = (r + gg + b) / 3;
+    r = l + (r - l) * sat;
+    gg = l + (gg - l) * sat;
+    b = l + (b - l) * sat;
+    r = 128 + (r - 128) * con;
+    gg = 128 + (gg - 128) * con;
+    b = 128 + (b - 128) * con;
+    if (edgeMask[i]) {
+      r *= 1 - edge;
+      gg *= 1 - edge;
+      b *= 1 - edge * 0.85;
+    }
+    d[o] = Math.max(0, Math.min(255, r));
+    d[o + 1] = Math.max(0, Math.min(255, gg));
+    d[o + 2] = Math.max(0, Math.min(255, b));
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+const tintCache = new Map();
+/** Einfarbige Silhouette eines Sprites (zwischengespeichert). */
+export function tinted(img, color) {
+  let m = tintCache.get(img);
+  if (!m) tintCache.set(img, (m = new Map()));
+  let t = m.get(color);
+  if (!t) {
+    const [c, g] = canvas(img.width, img.height);
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, img.width, img.height);
+    m.set(color, (t = c));
+  }
+  return t;
+}
+
+/** Sprite mit 1-px-Außenkontur (z. B. Glow des aktuellen Interactables) zeichnen. */
+export function drawOutlinedImage(ctx, img, x, y, color, alpha = 1) {
+  const t = tinted(img, color);
+  const a = ctx.globalAlpha;
+  ctx.globalAlpha = a * alpha;
+  ctx.drawImage(t, x - 1, y);
+  ctx.drawImage(t, x + 1, y);
+  ctx.drawImage(t, x, y - 1);
+  ctx.drawImage(t, x, y + 1);
+  ctx.globalAlpha = a;
+  ctx.drawImage(img, x, y);
+}
+
+/** Weicher Bodenschatten (Ellipse aus Pixelzeilen) unter einer Figur. */
+export function drawShadow(ctx, x, y, rx, alpha = 0.32) {
+  x = Math.round(x);
+  y = Math.round(y);
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  const ry = Math.max(1, Math.round(rx * 0.35));
+  for (let i = -ry; i <= ry; i++) {
+    const w = Math.round(rx * Math.sqrt(1 - (i * i) / ((ry + 0.5) * (ry + 0.5))));
+    ctx.fillRect(x - w, y + i, w * 2, 1);
+  }
+}
+
 // ------------------------------------------------------------------ Bäume, Steine, Büsche
 function makePine(v) {
   // Römische Schirmpinie: dünner Stamm, flache breite Krone
@@ -293,18 +375,18 @@ function makeFarm() {
 
 /** Alle statischen Sprites erzeugen (einmalig beim Start). */
 export function buildSprites() {
-  Sprites.pine = [0, 1, 2].map(makePine);
-  Sprites.cypress = makeCypress();
-  Sprites.stump = makeStump();
-  Sprites.rock = [0, 1, 2].map(makeRock);
-  Sprites.bush = makeBush(true);
-  Sprites.bushEmpty = makeBush(false);
-  Sprites.center = makeCenter();
-  Sprites.hut = makeHut();
-  Sprites.well = makeWell();
-  Sprites.wall = makeWall();
-  Sprites.tower = makeTower();
-  Sprites.farm = makeFarm();
+  Sprites.pine = [0, 1, 2].map((v) => inkSprite(makePine(v)));
+  Sprites.cypress = inkSprite(makeCypress());
+  Sprites.stump = inkSprite(makeStump(), { edge: 0.35 });
+  Sprites.rock = [0, 1, 2].map((v) => inkSprite(makeRock(v)));
+  Sprites.bush = inkSprite(makeBush(true), { sat: 1.3 });
+  Sprites.bushEmpty = inkSprite(makeBush(false), { sat: 1.1 });
+  Sprites.center = inkSprite(makeCenter());
+  Sprites.hut = inkSprite(makeHut());
+  Sprites.well = inkSprite(makeWell());
+  Sprites.wall = inkSprite(makeWall());
+  Sprites.tower = inkSprite(makeTower());
+  Sprites.farm = inkSprite(makeFarm(), { edge: 0.3 });
   Sprites.icons = {};
   for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
 }
@@ -315,24 +397,32 @@ export function iconURL(kind) {
 }
 
 // ------------------------------------------------------------------ Ressourcenknoten
-export function drawNode(ctx, node) {
+/** Sprite und Position eines Knotens (für Zeichnen und Glow). */
+export function nodeSprite(node) {
   const x = node.tx * TILE, y = node.ty * TILE;
   const sh = node.shake > 0 ? Math.round(Math.sin(node.shake * 60) * 1) : 0;
   if (node.type === 'tree') {
-    if (node.amount <= 0) {
-      ctx.drawImage(Sprites.stump, x, y + 6);
-      return;
-    }
-    if (node.variant === 2) ctx.drawImage(Sprites.cypress, x + 2 + sh, y - 14);
-    else ctx.drawImage(Sprites.pine[node.variant], x - 4 + sh, y - 14);
-  } else if (node.type === 'rock') {
-    ctx.drawImage(Sprites.rock[node.variant], x - 1 + sh, y);
-  } else if (node.type === 'bush') {
-    ctx.drawImage(node.amount > 0 ? Sprites.bush : Sprites.bushEmpty, x + sh, y + 2);
+    if (node.amount <= 0) return [Sprites.stump, x, y + 6];
+    if (node.variant === 2) return [Sprites.cypress, x + 2 + sh, y - 14];
+    return [Sprites.pine[node.variant], x - 4 + sh, y - 14];
   }
+  if (node.type === 'rock') return [Sprites.rock[node.variant], x - 1 + sh, y];
+  if (node.type === 'bush') return [node.amount > 0 ? Sprites.bush : Sprites.bushEmpty, x + sh, y + 2];
+  return null;
+}
+
+/** Knoten zeichnen; glow > 0 = pulsierende goldene Kontur (Interactable in Reichweite). */
+export function drawNode(ctx, node, glow = 0) {
+  const s = nodeSprite(node);
+  if (!s) return;
+  if (glow > 0) drawOutlinedImage(ctx, s[0], s[1], s[2], '#ffd36a', glow);
+  else ctx.drawImage(s[0], s[1], s[2]);
 }
 
 // ------------------------------------------------------------------ Figuren
+const OUTLINE_OFFSETS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+/** Umrissfarben: Spieler hell, Siedler dunkel, Gegner dunkelrot */
+export const OUTLINE = { player: '#fff3c4', settler: '#20160f', enemy: '#2a0805' };
 /**
  * Zeichnet eine menschliche Figur mit Füßen bei (x,y).
  * o: { flip, walk (Animationsphase), tunic, skin, hair, helmet, plume, hurt, carry }
@@ -340,6 +430,13 @@ export function drawNode(ctx, node) {
 export function drawHumanoid(ctx, x, y, o) {
   x = Math.round(x);
   y = Math.round(y);
+  if (o.outline && !o.silhouette) {
+    // Schatten, dann 1-px-Umriss (Silhouette 4× versetzt), dann die Figur
+    drawShadow(ctx, x, y, 5);
+    for (const [dx, dy] of OUTLINE_OFFSETS) drawHumanoid(ctx, x + dx, y + dy, { ...o, silhouette: o.outline, outline: null, noShadow: true });
+    drawHumanoid(ctx, x, y, { ...o, outline: null, noShadow: true });
+    return;
+  }
   const f = o.flip ? -1 : 1;
   // Rechteck relativ zur Figur, horizontal gespiegelt bei Blick nach links
   const sil = o.silhouette;
@@ -351,7 +448,7 @@ export function drawHumanoid(ctx, x, y, o) {
   const bob = o.walk ? Math.abs(Math.round(Math.sin(o.walk))) : 0;
   const skin = o.hurt ? '#ffffff' : o.skin;
   const tunic = o.hurt ? '#ffffff' : o.tunic;
-  if (!sil) R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
+  if (!sil && !o.noShadow) R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
   // Beine
   R(-3, -5, 2, 4 + Math.max(0, step), skin);
   R(1, -5, 2, 4 + Math.max(0, -step), skin);
@@ -470,12 +567,19 @@ export function buildingPreviewURL(type) {
  * Zeichnet einen Gegner mit Füßen bei (e.x, e.y).
  * e: { type, flip, walk, hurt, attack (0..1 Ausholbewegung), burn }
  */
-export function drawEnemy(ctx, e, time, sil = null) {
+export function drawEnemy(ctx, e, time, sil = null, outline = null) {
+  if (outline && !sil) {
+    const big = e.type === 'brute' || e.type === 'boss';
+    drawShadow(ctx, e.x, e.y, e.type === 'boss' ? 9 : big ? 7 : e.type === 'dog' ? 6 : 5, 0.36);
+    for (const [dx, dy] of OUTLINE_OFFSETS) drawEnemy(ctx, { ...e, x: e.x + dx, y: e.y + dy }, time, outline);
+    drawEnemy(ctx, e, time, '');
+    return;
+  }
   const x = Math.round(e.x), y = Math.round(e.y);
   const f = e.flip ? -1 : 1;
   const white = e.hurt > 0;
   const R = (rx, ry, w, h, c) => {
-    if (sil && c.startsWith('rgba(0,0,0')) return; // Schatten nicht in der Silhouette
+    if (sil !== null && c.startsWith('rgba(0,0,0')) return; // Schatten nicht in Silhouette/Umriss-Durchgang
     ctx.fillStyle = sil || (white ? '#ffffff' : c);
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };

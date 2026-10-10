@@ -4,7 +4,7 @@
 import { TILE, RES, RES_KEYS, SETTLER, FARM_GROW_TIME, FARM_YIELD, SETTLER_ARRIVAL_COST } from './config.js';
 import { NODE_DEFS, T } from './world.js';
 import { CENTER_BEDS, BUILDING_DEFS } from './buildings.js';
-import { drawHumanoid } from './sprites.js';
+import { drawHumanoid, OUTLINE } from './sprites.js';
 import { dist, hash2 } from './util.js';
 
 const NAMES = ['Marcus', 'Livia', 'Gaius', 'Iulia', 'Titus', 'Octavia', 'Lucius', 'Cornelia', 'Quintus', 'Aurelia', 'Decimus', 'Flavia',
@@ -557,7 +557,7 @@ export class Settlers {
   drawSettler(ctx, s, time, sil = null) {
     const working = s.task && (s.task.type === 'gather' || s.task.type === 'farm' || s.task.type === 'water') && !s.moving;
     drawHumanoid(ctx, s.x, s.y, {
-      flip: s.flip, walk: s.moving ? s.walk : working ? Math.sin(time * 8) * 0.6 : 0, silhouette: sil,
+      flip: s.flip, walk: s.moving ? s.walk : working ? Math.sin(time * 8) * 0.6 : 0, silhouette: sil, outline: OUTLINE.settler,
       tunic: s.tunic, skin: '#c99a6e', hair: s.hair, hurt: s.hurt > 0, carry: s.carry ? s.carry.res : null,
     });
     if (sil) return;

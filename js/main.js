@@ -17,6 +17,8 @@ import { SoundEngine } from './audio.js';
 import { saveGame, loadGame, deleteSave } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
 import { SpatialHash, separateUnits, resolve } from './physics.js';
+import { Interact } from './interact.js';
+import { drawEdgeArrow } from './ui.js';
 
 class Game {
   constructor() {
@@ -41,6 +43,7 @@ class Game {
     this.combat = new Combat();
     this.enemies = new Enemies();
     this.lighting = new Lighting();
+    this.interact = new Interact();
     this.ui = new UI(this);
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -382,7 +385,7 @@ class Game {
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const n = world.nodeAtTile(tx, ty);
-        if (n && !n.removed) list.push({ y: n.y + 4, draw: () => drawNode(ctx, n), occ: n.type === 'tree' && n.amount > 0 ? [n.x - 10, n.y - 22, 20, 22] : null });
+        if (n && !n.removed) list.push({ y: n.y + 4, draw: () => drawNode(ctx, n, this.interact.glowFor(n, this.time)), occ: n.type === 'tree' && n.amount > 0 ? [n.x - 10, n.y - 22, 20, 22] : null });
       }
     }
     this.buildings.collectDrawables(list, ctx, camera, this.time);
@@ -405,6 +408,8 @@ class Game {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
     if (this.state !== 'menu') {
+      this.interact.drawPrompt(ctx, this);
+      this.drawPoiArrows(ctx);
       this.enemies.drawIndicators(ctx, camera);
       this.ui.drawMinimap();
       this.drawJoystick(ctx);
@@ -459,11 +464,17 @@ class Game {
     ctx.fill();
   }
 
-  /** Pulsierende Eckklammern um das aktuelle Sammelziel. */
+  /** Randpfeile zu wichtigen Orten außerhalb der Sicht (die Flamme; später Lager und POIs). */
+  drawPoiArrows(ctx) {
+    const c = this.buildings.center;
+    if (c && c.hp > 0) drawEdgeArrow(ctx, this.camera, c.x, c.y - 8, { color: 'rgba(255,200,90,0.95)', outline: 'rgba(60,30,10,0.8)', size: 1.3, icon: '♨', pulse: true });
+  }
+
+  /** Pulsierende Eckklammern um eine Wasserstelle (Knoten leuchten selbst). */
   drawTargetMarker(ctx) {
     const t = this.player.target;
-    if (!t || this.player.dead) return;
-    const tx = t.kind === 'node' ? t.node.tx : t.tx, ty = t.kind === 'node' ? t.node.ty : t.ty;
+    if (!t || this.player.dead || t.kind !== 'water') return;
+    const tx = t.tx, ty = t.ty;
     const x = tx * TILE, y = ty * TILE, o = Math.round(Math.sin(this.time * 6)) - 1;
     ctx.fillStyle = 'rgba(255,230,160,0.9)';
     for (const [cx, cy, sx, sy] of [[x, y, 1, 1], [x + TILE, y, -1, 1], [x, y + TILE, 1, -1], [x + TILE, y + TILE, -1, -1]]) {
