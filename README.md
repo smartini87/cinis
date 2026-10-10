@@ -4,6 +4,8 @@ Rom ist gefallen. Asche bedeckt die sieben Hügel, und nachts kriecht sie als Ge
 
 Single-Player Survival-/Colony-Builder als HTML5-Spiel: Canvas 2D, Vanilla JavaScript (ES-Module), keine Libraries, keine externen Assets. Grafik (Pixel-Look) und Sound (WebAudio) werden komplett per Code erzeugt.
 
+**Online spielen:** https://smartini87.github.io/cinis/
+
 ## Starten
 
 ```bash
