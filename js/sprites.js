@@ -198,6 +198,99 @@ function makeCenter() {
   return c;
 }
 
+function makeHut() {
+  // Kleines Steinhaus mit Terrakotta-Ziegeldach (32 x 40)
+  const [c, g] = canvas(32, 40);
+  px(g, 3, 20, 26, 18, '#b9a98a');
+  for (let y = 22; y < 38; y += 4) for (let x = 3 + ((y / 4) % 2) * 3; x < 29; x += 6) px(g, x, y, 1, 3, '#9a8a6c');
+  for (let y = 21; y < 38; y += 4) px(g, 3, y, 26, 1, '#a39375');
+  px(g, 3, 37, 26, 1, '#6f6450');
+  // Tür + Fenster
+  px(g, 13, 27, 7, 11, '#3d2a1c');
+  px(g, 14, 28, 5, 10, '#5b3f2a');
+  px(g, 16, 32, 1, 1, '#c9a24a');
+  px(g, 6, 25, 4, 4, '#2a2420');
+  px(g, 23, 25, 4, 4, '#ffd27a');
+  // Dach
+  for (let y = 0; y < 14; y++) {
+    const w = 6 + y * 1.3;
+    px(g, Math.round(16 - w), 7 + y, Math.round(w * 2), 1, y % 3 === 0 ? '#8a3a20' : '#b5532c');
+  }
+  px(g, 14, 5, 4, 3, '#8a3a20');
+  for (let x = 0; x < 32; x += 3) px(g, x, 20, 1, 1, '#6a2a14');
+  px(g, 0, 20, 32, 1, '#7a3018');
+  return c;
+}
+
+function makeWell() {
+  const [c, g] = canvas(16, 24);
+  // Holzgestell
+  px(g, 2, 3, 2, 14, '#6b4a2a');
+  px(g, 12, 3, 2, 14, '#6b4a2a');
+  px(g, 1, 2, 14, 2, '#8d6240');
+  px(g, 7, 4, 1, 6, '#c9b07a');
+  px(g, 6, 9, 3, 3, '#7a5233');
+  // Steinring
+  px(g, 1, 13, 14, 9, '#8e8a80');
+  px(g, 1, 13, 14, 1, '#c3beb2');
+  px(g, 3, 14, 10, 3, '#2c5f86');
+  px(g, 4, 15, 3, 1, '#6aa6bb');
+  for (let x = 1; x < 15; x += 4) px(g, x, 18, 1, 4, '#6f6b63');
+  px(g, 1, 21, 14, 1, '#5a5650');
+  return c;
+}
+
+function makeWall() {
+  const [c, g] = canvas(16, 22);
+  px(g, 0, 6, 16, 16, '#9a958a');
+  px(g, 0, 6, 16, 2, '#c3beb2');
+  for (let y = 10; y < 22; y += 4) {
+    px(g, 0, y, 16, 1, '#7a766d');
+    const off = (y / 4) % 2 ? 0 : 5;
+    for (let x = off; x < 16; x += 8) px(g, x, y + 1, 1, 3, '#7a766d');
+  }
+  // Zinnen
+  px(g, 1, 2, 4, 4, '#a8a498');
+  px(g, 11, 2, 4, 4, '#a8a498');
+  px(g, 1, 2, 4, 1, '#d0ccc0');
+  px(g, 11, 2, 4, 1, '#d0ccc0');
+  px(g, 0, 21, 16, 1, '#5a5650');
+  return c;
+}
+
+function makeTower() {
+  const [c, g] = canvas(20, 40);
+  px(g, 3, 14, 14, 26, '#9a958a');
+  for (let y = 16; y < 40; y += 4) px(g, 3, y, 14, 1, '#7a766d');
+  px(g, 3, 14, 2, 26, '#b9b4a8');
+  px(g, 15, 14, 2, 26, '#7a766d');
+  px(g, 8, 24, 4, 6, '#2a2420');
+  // Holzplattform
+  px(g, 1, 10, 18, 4, '#7a5233');
+  px(g, 1, 10, 18, 1, '#a07c52');
+  for (let x = 2; x < 19; x += 4) px(g, x, 13, 2, 2, '#5b3f2a');
+  return c;
+}
+
+function makeFarm() {
+  const [c, g] = canvas(32, 32);
+  px(g, 0, 0, 32, 32, '#5e4630');
+  for (let y = 3; y < 32; y += 5) {
+    px(g, 1, y, 30, 2, '#4a3624');
+    px(g, 1, y + 2, 30, 1, '#6f553c');
+  }
+  // Zaun
+  px(g, 0, 0, 32, 1, '#8d6240');
+  px(g, 0, 31, 32, 1, '#8d6240');
+  px(g, 0, 0, 1, 32, '#8d6240');
+  px(g, 31, 0, 1, 32, '#8d6240');
+  for (let i = 0; i < 32; i += 8) {
+    px(g, i, 0, 2, 2, '#6b4a2a');
+    px(g, i, 30, 2, 2, '#6b4a2a');
+  }
+  return c;
+}
+
 /** Alle statischen Sprites erzeugen (einmalig beim Start). */
 export function buildSprites() {
   Sprites.pine = [0, 1, 2].map(makePine);
@@ -207,6 +300,11 @@ export function buildSprites() {
   Sprites.bush = makeBush(true);
   Sprites.bushEmpty = makeBush(false);
   Sprites.center = makeCenter();
+  Sprites.hut = makeHut();
+  Sprites.well = makeWell();
+  Sprites.wall = makeWall();
+  Sprites.tower = makeTower();
+  Sprites.farm = makeFarm();
   Sprites.icons = {};
   for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
 }
@@ -303,4 +401,60 @@ export function drawFlame(ctx, x, y, size, t) {
       ctx.fillRect(x - w + sway, y - i, w * 2, 1);
     }
   }
+}
+
+/** Feldfrüchte auf einer Farm (Wachstum 0..1). */
+export function drawCrops(ctx, x, y, growth) {
+  const stage = Math.min(3, Math.floor(growth * 4));
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 6; col++) {
+      const cx = x + 3 + col * 5, cy = y + 3 + row * 5;
+      if (stage === 0) {
+        ctx.fillStyle = '#4f8a3f';
+        ctx.fillRect(cx + 1, cy, 1, 1);
+      } else if (stage === 1) {
+        ctx.fillStyle = '#4f8a3f';
+        ctx.fillRect(cx, cy - 1, 1, 2);
+        ctx.fillRect(cx + 2, cy - 1, 1, 2);
+      } else {
+        ctx.fillStyle = '#3f7234';
+        ctx.fillRect(cx, cy - 3, 3, 4);
+        if (stage === 3) {
+          ctx.fillStyle = '#d9b25a';
+          ctx.fillRect(cx, cy - 4, 3, 2);
+        }
+      }
+    }
+  }
+}
+
+/** Ballista oben auf dem Turm, zeigt in Richtung angle. */
+export function drawBallista(ctx, x, y, angle, recoil) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.rotate(angle);
+  ctx.fillStyle = '#5b3f2a';
+  ctx.fillRect(-4 - recoil, -1, 10, 3);
+  ctx.fillStyle = '#8d6240';
+  ctx.fillRect(2 - recoil, -5, 2, 11);
+  ctx.fillStyle = '#d8d4ca';
+  ctx.fillRect(4 - recoil, 0, 4, 1);
+  ctx.restore();
+}
+
+/** Kleines Vorschaubild eines Gebäudes für die Bauleiste. */
+export function buildingPreviewURL(type) {
+  let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower }[type];
+  if (type === 'farm') {
+    const [fc, fg] = canvas(32, 32);
+    fg.drawImage(Sprites.farm, 0, 0);
+    drawCrops(fg, 0, 0, 0.8);
+    spr = fc;
+  }
+  const [c, g] = canvas(40, 40);
+  g.imageSmoothingEnabled = false;
+  const k = Math.min(36 / spr.width, 36 / spr.height);
+  const w = spr.width * k, h = spr.height * k;
+  g.drawImage(spr, Math.round(20 - w / 2), Math.round(38 - h), Math.round(w), Math.round(h));
+  return c.toDataURL();
 }

@@ -20,7 +20,7 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') 
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}\n${e.stack || ''}`));
 page.on('requestfailed', (r) => errors.push(`[requestfailed] ${r.url()}`));
 
-await page.goto(`http://localhost:${port}/`);
+await page.goto(`http://localhost:${port}/?seed=${process.env.SEED || 4242}`);
 await page.waitForTimeout(1500);
 // Standardablauf: ein wenig herumlaufen
 for (const k of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {

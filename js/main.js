@@ -5,7 +5,7 @@ import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
 import { Player } from './player.js';
-import { Buildings } from './buildings.js';
+import { Buildings, BUILDABLE } from './buildings.js';
 import { Effects } from './particles.js';
 import { UI } from './ui.js';
 import { buildSprites, drawNode } from './sprites.js';
@@ -26,7 +26,9 @@ class Game {
     this.ui = new UI(this);
     window.addEventListener('resize', () => this.resize());
     this.resize();
-    this.newGame((Math.random() * 1e9) | 0);
+    // ?seed=123 erzwingt eine bestimmte Welt (reproduzierbare Tests)
+    const qs = new URLSearchParams(location.search).get('seed');
+    this.newGame(qs ? Number(qs) >>> 0 : (Math.random() * 1e9) | 0);
     requestAnimationFrame((t) => this.frame(t));
   }
 
@@ -45,6 +47,7 @@ class Game {
     this.buildings = new Buildings(this.world);
     this.buildings.add('center', this.world.cx - 1, this.world.cy - 1);
     this.stock = { ...START_STOCK };
+    this.stats = { built: 0, kills: 0, gathered: 0 };
     this.effects.clear();
     const cx = (this.world.cx + 0.5) * TILE, cy = (this.world.cy + 2.5) * TILE;
     this.player = new Player(cx, cy);
@@ -63,16 +66,23 @@ class Game {
       this.update(STEP);
       this.acc -= STEP;
       steps++;
-      if (steps === 1) this.input.endFrame(); // Flanken nur im ersten Schritt auswerten
     }
     if (steps >= 8) this.acc = 0; // Spirale des Todes vermeiden
+    this.input.endFrame(); // Flanken werden ausschließlich in handleFrameInput ausgewertet
     this.render();
     requestAnimationFrame((t) => this.frame(t));
   }
 
-  /** Eingaben, die unabhängig von der Simulation pro Frame gelten (Zoom, Debug). */
+  /** Eingaben mit Flanken (Tastendruck/Klick) – genau einmal pro Frame ausgewertet. */
   handleFrameInput() {
     const inp = this.input;
+    // Abbrechen zuerst auswerten, damit Esc + neue Auswahl im selben Frame korrekt sind
+    if ((inp.wasPressed('Escape') || inp.mouse.rightClicked) && this.buildings.selected) this.buildings.select(null);
+    BUILDABLE.forEach((type, i) => {
+      if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1))) this.buildings.select(type);
+    });
+    if (inp.wasPressed('KeyX')) this.buildings.select('demolish');
+    this.buildings.updateBuildMode(this);
     if (inp.mouse.wheel) {
       this.camera.addZoom(-inp.mouse.wheel);
       inp.mouse.wheel = 0;
@@ -82,14 +92,14 @@ class Game {
 
   /** Darf die linke Maustaste gerade als Spieleraktion gelten? */
   mouseActionAllowed() {
-    return true;
+    return !this.buildings.selected;
   }
 
   update(dt) {
     this.time += dt;
     this.world.updateNodes(dt);
     this.player.update(dt, this);
-    this.buildings.update(dt);
+    this.buildings.update(dt, this);
     this.effects.update(dt);
     this.camera.follow(this.player.x, this.player.y - 8, dt);
   }
@@ -117,7 +127,8 @@ class Game {
     list.push({ y: this.player.y, draw: () => this.player.draw(ctx) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
-    this.drawTargetMarker(ctx);
+    if (!this.buildings.selected) this.drawTargetMarker(ctx);
+    this.buildings.drawGhost(ctx, this.time);
     this.effects.drawParticles(ctx);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);

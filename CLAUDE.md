@@ -10,7 +10,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-- `window.__game` ist die Spielinstanz (für Tests/Debug).
+- `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
+- Eingabe-Flanken (`wasPressed`, `mouse.clicked`) nur in `Game.handleFrameInput()` auswerten – sie gelten genau einen Frame.
 
 ## Architektur (js/)
 | Modul | Verantwortung |
@@ -23,7 +24,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, Kollision, Gelände-Rendering |
 | `sprites.js` | Prozedurale Pixel-Grafik (Offscreen-Canvases) + Figuren-Zeichner |
 | `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
-| `buildings.js` | Gebäudedefinitionen, Belegungsraster (`world.buildingAt`), Zeichnen |
+| `buildings.js` | Gebäudedefinitionen + Kosten, Bausystem (Vorschau/Platzieren/Abriss, Bauradius), Belegungsraster (`world.buildingAt`), Brunnen-Produktion, Zeichnen |
 | `particles.js` | Partikel + schwebende Texte (`game.effects`) |
 | `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`) |
 

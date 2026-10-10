@@ -1,7 +1,8 @@
 // ui.js – DOM-HUD über dem Canvas: Ressourcen, Traglast, Hinweise, Meldungen.
 
 import { RES, RES_KEYS } from './config.js';
-import { iconURL } from './sprites.js';
+import { iconURL, buildingPreviewURL } from './sprites.js';
+import { BUILDING_DEFS, BUILDABLE } from './buildings.js';
 
 /** Kurzhelfer zum Erzeugen von DOM-Elementen. */
 function el(tag, cls, parent, html) {
@@ -41,6 +42,42 @@ export class UI {
     el('div', 'lbl', carry, 'Getragen');
     this.carryBar = el('div', 'fill', el('div', 'bar', carry));
     this.carryTxt = el('div', 'carry-txt', carry);
+    // Bauleiste (unten Mitte)
+    this.buildBar = el('div', 'panel buildbar', hud);
+    this.buildBtns = {};
+    for (const type of [...BUILDABLE, 'demolish']) {
+      const btn = el('button', 'bslot', this.buildBar);
+      btn.type = 'button';
+      if (type === 'demolish') {
+        el('div', 'demo-icon', btn, '⛏');
+        el('div', 'bname', btn, 'Abriss');
+        el('div', 'bcost', btn, '50 % zurück');
+        el('span', 'bkey', btn, 'X');
+        btn.title = 'Abriss: Gebäude anklicken, die Hälfte der Kosten wird erstattet.';
+      } else {
+        const def = BUILDING_DEFS[type];
+        const img = el('img', 'bimg', btn);
+        img.src = buildingPreviewURL(type);
+        img.alt = def.name;
+        el('div', 'bname', btn, def.name);
+        const cost = el('div', 'bcost', btn);
+        for (const k of RES_KEYS) {
+          if (!def.cost[k]) continue;
+          const c = el('span', 'c', cost);
+          const ic = el('img', 'ci', c);
+          ic.src = iconURL(k);
+          ic.alt = RES[k].name;
+          el('span', '', c, String(def.cost[k]));
+        }
+        el('span', 'bkey', btn, def.key);
+        btn.title = `${def.name}: ${def.desc}`;
+      }
+      btn.addEventListener('click', () => {
+        this.game.buildings.select(type);
+        this.game.audio?.play('click');
+      });
+      this.buildBtns[type] = btn;
+    }
     // Hinweiszeile + Meldungen
     this.hint = el('div', 'hint', hud);
     this.toasts = el('div', 'toasts', hud);
@@ -64,12 +101,25 @@ export class UI {
     const parts = RES_KEYS.filter((k) => p.inv[k] > 0).map((k) => `${p.inv[k]} ${RES[k].name}`);
     this.set('carryT', this.carryTxt, `${c}/${p.capacity}` + (parts.length ? ' · ' + parts.join(', ') : ''));
     this.set('hint', this.hint, this.contextHint());
+    const bs = g.buildings;
+    for (const type of [...BUILDABLE, 'demolish']) {
+      const btn = this.buildBtns[type];
+      const cls = 'bslot' + (bs.selected === type ? ' active' : '') + (type !== 'demolish' && !bs.canAfford(g, BUILDING_DEFS[type].cost) ? ' poor' : '');
+      this.set('b' + type, btn, cls, 'className');
+    }
   }
 
   /** Kontextabhängiger Steuerungshinweis am unteren Rand. */
   contextHint() {
     const g = this.game, p = g.player, touch = g.input.usingTouch;
     const key = touch ? 'Tippen' : '[Leertaste/Klick]';
+    const bs = g.buildings;
+    if (bs.selected === 'demolish') return touch ? 'Gebäude antippen zum Abreißen' : 'Gebäude anklicken zum Abreißen · Rechtsklick/Esc: beenden';
+    if (bs.selected) {
+      const def = BUILDING_DEFS[bs.selected];
+      if (bs.ghost && !bs.ghost.ok) return `${def.name}: ${bs.ghost.reason}`;
+      return touch ? `${def.name} – zum Bauen tippen` : `${def.name} – Klick: bauen${bs.selected === 'wall' ? ' (ziehen für Reihen)' : ''} · Rechtsklick/Esc: abbrechen`;
+    }
     if (p.carried >= p.capacity) return 'Voll beladen – zurück zur Ewigen Flamme, um abzuliefern.';
     const t = p.target;
     if (t) {

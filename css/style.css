@@ -84,3 +84,36 @@ html, body {
   .carry-panel { width: 150px; }
   .hint { font-size: 13px; bottom: 96px; white-space: normal; text-align: center; width: 90vw; }
 }
+
+/* ---------------------------------------------------------------- Bauleiste */
+.buildbar {
+  left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 6px; pointer-events: auto;
+}
+.bslot {
+  position: relative; width: 78px; padding: 4px 2px 3px; border: 2px solid #4a3c28; border-radius: 3px;
+  background: #2a231d; color: #efe6d2; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+}
+.bslot:hover { border-color: #b08a4a; background: #352b22; }
+.bslot.active { border-color: #ffd36a; background: #4a3a24; box-shadow: 0 0 8px rgba(255, 211, 106, 0.5); }
+.bslot.poor .bcost { color: #e07a6a; }
+.bslot.poor .bimg { opacity: 0.55; }
+.bimg { width: 40px; height: 40px; image-rendering: pixelated; }
+.demo-icon { height: 40px; font-size: 28px; line-height: 40px; }
+.bname { font-size: 13px; font-weight: bold; }
+.bcost { font-size: 11px; display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; color: #d9cba8; }
+.bcost .c { display: inline-flex; align-items: center; gap: 1px; }
+.ci { width: 12px; height: 12px; image-rendering: pixelated; }
+.bkey {
+  position: absolute; top: 2px; left: 4px; font-size: 11px; color: #b9a988; font-family: monospace;
+}
+
+@media (max-width: 640px) {
+  .buildbar { gap: 3px; padding: 3px; bottom: 6px; }
+  .bslot { width: 52px; }
+  .bimg, .demo-icon { width: 28px; height: 28px; font-size: 20px; line-height: 28px; }
+  .bname { font-size: 10px; }
+  .bcost { font-size: 9px; }
+  .bkey { display: none; }
+  .carry-panel { bottom: auto; top: 10px; left: auto; right: 10px; }
+}
