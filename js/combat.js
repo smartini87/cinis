@@ -74,7 +74,7 @@ export function damageBuilding(game, b, dmg) {
 
 /** Schaden an einer Einheit (Siedler oder Spieler). */
 export function damageUnit(game, u, dmg, kx = 0, ky = 0) {
-  if (u.dead || u.hidden) return;
+  if (u.dead || u.hidden || u.invuln > 0) return;
   u.hp -= dmg;
   u.hurt = 0.15;
   u.lastHit = game.time;

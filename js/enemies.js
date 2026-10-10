@@ -100,7 +100,7 @@ export class Enemies {
       hp: def.hp * hpMul, maxHp: def.hp * hpMul, dmg: def.dmg * dmgMul,
       speed: def.speed * (0.9 + Math.random() * 0.2),
       cd: Math.random() * def.cd, flip: false, walk: Math.random() * 6, hurt: 0, attack: 0,
-      target: null, retarget: 0, dead: false, burn: false, blockedT: 0,
+      target: null, retarget: 0, dead: false, burn: false, blockedT: 0, kvx: 0, kvy: 0, prep: 0,
     };
     this.list.push(e);
     return e;
@@ -121,6 +121,14 @@ export class Enemies {
     for (const e of this.list) {
       if (e.hurt > 0) e.hurt -= dt;
       if (e.attack > 0) e.attack = Math.max(0, e.attack - dt * 3);
+      // Rückstoß klingt schnell ab
+      if (Math.abs(e.kvx) + Math.abs(e.kvy) > 1) {
+        world.moveEntity(e, e.kvx * dt, e.kvy * dt, e.r, 'enemy');
+        const k = Math.exp(-12 * dt);
+        e.kvx *= k;
+        e.kvy *= k;
+      }
+      e.prep = 0;
       e.burn = sunny;
       if (sunny) {
         // Im Sonnenlicht zerfallen sie zu Asche
@@ -238,7 +246,10 @@ export class Enemies {
 
   tryAttack(e, def, game, fn, tx) {
     e.flip = tx < e.x;
+    // Ausholen kurz vor dem Schlag (sichtbare Vorwarnung)
+    e.prep = e.cd < 0.3 ? 1 - Math.max(0, e.cd) / 0.3 : 0;
     if (e.cd > 0) return;
+    e.prep = 0;
     e.cd = def.cd;
     e.attack = 1;
     fn();
@@ -251,7 +262,8 @@ export class Enemies {
     e.hp -= dmg;
     e.hurt = 0.12;
     const kb = e.type === 'boss' ? 0.1 : e.type === 'brute' ? 0.3 : 1;
-    game.world.moveEntity(e, kx * kb, ky * kb, e.r, 'enemy');
+    e.kvx += kx * kb * 14;
+    e.kvy += ky * kb * 14;
     game.effects.burst(e.x, e.y - 8, { n: 4, color: ['#5a5450', '#8a8580', '#e8742a'], speed: 40, life: 0.4 });
     if (e.hp <= 0) this.kill(e, game, true);
   }
@@ -261,6 +273,10 @@ export class Enemies {
     e.dead = true;
     const big = e.type === 'brute' || e.type === 'boss';
     game.effects.burst(e.x, e.y - 8, { n: big ? 40 : 18, color: ['#5a5450', '#3b3634', '#8a8580', '#e8742a', '#b8401c'], speed: big ? 70 : 45, life: 0.9, up: 25 });
+    // Zerfall zu Asche: Figur sinkt ein und verblasst, Flocken steigen auf
+    const ghost = { ...e, hurt: 0, attack: 0, prep: 0 };
+    game.effects.corpse((ctx, k) => drawEnemy(ctx, { ...ghost, y: ghost.y + k * 4 }, 0, k > 0.5 ? '#3b3634' : null), 0.5);
+    game.effects.burst(e.x, e.y - 6, { n: big ? 18 : 8, color: ['#8a8580', '#5a5450'], speed: 10, life: 1.4, up: 22, gravity: -8, drag: 0.5 });
     if (byPlayer) {
       game.stats.kills++;
       game.audio.play('enemyDie', 0.6);

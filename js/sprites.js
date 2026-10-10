@@ -195,6 +195,18 @@ function makeBush(withFruit) {
   return c;
 }
 
+function makeSack() {
+  // Beutesack mit Schnur
+  const [c, g] = canvas(12, 11);
+  blob(g, 6, 7, 5, 3, '#8a6a46', 2);
+  blob(g, 6, 6, 4, 3, '#a8845a', 3);
+  px(g, 5, 2, 3, 2, '#8a6a46');
+  px(g, 4, 3, 5, 1, '#5b3f2a');
+  px(g, 3, 6, 1, 2, '#c9a87a');
+  px(g, 2, 10, 9, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
 // ------------------------------------------------------------------ Icons (HUD)
 function makeIcon(kind) {
   const [c, g] = canvas(12, 12);
@@ -387,6 +399,7 @@ export function buildSprites() {
   Sprites.wall = inkSprite(makeWall());
   Sprites.tower = inkSprite(makeTower());
   Sprites.farm = inkSprite(makeFarm(), { edge: 0.3 });
+  Sprites.sack = inkSprite(makeSack());
   Sprites.icons = {};
   for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
 }
@@ -425,57 +438,158 @@ const OUTLINE_OFFSETS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 export const OUTLINE = { player: '#fff3c4', settler: '#20160f', enemy: '#2a0805' };
 /**
  * Zeichnet eine menschliche Figur mit Füßen bei (x,y).
- * o: { flip, walk (Animationsphase), tunic, skin, hair, helmet, plume, hurt, carry }
+ * o: {
+ *   flip, walk (Laufphase, 0 = steht), breath (Zeit für Idle-Atmung), dir ('side' | 'up' | 'down'),
+ *   lean (Körperneigung in Blickrichtung, px), arm (Weltwinkel des vorderen Arms oder null), item ('sword' | 'axe' | 'pick' | 'hoe' | 'bucket'),
+ *   pose ('stand' | 'kneel' | 'lie'), tunic, skin, hair, helmet, plume, belt, hurt, carry, silhouette, outline, noShadow
+ * }
  */
 export function drawHumanoid(ctx, x, y, o) {
   x = Math.round(x);
   y = Math.round(y);
   if (o.outline && !o.silhouette) {
     // Schatten, dann 1-px-Umriss (Silhouette 4× versetzt), dann die Figur
-    drawShadow(ctx, x, y, 5);
+    if (o.pose !== 'lie') drawShadow(ctx, x, y, 5);
     for (const [dx, dy] of OUTLINE_OFFSETS) drawHumanoid(ctx, x + dx, y + dy, { ...o, silhouette: o.outline, outline: null, noShadow: true });
     drawHumanoid(ctx, x, y, { ...o, outline: null, noShadow: true });
     return;
   }
+  if (o.pose === 'lie') {
+    // Liegend: um 90° zur Seite gekippt
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((o.flip ? 1 : -1) * Math.PI / 2);
+    drawHumanoid(ctx, 0, 0, { ...o, pose: 'stand', walk: 0, arm: null, item: null, carry: null, noShadow: true });
+    ctx.restore();
+    return;
+  }
   const f = o.flip ? -1 : 1;
-  // Rechteck relativ zur Figur, horizontal gespiegelt bei Blick nach links
   const sil = o.silhouette;
+  // Rechteck relativ zur Figur, horizontal gespiegelt bei Blick nach links
   const R = (rx, ry, w, h, c) => {
     ctx.fillStyle = sil || c;
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };
-  const step = o.walk ? Math.round(Math.sin(o.walk) * 1.5) : 0;
-  const bob = o.walk ? Math.abs(Math.round(Math.sin(o.walk))) : 0;
+  const dir = o.dir || 'side';
+  const walking = !!o.walk;
+  const step = walking ? Math.round(Math.sin(o.walk) * 1.6) : 0;
+  const swingArm = walking ? Math.round(Math.sin(o.walk) * 1.5) : 0;
+  const breath = !walking && o.breath !== undefined && Math.sin(o.breath * 2.2) > 0.55 ? 1 : 0;
+  const kneel = o.pose === 'kneel' ? 3 : 0;
+  const bob = (walking ? Math.abs(Math.round(Math.sin(o.walk))) : 0) + breath - kneel;
+  const lean = Math.round(o.lean || 0);
   const skin = o.hurt ? '#ffffff' : o.skin;
   const tunic = o.hurt ? '#ffffff' : o.tunic;
+  const dark = o.hurt ? '#ffffff' : '#4a3020';
   if (!sil && !o.noShadow) R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
-  // Beine
-  R(-3, -5, 2, 4 + Math.max(0, step), skin);
-  R(1, -5, 2, 4 + Math.max(0, -step), skin);
-  R(-3, -1 + Math.max(0, step), 2, 1, '#4a3020');
-  R(1, -1 + Math.max(0, -step), 2, 1, '#4a3020');
+  // Beine (beim Knien kurz)
+  if (kneel) {
+    R(-3, -2, 2, 2, skin);
+    R(1, -3, 3, 2, skin);
+    R(-3, -1, 2, 1, dark);
+  } else {
+    R(-3, -5, 2, 4 + Math.max(0, step), skin);
+    R(1, -5, 2, 4 + Math.max(0, -step), skin);
+    R(-3, -1 + Math.max(0, step), 2, 1, dark);
+    R(1, -1 + Math.max(0, -step), 2, 1, dark);
+  }
+  const by = -bob;
+  // hinterer Arm (schwingt gegenläufig)
+  R(-5 + Math.round(lean * 0.5), -10 + by - swingArm * 0.5, 1, 5, o.hurt ? '#ffffff' : shade(o.skin));
   // Körper
-  R(-4, -11 - bob, 8, 7, tunic);
-  R(-4, -6 - bob, 8, 1, o.belt || '#5a3d24');
-  // Arme
-  R(-5, -10 - bob, 1, 5, skin);
-  R(4, -10 - bob, 1, 5, skin);
+  R(-4 + lean, -11 + by, 8, 7, tunic);
+  R(-4 + lean, -6 + by, 8, 1, o.belt || '#5a3d24');
   // Kopf
-  R(-3, -16 - bob, 6, 5, skin);
-  R(1, -14 - bob, 1, 1, '#1d1712');
+  const hx = lean + (dir === 'side' ? 0 : 0);
+  R(-3 + hx, -16 + by, 6, 5, skin);
+  if (dir === 'side') R(1 + hx, -14 + by, 1, 1, '#1d1712');
+  else if (dir === 'down') {
+    R(-2 + hx, -14 + by, 1, 1, '#1d1712');
+    R(1 + hx, -14 + by, 1, 1, '#1d1712');
+  }
   if (o.helmet) {
-    R(-3, -17 - bob, 6, 3, o.helmet);
-    R(-4, -15 - bob, 1, 3, o.helmet);
-    if (o.plume) R(-2, -19 - bob, 5, 2, o.plume);
+    R(-3 + hx, -17 + by, 6, dir === 'up' ? 5 : 3, o.helmet);
+    if (dir === 'side') R(-4 + hx, -15 + by, 1, 3, o.helmet);
+    if (o.plume) R(-2 + hx, -19 + by, 5, 2, o.plume);
   } else if (o.hair) {
-    R(-3, -17 - bob, 6, 2, o.hair);
-    R(-3, -15 - bob, 1, 2, o.hair);
+    R(-3 + hx, -17 + by, 6, dir === 'up' ? 5 : 2, o.hair);
+    if (dir === 'side') R(-3 + hx, -15 + by, 1, 2, o.hair);
+  }
+  // vorderer Arm: frei schwingend oder mit Werkzeug/Waffe im angegebenen Weltwinkel
+  const sx = x + f * (2 + lean), sy = y - 10 + by;
+  if (o.arm === null || o.arm === undefined) {
+    R(4 + lean, -10 + by + swingArm * 0.5, 1, 5, skin);
+    if (o.item === 'sword' && !sil) {
+      // Schwert hängt locker in der Hand nach unten
+      drawItem(ctx, x + f * (4 + lean) + (f > 0 ? 0 : 0), y - 5 + by + swingArm * 0.5, Math.PI / 2 - f * 0.35, 'sword', null);
+    }
+  } else {
+    const hand = line(ctx, sx, sy, o.arm, 5, sil || skin, 1);
+    drawItem(ctx, hand[0], hand[1], o.arm, o.item, sil);
   }
   if (o.carry) {
     // getragene Ressource über dem Kopf
-    const col = { wood: '#8d6240', stone: '#b9b4a8', food: '#7a3266', water: '#3f86c0' }[o.carry];
-    R(-3, -22 - bob, 6, 4, col);
-    R(-3, -22 - bob, 6, 1, 'rgba(255,255,255,0.35)');
+    const col = { wood: '#8d6240', stone: '#b9b4a8', food: '#7a3266', water: '#3f86c0', hide: '#8a6a4a' }[o.carry] || '#b9a98a';
+    R(-3, -22 + by, 6, 4, col);
+    R(-3, -22 + by, 6, 1, 'rgba(255,255,255,0.35)');
+    R(-4, -20 + by, 1, 4, skin);
+    R(3, -20 + by, 1, 4, skin);
+  }
+}
+
+/** Etwas dunklerer Farbton (hintere Körperteile). */
+function shade(hex) {
+  if (!hex || hex[0] !== '#' || hex.length !== 7) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) * 0.78, g = ((n >> 8) & 255) * 0.78, b = (n & 255) * 0.78;
+  return `rgb(${r | 0},${g | 0},${b | 0})`;
+}
+
+/** Pixelgenaue Linie (Arm, Griff) von (x,y) im Winkel a; liefert den Endpunkt. */
+function line(ctx, x, y, a, len, color, w = 1) {
+  ctx.fillStyle = color;
+  const dx = Math.cos(a), dy = Math.sin(a);
+  for (let i = 0; i <= len; i++) ctx.fillRect(Math.round(x + dx * i), Math.round(y + dy * i), w, w);
+  return [x + dx * len, y + dy * len];
+}
+
+/** Werkzeug bzw. Waffe in der Hand bei (x,y), ausgerichtet im Winkel a. */
+export function drawItem(ctx, x, y, a, item, sil = null) {
+  if (!item) return;
+  const C = (c) => sil || c;
+  const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx;
+  const P = (along, side, c, sz = 1) => {
+    ctx.fillStyle = C(c);
+    ctx.fillRect(Math.round(x + dx * along + nx * side), Math.round(y + dy * along + ny * side), sz, sz);
+  };
+  if (item === 'sword') {
+    // Gladius: Griff, Parierstange, breite Klinge
+    for (let i = -1; i <= 1; i++) P(i, 0, '#6b4a2a');
+    for (let s2 = -2; s2 <= 2; s2++) P(2, s2, '#b8a04a');
+    for (let i = 3; i <= 11; i++) {
+      P(i, 0, '#e4e8ec');
+      P(i, 1, i < 11 ? '#aab0b6' : '#e4e8ec');
+    }
+    P(12, 0, '#ffffff');
+  } else if (item === 'axe') {
+    for (let i = -1; i <= 7; i++) P(i, 0, '#7a5233');
+    for (let s2 = 1; s2 <= 3; s2++) {
+      P(6, s2, '#9aa0a6');
+      P(7, s2, '#c8ccd0');
+    }
+  } else if (item === 'pick') {
+    for (let i = -1; i <= 7; i++) P(i, 0, '#7a5233');
+    for (let s2 = -3; s2 <= 3; s2++) P(7 - Math.abs(s2) * 0.4, s2, '#9aa0a6');
+  } else if (item === 'hoe') {
+    for (let i = -1; i <= 8; i++) P(i, 0, '#7a5233');
+    for (let s2 = 1; s2 <= 3; s2++) P(8, s2, '#8e8a80');
+  } else if (item === 'bucket') {
+    P(1, -1, '#5b3f2a', 3);
+    P(1, 1, '#3f86c0', 2);
+  } else if (item === 'torch') {
+    for (let i = -1; i <= 6; i++) P(i, 0, '#7a5233');
+    P(7, 0, '#ffd36a', 2);
+    P(8, -1, '#f0a53a', 2);
   }
 }
 
@@ -584,7 +698,7 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };
   const step = Math.round(Math.sin(e.walk) * 1.5);
-  const lunge = e.attack > 0 ? Math.round(Math.sin(e.attack * Math.PI) * 3) : 0;
+  const lunge = e.attack > 0 ? Math.round(Math.sin(e.attack * Math.PI) * 3) : e.prep ? -Math.round(e.prep * 2) : 0;
   const eye = e.burn ? '#ffe08a' : '#ff7a2a';
   switch (e.type) {
     case 'walker': {

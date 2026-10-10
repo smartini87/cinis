@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `balance`.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt).
@@ -37,7 +37,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
 | `save.js` | Spielstand in localStorage (`cinis.save.v1`): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
-| `particles.js` | Partikel + schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
+| `particles.js` | Partikel, `converge` (Funken fliegen zu einem Punkt), `corpse` (zerfallende Figuren), schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
+| `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
 
@@ -54,4 +55,6 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - Siedlerziele an Gebäuden immer über `buildings.accessPoint(b, x, y)`, an Knoten über `world.accessTile(...)`.
 - Belegungsänderungen setzen `world.navDirty` (über `buildings.setTiles`) – das Navigationsraster wird bei der nächsten Wegsuche neu aufgebaut.
 - `buildings.changed = true` nach jeder Belegungsänderung → Flussfeld wird im nächsten Update neu berechnet.
-- Szenario-Tests können die Simulation synchron vorspulen: `for (...) game.update(1/60)`.
+- Szenario-Tests können die Simulation synchron vorspulen: `for (...) game.update(1/60)`. Für Screenshots eines bestimmten Moments `game.speed = 0` setzen (friert ein, Rendering läuft weiter).
+- `Game.update` pausiert für `game.hitStop` Schritte (Trefferpause) – Tests, die exakte Schrittzahlen erwarten, berücksichtigen das.
+- Figuren: `drawHumanoid(ctx, x, y, o)` mit `walk`, `breath`, `dir`, `arm` (Weltwinkel) + `item`, `lean`, `pose`, `outline`, `silhouette`.

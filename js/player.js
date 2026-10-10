@@ -1,12 +1,13 @@
-// player.js – der Spieler: Bewegung, Zielwahl, Sammeln, Inventar und Abliefern an der Flamme.
+// player.js – der Spieler: Bewegung (Beschleunigung), Angriff mit Ausholen/Schlag/Erholen, Sammeln mit
+// Fortschritt, Inventar, Abliefern an der Flamme sowie Tod und Rückkehr an der Flamme.
 
 import {
-  TILE, RES, RES_KEYS, PLAYER_CAPACITY, PLAYER_REACH, DEPOSIT_RANGE, GATHER_TIME,
+  TILE, RES, RES_KEYS, PLAYER_CAPACITY, DEPOSIT_RANGE, GATHER_TIME,
   PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
-import { dist } from './util.js';
+import { dist, lerp } from './util.js';
 
 /** Partikelfarben beim Abbauen */
 const CHIP_COLORS = {
@@ -15,6 +16,17 @@ const CHIP_COLORS = {
   bush: ['#7a3266', '#3f7234', '#a8579a'],
   water: ['#7fc0ea', '#cfeaf8', '#3f86c0'],
 };
+/** Werkzeug in der Hand beim Sammeln */
+const GATHER_ITEM = { tree: 'axe', rock: 'pick', bush: null, water: 'bucket' };
+
+/** Angriffs-Zeitleiste in Sekunden */
+const ATK = { windup: 0.09, strike: 0.1, recover: 0.15 };
+/** Armstellung (relativ zur Blickrichtung) in den Phasen: Ruhe → ausgeholt → durchgezogen */
+const ARM_REST = -0.5, ARM_RAISED = 1.9, ARM_FOLLOW = -1.3;
+export const STAND_UP = 0.7;   // Dauer der Aufsteh-Animation
+export const RESPAWN_INVULN = 1.5;
+
+const ease = (k) => 1 - (1 - k) * (1 - k);
 
 export class Player {
   constructor(x, y) {
@@ -32,14 +44,22 @@ export class Player {
     this.inv = { wood: 0, stone: 0, food: 0, water: 0 };
     this.capacity = PLAYER_CAPACITY;
     this.actionT = 0;     // Abklingzeit bis zur nächsten Aktion
-    this.swing = 0;       // Restdauer der Schwunganimation
-    this.target = null;   // aktuelles Sammelziel
+    this.atk = null;      // laufender Angriff { t, base, side, hit }
+    this.trail = [];      // Klingenspitzen des Schlags (Bogen-Trail)
+    this.gatherT = 0;     // Fortschritt der aktuellen Sammelaktion
+    this.gatherDur = 1;
+    this.gatherKey = null;
+    this.target = null;   // aktuelles Interaktionsziel
     this.hp = PLAYER_HP;
     this.maxHp = PLAYER_HP;
     this.hurt = 0;
     this.lastHit = -99;
+    this.invuln = 0;      // Unverwundbarkeit (Respawn, später Dash)
+    this.standT = 0;      // Aufstehen nach Respawn/Intro
     this.dead = false;
+    this.deathT = 0;
     this.respawnT = 0;
+    this.converged = false;
   }
 
   get tx() {
@@ -56,15 +76,31 @@ export class Player {
     const { input, world } = game;
     if (this.hurt > 0) this.hurt -= dt;
     if (this.dead) {
+      this.deathT += dt;
       this.respawnT -= dt;
+      // Kurz vor der Rückkehr sammeln sich Funken an der Flamme
+      if (!this.converged && this.respawnT <= 0.9) {
+        this.converged = true;
+        const p = this.respawnPoint(game);
+        game.effects.converge(p.x, p.y - 8, { n: 46, radius: 46, life: 0.85, color: ['#ffd36a', '#fff3c4', '#f0a53a', '#e8742a'] });
+        game.audio.play('respawnCharge', 0.6);
+      }
       if (this.respawnT <= 0) this.respawn(game);
       return;
     }
+    if (this.invuln > 0) this.invuln -= dt;
     // Langsame Heilung, wenn eine Weile kein Treffer kam
     if (game.time - this.lastHit > 5) this.hp = Math.min(this.maxHp, this.hp + 3 * dt);
-    const ax = input.axis();
+
+    // Bewegung (während des Aufstehens keine Steuerung, beim Schlag gebremst)
+    let ax = input.axis();
+    if (this.standT > 0) {
+      this.standT -= dt;
+      ax = { x: 0, y: 0 };
+    }
     const steering = ax.x !== 0 || ax.y !== 0;
-    this.accelerate(ax.x * this.speed, ax.y * this.speed, steering ? PLAYER_ACCEL : PLAYER_DECEL, dt);
+    const slow = this.atk ? 0.55 : this.gatherT > 0 ? 0.8 : 1;
+    this.accelerate(ax.x * this.speed * slow, ax.y * this.speed * slow, steering ? PLAYER_ACCEL : PLAYER_DECEL, dt);
     const sp = Math.hypot(this.vx, this.vy);
     this.moving = sp > 8;
     if (sp > 0.01) {
@@ -75,7 +111,7 @@ export class Player {
         this.vy = (this.y - oy) / dt;
       }
     }
-    if (steering) {
+    if (steering && !this.atk) {
       const l = Math.hypot(ax.x, ax.y);
       this.aimX = ax.x / l;
       this.aimY = ax.y / l;
@@ -86,9 +122,12 @@ export class Player {
 
     this.target = game.interact.update(game);
     this.actionT -= dt;
-    this.swing = Math.max(0, this.swing - dt);
+    if (this.atk) this.updateAttack(dt, game);
     const mouseAct = input.mouse.down && game.mouseActionAllowed();
-    if ((input.isDown('Space', 'KeyE') || mouseAct) && this.actionT <= 0) this.act(game, mouseAct);
+    const held = (input.isDown('Space', 'KeyE') || mouseAct) && this.standT <= 0;
+    if (held && !this.atk && this.actionT <= 0) this.act(game, mouseAct);
+    else if (!held) this.resetGather();
+    if (held && !this.atk && this.actionT > 0 && this.gatherKey) this.continueGather(dt, game);
 
     // Automatisch an der Ewigen Flamme abliefern
     const center = game.buildings.center;
@@ -113,26 +152,84 @@ export class Player {
     return Math.hypot(dx, dy);
   }
 
-  /** Eine Aktion ausführen (Sammeln). */
+  /** Gegner (und später Tiere) in Schlagreichweite. */
+  foesInReach(game) {
+    return game.hittables().filter((e) => !e.dead && dist(this.x, this.y, e.x, e.y) <= PLAYER_ATTACK_RANGE + e.r);
+  }
+
+  /** Aktion: Kampf hat Vorrang, sonst Interaktion bzw. Sammeln am aktuellen Ziel. */
   act(game, viaMouse) {
-    const { world, effects, ui, input, camera } = game;
-    this.swing = 0.22;
-    this.actionT = 0.45;
+    const { input, camera } = game;
     if (viaMouse && input.mouse.inside) {
       const w = camera.screenToWorld(input.mouse.x, input.mouse.y);
       this.faceTowards(w.x, w.y);
     }
-    // Kampf hat Vorrang vor dem Sammeln
-    if (this.attack(game, viaMouse && input.mouse.inside)) return;
+    const foes = this.foesInReach(game);
+    if (foes.length) {
+      if (!(viaMouse && input.mouse.inside)) {
+        foes.sort((a, b) => dist(this.x, this.y, a.x, a.y) - dist(this.x, this.y, b.x, b.y));
+        this.faceTowards(foes[0].x, foes[0].y);
+      }
+      this.startAttack(game);
+      return;
+    }
     const t = this.target;
-    if (!t) return;
+    if (!t) {
+      this.resetGather();
+      return;
+    }
     this.faceTowards(t.x, t.y);
     if (t.act) {
+      this.resetGather();
       t.act(game);
+      this.actionT = 0.35;
       return;
     }
     if (this.carried >= this.capacity) {
-      ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
+      game.ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
+      this.actionT = 0.5;
+      return;
+    }
+    // Sammeln beginnen: Fortschritt läuft, solange die Taste gehalten wird
+    const kind = t.kind === 'node' ? t.node.type : 'water';
+    const key = t.kind === 'node' ? 'n' + t.node.id : `w${t.tx},${t.ty}`;
+    if (this.gatherKey !== key) {
+      this.gatherKey = key;
+      this.gatherT = 0;
+      this.gatherKind = kind;
+      this.gatherTarget = t;
+      this.gatherDur = GATHER_TIME[kind];
+    }
+    this.actionT = 0.01;
+  }
+
+  resetGather() {
+    this.gatherKey = null;
+    this.gatherT = 0;
+  }
+
+  continueGather(dt, game) {
+    const t = this.target;
+    const key = t && (t.kind === 'node' ? 'n' + t.node.id : t.kind === 'water' ? `w${t.tx},${t.ty}` : null);
+    if (key !== this.gatherKey || this.foesInReach(game).length) {
+      this.resetGather();
+      return;
+    }
+    this.gatherTarget = t;
+    this.actionT = 0.01;
+    this.gatherT += dt;
+    if (this.gatherT >= this.gatherDur) {
+      this.gatherT = 0;
+      this.harvest(game, t);
+    }
+  }
+
+  /** Ertrag einer abgeschlossenen Sammelaktion. */
+  harvest(game, t) {
+    const { world, effects } = game;
+    if (this.carried >= this.capacity) {
+      game.ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
+      this.resetGather();
       return;
     }
     let res, kind;
@@ -145,55 +242,113 @@ export class Player {
       res = 'water';
     }
     this.inv[res] += 1;
-    this.actionT = GATHER_TIME[kind];
     game.stats.gathered++;
     game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water' }[kind]);
-    effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 5, color: CHIP_COLORS[kind], speed: 45, life: 0.5, up: 35 });
+    effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 6, color: CHIP_COLORS[kind], speed: 50, life: 0.5, up: 35 });
     effects.text(t.x, t.y - 14, `+1 ${RES[res].name}`, RES[res].color);
   }
 
-  /** Schwerthieb: trifft alle Gegner im Bogen vor dem Spieler. Liefert true, wenn Gegner in Reichweite. */
-  attack(game, aimedByMouse) {
-    const foes = game.enemies.list.filter((e) => !e.dead && dist(this.x, this.y, e.x, e.y) <= PLAYER_ATTACK_RANGE + e.r);
-    if (!foes.length) return false;
-    if (!aimedByMouse) {
-      foes.sort((a, b) => dist(this.x, this.y, a.x, a.y) - dist(this.x, this.y, b.x, b.y));
-      this.faceTowards(foes[0].x, foes[0].y);
-    }
-    let hits = 0;
-    for (const e of foes) {
-      const d = Math.max(1, dist(this.x, this.y, e.x, e.y));
-      const dot = ((e.x - this.x) * this.aimX + (e.y - this.y) * this.aimY) / d;
-      if (dot > 0.25 || d < 10) {
-        game.enemies.hit(e, PLAYER_DAMAGE, game, this.aimX * 6, this.aimY * 6);
-        hits++;
+  // ---------------------------------------------------------------- Kampf
+  startAttack(game) {
+    this.resetGather();
+    this.atk = { t: 0, base: Math.atan2(this.aimY, this.aimX), side: this.aimX < 0 ? 1 : -1, hit: false };
+    this.trail.length = 0;
+    this.actionT = PLAYER_ATTACK_TIME;
+    game.audio.play('swing', 0.7);
+  }
+
+  /** Armwinkel (relativ zur Blickrichtung) im Verlauf des Angriffs. */
+  attackArm() {
+    const t = this.atk.t;
+    if (t < ATK.windup) return lerp(ARM_REST, ARM_RAISED, ease(t / ATK.windup));
+    if (t < ATK.windup + ATK.strike) return lerp(ARM_RAISED, ARM_FOLLOW, ease((t - ATK.windup) / ATK.strike));
+    return lerp(ARM_FOLLOW, ARM_REST, Math.min(1, (t - ATK.windup - ATK.strike) / ATK.recover));
+  }
+
+  updateAttack(dt, game) {
+    const a = this.atk;
+    a.t += dt;
+    if (!a.hit && a.t >= ATK.windup) {
+      // Schlag: Körper-Lunge nach vorn, Treffer im Bogen vor dem Spieler
+      a.hit = true;
+      this.vx += this.aimX * 95;
+      this.vy += this.aimY * 95;
+      let hits = 0;
+      for (const e of this.foesInReach(game)) {
+        const d = Math.max(1, dist(this.x, this.y, e.x, e.y));
+        const dot = ((e.x - this.x) * this.aimX + (e.y - this.y) * this.aimY) / d;
+        if (dot > 0.2 || d < 10) {
+          game.hitUnit(e, PLAYER_DAMAGE, this.aimX * 7, this.aimY * 7);
+          hits++;
+        }
+      }
+      if (hits) {
+        game.hitStop = 3;
+        game.camera.addShake(1.5, 0.12);
+        game.audio.play('hit');
       }
     }
-    this.actionT = PLAYER_ATTACK_TIME;
-    game.audio.play(hits ? 'hit' : 'swing');
-    return true;
+    // Klingenspitze für den Bogen-Trail aufzeichnen
+    if (a.t >= ATK.windup * 0.6 && a.t <= ATK.windup + ATK.strike + 0.03) {
+      const ang = a.base + a.side * this.attackArm();
+      this.trail.push({ x: this.x + Math.cos(ang) * 16, y: this.y - 10 + Math.sin(ang) * 16, t: game.time });
+      if (this.trail.length > 8) this.trail.shift();
+    }
+    if (a.t >= ATK.windup + ATK.strike + ATK.recover) this.atk = null;
+  }
+
+  /** Respawnpunkt an der Flamme. */
+  respawnPoint(game) {
+    const c = game.buildings.center;
+    return { x: c.x, y: c.y + 2 * TILE };
   }
 
   die(game) {
     this.dead = true;
     this.hp = 0;
+    this.deathT = 0;
     this.respawnT = PLAYER_RESPAWN;
-    const lost = this.carried;
-    for (const k of RES_KEYS) this.inv[k] = 0;
-    game.effects.burst(this.x, this.y - 8, { n: 24, color: ['#a8322c', '#b8a04a', '#7a1c18'], speed: 60, life: 0.9 });
-    game.ui.toast(`Du bist gefallen!${lost ? ` ${lost} getragene Ressourcen sind verloren.` : ''}`, 'danger');
+    this.converged = false;
+    this.atk = null;
+    this.resetGather();
+    // Die Hälfte der getragenen Rohstoffe fällt als Beutehaufen zu Boden, der Rest bleibt
+    const drop = {};
+    let lost = 0;
+    for (const k of RES_KEYS) {
+      const n = Math.ceil(this.inv[k] / 2);
+      if (n > 0) {
+        drop[k] = n;
+        this.inv[k] -= n;
+        lost += n;
+      }
+    }
+    if (lost) game.loot.drop(this.x, this.y, drop);
+    game.effects.burst(this.x, this.y - 8, { n: 26, color: ['#a8322c', '#b8a04a', '#7a1c18'], speed: 55, life: 0.9 });
+    game.effects.burst(this.x, this.y - 6, { n: 30, color: ['#8a8580', '#5a5450', '#b9b4a8'], speed: 14, life: 2.2, up: 26, gravity: -6, drag: 0.4 });
+    const look = this.look(), x = this.x, y = this.y;
+    game.effects.corpse((ctx, k) => drawHumanoid(ctx, x, y + k * 2, { ...look, pose: k < 0.35 ? 'kneel' : 'lie' }), 1.2);
+    game.ui.toast(`Du bist gefallen!${lost ? ` ${lost} Ressourcen liegen als Beute am Boden.` : ''}`, 'danger');
     game.audio.play('death');
   }
 
   respawn(game) {
-    const c = game.buildings.center;
+    const p = this.respawnPoint(game);
     this.dead = false;
     this.hp = this.maxHp;
-    this.x = c.x;
-    this.y = c.y + 2 * TILE;
+    this.x = p.x;
+    this.y = p.y;
     this.vx = this.vy = 0;
     this.lastHit = game.time;
-    game.effects.burst(this.x, this.y - 8, { n: 16, color: ['#ffd36a', '#fff3c4'], speed: 40, life: 0.8, up: 30 });
+    this.invuln = RESPAWN_INVULN;
+    this.standT = STAND_UP;
+    this.aimX = 0;
+    this.aimY = 1;
+    game.flashT = 0.35;
+    const c = game.buildings.center;
+    if (c) c.pulse = 1;
+    game.camera.addShake(2, 0.2);
+    game.effects.burst(this.x, this.y - 8, { n: 22, color: ['#ffd36a', '#fff3c4'], speed: 55, life: 0.8, up: 30 });
+    game.audio.play('respawn');
   }
 
   faceTowards(x, y) {
@@ -218,28 +373,66 @@ export class Player {
     }
   }
 
-  /** Zeichnen; sil = Farbe für die Silhouette (hinter Gebäuden), dann ohne Waffe. */
-  draw(ctx, sil = null) {
+  // ---------------------------------------------------------------- Zeichnen
+  /** Grundaussehen der Figur. */
+  look() {
+    return { flip: this.flip, tunic: '#c8302a', skin: '#d6a676', helmet: '#e0b84a', plume: '#e8402c', belt: '#5a3a1e' };
+  }
+
+  /** Zeichnen; sil = Farbe für die Silhouette (hinter Gebäuden). */
+  draw(ctx, sil = null, time = 0) {
     if (this.dead) return;
-    drawHumanoid(ctx, this.x, this.y, {
-      flip: this.flip, walk: this.moving ? this.walk : 0, hurt: this.hurt > 0, silhouette: sil, outline: OUTLINE.player,
-      tunic: '#c8302a', skin: '#d6a676', helmet: '#e0b84a', plume: '#e8402c', belt: '#5a3a1e',
-    });
-    if (this.swing > 0 && !sil) {
-      // Werkzeug-/Waffenschwung in Blickrichtung
-      const base = Math.atan2(this.aimY, this.aimX);
-      const a = base + (this.swing / 0.22 - 0.5) * 2.2 * (this.flip ? -1 : 1);
-      ctx.save();
-      ctx.translate(Math.round(this.x), Math.round(this.y - 8));
-      ctx.rotate(a);
-      // Gladius: Griff + Klinge
-      ctx.fillStyle = '#6b4a2a';
-      ctx.fillRect(2, -1, 3, 2);
-      ctx.fillStyle = '#b8a04a';
-      ctx.fillRect(5, -2, 1, 4);
-      ctx.fillStyle = '#d8dce0';
-      ctx.fillRect(6, -1, 8, 2);
-      ctx.restore();
+    // Unverwundbar: Blinken
+    const blink = this.invuln > 0 && !sil && Math.floor(this.invuln * 14) % 2 === 0;
+    if (blink) ctx.globalAlpha = 0.35;
+    const o = { ...this.look(), walk: this.moving ? this.walk : 0, breath: time, hurt: this.hurt > 0, silhouette: sil, outline: OUTLINE.player, item: 'sword' };
+    o.dir = this.aimY < -0.7 ? 'up' : this.aimY > 0.7 && Math.abs(this.aimX) < 0.5 ? 'down' : 'side';
+    if (this.standT > 0) o.pose = this.standT > STAND_UP * 0.55 ? 'lie' : this.standT > STAND_UP * 0.2 ? 'kneel' : 'stand';
+    if (this.atk) {
+      const t = this.atk.t;
+      o.arm = this.atk.base + this.atk.side * this.attackArm();
+      o.lean = t < ATK.windup ? -1 : t < ATK.windup + ATK.strike + 0.05 ? 2 : 0;
+      o.dir = 'side';
+    } else if (this.gatherKey && this.gatherT > 0) {
+      // Werkzeug-Schwung: ausholen, Schlag genau beim Ertrag
+      const k = this.gatherT / this.gatherDur;
+      const base = this.flip ? Math.PI : 0, side = this.flip ? 1 : -1;
+      const sw = k < 0.65 ? lerp(-0.5, 1.6, k / 0.65) : lerp(1.6, -0.7, (k - 0.65) / 0.35);
+      o.item = GATHER_ITEM[this.gatherKind];
+      o.arm = o.item ? base + side * sw : base + side * (0.2 + Math.sin(k * Math.PI * 2) * 0.4);
+      o.lean = k > 0.65 ? 1 : 0;
+      o.dir = 'side';
     }
+    drawHumanoid(ctx, this.x, this.y, o);
+    if (blink) ctx.globalAlpha = 1;
+  }
+
+  /** Bogen-Trail des Schwerthiebs (verblasst schnell). */
+  drawTrail(ctx, time) {
+    const tr = this.trail.filter((p) => time - p.t < 0.14);
+    if (tr.length < 2) return;
+    const sx = this.x, sy = this.y - 10;
+    for (let i = 1; i < tr.length; i++) {
+      const a = 1 - (time - tr[i].t) / 0.14;
+      ctx.fillStyle = `rgba(255,244,214,${0.5 * a})`;
+      ctx.beginPath();
+      ctx.moveTo(sx + (tr[i - 1].x - sx) * 0.45, sy + (tr[i - 1].y - sy) * 0.45);
+      ctx.lineTo(tr[i - 1].x, tr[i - 1].y);
+      ctx.lineTo(tr[i].x, tr[i].y);
+      ctx.lineTo(sx + (tr[i].x - sx) * 0.45, sy + (tr[i].y - sy) * 0.45);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  /** Fortschrittsbalken der Sammelaktion über dem Ziel. */
+  drawGatherBar(ctx) {
+    if (!this.gatherKey || this.gatherT <= 0 || !this.gatherTarget) return;
+    const t = this.gatherTarget, k = Math.min(1, this.gatherT / this.gatherDur);
+    const x = Math.round(t.x - 7), y = Math.round(t.y - (t.promptH ?? 18) - 6);
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(x - 1, y - 1, 16, 4);
+    ctx.fillStyle = '#ffd36a';
+    ctx.fillRect(x, y, Math.round(14 * k), 2);
   }
 }

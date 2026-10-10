@@ -143,6 +143,8 @@ export class Settlers {
       if (j >= 0) s.home.sleepers.splice(j, 1);
     }
     game.effects.burst(s.x, s.y - 6, { n: 16, color: ['#8a1c1c', '#5a5048', '#3b3634'], speed: 50, life: 0.8 });
+    const look = this.look(s), x = s.x, y = s.y;
+    game.effects.corpse((ctx, k) => drawHumanoid(ctx, x, y + k * 2, { ...look, pose: k < 0.3 ? 'kneel' : 'lie' }), 0.9);
     game.ui.toast(`${s.name} ist ${how}.`, 'danger');
     game.audio.play('death');
     game.stats.lost = (game.stats.lost || 0) + 1;
@@ -318,6 +320,7 @@ export class Settlers {
     const ox = s.x, oy = s.y;
     game.world.moveEntity(s, (dx / d) * step, (dy / d) * step, s.r, 'friendly');
     s.moving = true;
+    s.vy = dy / d; // für die Blickrichtung beim Zeichnen
     s.walk += dt * 10;
     if (Math.abs(dx) > 0.5) s.flip = dx < 0;
     // Feststecken erkennen: erst neuen Weg planen, dann Aufgabe aufgeben
@@ -554,11 +557,32 @@ export class Settlers {
     }
   }
 
+  /** Werkzeug und Armwinkel bei der Arbeit (Hacken, Picken, Schöpfen, Feldarbeit) oder null. */
+  workPose(s, time) {
+    const t = s.task;
+    if (!t || s.moving) return null;
+    let item;
+    if (t.type === 'gather') item = { tree: 'axe', rock: 'pick', bush: null }[t.node.type];
+    else if (t.type === 'farm') item = 'hoe';
+    else if (t.type === 'water') item = 'bucket';
+    else return null;
+    // Schlagzyklus: langsam ausholen, schnell zuschlagen
+    const ph = (time * 1.4 + s.id * 0.37) % 1;
+    const sw = ph < 0.7 ? -0.5 + (ph / 0.7) * 2.1 : 1.6 - ((ph - 0.7) / 0.3) * 2.3;
+    const base = s.flip ? Math.PI : 0, side = s.flip ? 1 : -1;
+    return { item, arm: item ? base + side * sw : base + side * (0.1 + Math.sin(ph * Math.PI * 2) * 0.4), lean: ph > 0.7 ? 1 : 0 };
+  }
+
+  look(s) {
+    return { flip: s.flip, tunic: s.tunic, skin: '#c99a6e', hair: s.hair };
+  }
+
   drawSettler(ctx, s, time, sil = null) {
-    const working = s.task && (s.task.type === 'gather' || s.task.type === 'farm' || s.task.type === 'water') && !s.moving;
+    const work = this.workPose(s, time);
     drawHumanoid(ctx, s.x, s.y, {
-      flip: s.flip, walk: s.moving ? s.walk : working ? Math.sin(time * 8) * 0.6 : 0, silhouette: sil, outline: OUTLINE.settler,
-      tunic: s.tunic, skin: '#c99a6e', hair: s.hair, hurt: s.hurt > 0, carry: s.carry ? s.carry.res : null,
+      ...this.look(s), walk: s.moving ? s.walk : 0, breath: time + s.id, silhouette: sil, outline: OUTLINE.settler,
+      hurt: s.hurt > 0, carry: s.carry ? s.carry.res : null,
+      item: work && work.item, arm: work ? work.arm : null, lean: work ? work.lean : 0, dir: s.moving && s.vy > 0.7 ? 'down' : 'side',
     });
     if (sil) return;
     // Bedürfnis-Symbole bei Mangel

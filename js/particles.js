@@ -6,11 +6,37 @@ export class Effects {
   constructor() {
     this.particles = [];
     this.texts = [];
+    this.corpses = [];   // zerfallende Figuren { draw(ctx, k), life, max }
   }
 
   clear() {
     this.particles.length = 0;
     this.texts.length = 0;
+    this.corpses.length = 0;
+  }
+
+  /**
+   * Funken, die aus einem Ring auf einen Punkt zufliegen und dort nach o.life Sekunden ankommen
+   * (Rückkehr an der Flamme, Ankunft im Intro).
+   */
+  converge(x, y, o = {}) {
+    const n = o.n ?? 30, life = o.life ?? 0.8, rad = o.radius ?? 40;
+    const colors = Array.isArray(o.color) ? o.color : [o.color ?? '#ffd36a'];
+    for (let i = 0; i < n && this.particles.length < MAX_PARTICLES; i++) {
+      const a = Math.random() * Math.PI * 2, r = rad * (0.6 + Math.random() * 0.6);
+      const l = life * (0.75 + Math.random() * 0.25);
+      this.particles.push({
+        x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.7,
+        vx: (-Math.cos(a) * r) / l, vy: (-Math.sin(a) * r * 0.7) / l,
+        life: l, max: l * 2, size: Math.random() < 0.3 ? 2 : 1, g: 0, drag: 0,
+        color: colors[(Math.random() * colors.length) | 0],
+      });
+    }
+  }
+
+  /** Zerfallende Figur: draw(ctx, k) mit k = 0..1 (Fortschritt), wird ausgeblendet. */
+  corpse(draw, life = 0.6) {
+    this.corpses.push({ draw, life, max: life });
   }
 
   /**
@@ -59,12 +85,27 @@ export class Effects {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
     }
+    for (let i = this.corpses.length - 1; i >= 0; i--) {
+      const c = this.corpses[i];
+      c.life -= dt;
+      if (c.life <= 0) this.corpses.splice(i, 1);
+    }
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
       t.life -= dt;
       t.y -= 14 * dt;
       if (t.life <= 0) this.texts.splice(i, 1);
     }
+  }
+
+  /** Zerfallende Figuren in Weltkoordinaten zeichnen (sinken ein und verblassen). */
+  drawCorpses(ctx) {
+    for (const c of this.corpses) {
+      const k = 1 - c.life / c.max;
+      ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
+      c.draw(ctx, k);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Partikel in Weltkoordinaten zeichnen. */

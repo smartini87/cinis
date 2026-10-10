@@ -263,6 +263,7 @@ export class Buildings {
     const sunny = game.cycle.isSunny;
     for (const b of this.list) {
       if (b.flash > 0) b.flash -= dt;
+      if (b.pulse > 0) b.pulse = Math.max(0, b.pulse - dt * 1.5);
       if (b.spawn > 0) b.spawn -= dt;
       // Siedler reparieren tagsüber beschädigte Gebäude (abstrahiert als Regeneration)
       if (sunny && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
@@ -355,7 +356,7 @@ export class Buildings {
       case 'center': {
         const spr = Sprites.center;
         ctx.drawImage(spr, Math.round(x + s / 2 - spr.width / 2), bottom - spr.height + 6);
-        if (b.hp > 0) drawFlame(ctx, x + s / 2, bottom - 32, 7, time);
+        if (b.hp > 0) drawFlame(ctx, x + s / 2, bottom - 32, 7 * (1 + (b.pulse || 0) * 0.7), time);
         else {
           // Erloschen: nur noch Rauch
           ctx.fillStyle = 'rgba(90,84,80,0.6)';

@@ -146,6 +146,17 @@ export class SoundEngine {
         this.tone(90, 0.18, { vol: v(0.4), slide: 55 });
         this.noise(0.2, { vol: v(0.25), freq: 700, type: 'lowpass' });
         break;
+      case 'respawnCharge':
+        // aufsteigendes Funkeln
+        this.tone(330, 0.8, { type: 'sine', vol: v(0.08), slide: 990, attack: 0.3 });
+        this.noise(0.8, { vol: v(0.05), freq: 4000, type: 'highpass', attack: 0.4 });
+        break;
+      case 'respawn':
+        this.tone(523, 0.5, { type: 'triangle', vol: v(0.14) });
+        this.tone(784, 0.6, { type: 'triangle', vol: v(0.1), delay: 0.06 });
+        this.tone(1046, 0.7, { type: 'sine', vol: v(0.08), delay: 0.12 });
+        this.noise(0.3, { vol: v(0.12), freq: 600, type: 'lowpass' });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

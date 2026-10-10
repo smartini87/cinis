@@ -18,6 +18,7 @@ import { saveGame, loadGame, deleteSave } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
 import { SpatialHash, separateUnits, resolve } from './physics.js';
 import { Interact } from './interact.js';
+import { Loot } from './loot.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -44,6 +45,10 @@ class Game {
     this.enemies = new Enemies();
     this.lighting = new Lighting();
     this.interact = new Interact();
+    this.loot = new Loot();
+    this.interact.addProvider(this.loot.provider);
+    this.hitStop = 0;     // Trefferpause in Simulationsschritten
+    this.flashT = 0;      // weißer Bildschirmblitz (Respawn)
     this.ui = new UI(this);
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -171,6 +176,7 @@ class Game {
     this.stock = { ...START_STOCK };
     this.stats = { built: 0, kills: 0, gathered: 0, lost: 0 };
     this.effects.clear();
+    this.loot.clear();
     this.combat.clear();
     this.enemies.clear();
     this.cycle = new DayCycle();
@@ -253,7 +259,23 @@ class Game {
     return !this.buildings.selected;
   }
 
+  /** Alles, was der Spieler treffen kann (Gegner; später auch Tiere). */
+  hittables() {
+    return this.enemies.list;
+  }
+
+  /** Treffer durch den Spieler an eine Einheit weiterleiten. */
+  hitUnit(e, dmg, kx, ky) {
+    this.enemies.hit(e, dmg, this, kx, ky);
+  }
+
   update(dt) {
+    if (this.flashT > 0) this.flashT -= dt;
+    // Trefferpause: die Welt hält für wenige Schritte inne (Wucht des Schlags)
+    if (this.hitStop > 0) {
+      this.hitStop--;
+      return;
+    }
     this.time += dt;
     this.cycle.update(dt, this);
     // Flussfeld sofort bei Gebäudeänderungen; Baum/Fels-Änderungen nur, solange Gegner unterwegs sind,
@@ -392,10 +414,13 @@ class Game {
     this.settlers.collectDrawables(list, ctx, camera, this.time);
     this.enemies.collectDrawables(list, ctx, camera, this.time);
     const p = this.player;
-    if (!p.dead) list.push({ y: p.y, draw: () => p.draw(ctx), unit: [p.x - 5, p.y - 19, 10, 19], sil: () => p.draw(ctx, '#fff3c4') });
+    if (!p.dead) list.push({ y: p.y, draw: () => p.draw(ctx, null, this.time), unit: [p.x - 5, p.y - 19, 10, 19], sil: () => p.draw(ctx, '#fff3c4', this.time) });
+    this.loot.collectDrawables(list, ctx, camera, this.time, (o, t) => this.interact.glowFor(o, t));
     list.sort((a, b) => a.y - b.y);
+    this.effects.drawCorpses(ctx);
     for (const d of list) d.draw();
     this.drawOccluded(ctx, list);
+    if (!p.dead) p.drawTrail(ctx, this.time);
     this.combat.draw(ctx);
     this.effects.drawParticles(ctx);
 
@@ -403,10 +428,12 @@ class Game {
     this.lighting.draw(ctx, this);
     camera.apply(ctx);
     if (!this.buildings.selected) this.drawTargetMarker(ctx);
+    this.player.drawGatherBar(ctx);
     this.buildings.drawGhost(ctx, this.time);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
+    this.drawDeathOverlay(ctx);
     if (this.state !== 'menu') {
       this.interact.drawPrompt(ctx, this);
       this.drawPoiArrows(ctx);
@@ -462,6 +489,41 @@ class Game {
     ctx.beginPath();
     ctx.arc(st.ox + dx * k, st.oy + dy * k, 24 * dpr, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  /** Tod: Bild blendet ab, Countdown bis zur Rückkehr; Respawn: kurzer Lichtblitz. */
+  drawDeathOverlay(ctx) {
+    const p = this.player, W = this.canvas.width, H = this.canvas.height;
+    if (p.dead && this.state !== 'menu') {
+      const k = Math.min(1, p.deathT / 1.6) * Math.min(1, p.respawnT / 0.6);
+      const grd = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.15, W / 2, H / 2, Math.max(W, H) * 0.7);
+      grd.addColorStop(0, `rgba(8,4,4,${0.25 * k})`);
+      grd.addColorStop(1, `rgba(8,4,4,${0.85 * k})`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+      if (p.deathT > 0.8) {
+        const dpr = window.devicePixelRatio || 1;
+        const n = Math.ceil(p.respawnT);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = Math.min(1, (p.deathT - 0.8) * 2);
+        ctx.font = `italic ${Math.round(18 * dpr)}px Georgia, serif`;
+        ctx.fillStyle = '#f3e6c4';
+        ctx.fillText('Die Flamme ruft dich zurück …', W / 2, H / 2 - 30 * dpr);
+        if (n <= 3 && n > 0) {
+          const f = p.respawnT - Math.floor(p.respawnT);
+          ctx.font = `bold ${Math.round((44 + f * 16) * dpr)}px Georgia, serif`;
+          ctx.fillStyle = '#ffd36a';
+          ctx.fillText(String(n), W / 2, H / 2 + 22 * dpr);
+        }
+        ctx.restore();
+      }
+    }
+    if (this.flashT > 0) {
+      ctx.fillStyle = `rgba(255,240,200,${(this.flashT / 0.35) * 0.55})`;
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   /** Randpfeile zu wichtigen Orten außerhalb der Sicht (die Flamme; später Lager und POIs). */

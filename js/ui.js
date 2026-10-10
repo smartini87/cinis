@@ -445,7 +445,7 @@ export class UI {
     const key = touch ? 'Tippen' : '[Leertaste/Klick]';
     const bs = g.buildings;
     if (g.over) return '';
-    if (p.dead) return `Du bist gefallen – Rückkehr an der Flamme in ${Math.ceil(p.respawnT)} s`;
+    if (p.dead) return '';
     if (bs.selected === 'demolish') return touch ? 'Gebäude antippen zum Abreißen' : 'Gebäude anklicken zum Abreißen · Rechtsklick/Esc: beenden';
     if (bs.selected) {
       const def = BUILDING_DEFS[bs.selected];

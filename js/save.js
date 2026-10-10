@@ -65,6 +65,7 @@ export function saveGame(game) {
       farm: st.farm ? bIndex.get(st.farm) ?? -1 : -1, carry: st.carry, tunic: st.tunic, hair: st.hair,
     })),
     enemies: game.enemies.list.map((e) => ({ type: e.type, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, dmg: e.dmg, speed: e.speed })),
+    loot: game.loot.serialize(),
     queue: game.enemies.queue,
     plan: game.enemies.plan,
     nightT: game.enemies.nightT,
@@ -148,6 +149,7 @@ export function loadGame(game) {
     const e = en.spawn(ed.type, ed.x, ed.y);
     Object.assign(e, { hp: ed.hp, maxHp: ed.maxHp, dmg: ed.dmg, speed: ed.speed });
   }
+  game.loot.restore(d.loot);
   en.queue = d.queue || [];
   en.plan = d.plan || null;
   en.nightT = d.nightT || 0;
