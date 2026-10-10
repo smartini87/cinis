@@ -19,7 +19,10 @@ const EDGE_NAMES = { n: 'Norden', s: 'Süden', w: 'Westen', e: 'Osten' };
 
 /** Zusammensetzung der Welle in Nacht n. */
 export function waveFor(n) {
+  // Lernnächte: wenige, langsame Aschgänger
+  if (n <= 3) return { walker: [2, 4, 6][n - 1], dog: 0, brute: 0, boss: 0, hpMul: 1, dmgMul: 1, speedMul: [0.7, 0.85, 0.95][n - 1], edges: 1 };
   return {
+    speedMul: 1,
     walker: 3 + Math.floor(n * 1.6),
     dog: n >= 3 ? Math.floor((n - 1) * 0.9) : 0,
     brute: n >= 5 ? Math.floor((n - 2) / 1.8) : 0,
@@ -64,7 +67,7 @@ export class Enemies {
       this.queue.push({ type, at, edge: edges[i % edges.length] });
     });
     this.queue.sort((a, b) => a.at - b.at);
-    this.plan = { n, edges, total: types.length, hpMul: w.hpMul, dmgMul: w.dmgMul, boss: w.boss };
+    this.plan = { n, edges, total: types.length, hpMul: w.hpMul, dmgMul: w.dmgMul, speedMul: w.speedMul, boss: w.boss };
     return this.plan;
   }
 
@@ -114,7 +117,10 @@ export class Enemies {
       while (this.queue.length && this.queue[0].at <= this.nightT) {
         const q = this.queue.shift();
         const pos = this.findSpawn(q.edge, world);
-        if (pos) this.spawn(q.type, pos.x, pos.y, this.plan.hpMul, this.plan.dmgMul);
+        if (pos) {
+          const e = this.spawn(q.type, pos.x, pos.y, this.plan.hpMul, this.plan.dmgMul);
+          e.speed *= this.plan.speedMul ?? 1;
+        }
       }
     }
     const sunny = cycle.isSunny;

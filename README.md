@@ -38,6 +38,19 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 
 ## Spielanleitung
 
+### Einstieg
+Ein neues Spiel beginnt mit fast leerem Bildschirm: Lebenspunkte und ein Ziel-Banner oben. Ein goldener Pfeil zeigt jeweils auf das nächste Ziel, ein Randpfeil hilft, wenn es außerhalb der Sicht liegt. Die Ziele bauen aufeinander auf:
+1. Bewegen
+2. Holz sammeln
+3. Stein brechen
+4. An der Flamme abliefern
+5. Hütte bauen
+6. Farm bauen
+7. Erste Nacht überstehen (vorher kommen Dash und Kampf)
+8. Turm bauen
+
+HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, jeweils mit kurzer Einblendung und einem Satz Erklärung („Neu: Mauer“). Bis zum Nacht-Ziel bleibt es heller Tag. Die ersten drei Nächte sind Lernnächte mit wenigen, langsamen Gegnern. Im Hauptmenü startet „Neues Spiel – Tutorial überspringen“ mit allem freigeschaltet.
+
 ### Ziel
 Überlebe 30 Nächte. Mit dem Morgengrauen nach der 30. Nacht hast du gewonnen. Wird die Ewige Flamme zerstört, ist das Spiel verloren. Fällt deine Spielfigur, ruft die Flamme sie nach 8 Sekunden zurück: Funken sammeln sich, die Figur steht auf und ist 1,5 Sekunden unverwundbar. Die Hälfte der getragenen Rohstoffe bleibt als Beutehaufen an der Todesstelle liegen und kann mit E wieder aufgehoben werden.
 
@@ -109,6 +122,7 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 ## Getroffene Annahmen (Designentscheidungen)
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
 - **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und einziges Lager. Ressourcen zählen erst nach dem Abliefern.
+- **Einstieg statt Textwand:** Das frühere Tutorial mit mehreren Textseiten ist durch den Questpfad ersetzt. H zeigt nur noch die Tastenübersicht. Der Spielstand speichert den Questschritt und alle Freischaltungen (Format v2). Spielstände der Vorversion sind nicht kompatibel und werden mit einem Hinweis verworfen.
 - **Wildlife:** Tiere entstehen in einem Ring um die Kamera, passend zum Boden und zur Tageszeit, und verschwinden weit außerhalb der Sicht wieder. Es sind höchstens 60 gleichzeitig, davon höchstens 30 dekorative. Deko-Tiere und Tiere außerhalb der Sicht werden vereinfacht aktualisiert. Tiere werden nicht gespeichert. Fell ist eine neue Ressource, für Rezepte ab Phase 7.
 - **Kampfgefühl:** Ein Schwerthieb holt aus, zieht mit Bogenspur durch und lässt die Figur nach vorn ausfallen. Bei Treffern hält das Bild für drei Frames an (Trefferpause), dazu ein leichtes Wackeln, Rückstoß und weißes Aufblitzen. Sammeln braucht gehaltene Taste und zeigt einen Fortschrittsbalken. Das Werkzeug passt zum Ziel (Axt, Spitzhacke, Eimer).
 - **Lesbarkeit:** Der Boden ist bewusst entsättigt und etwas dunkler. Gebäude, Bäume, Felsen und Sträucher haben kräftigere Farben und eine dunkle Kontur. Der Spieler trägt einen hellen Umriss, Siedler einen dunklen, Gegner einen dunkelroten, alle mit Bodenschatten. Das Ziel in Reichweite leuchtet golden und zeigt ein „E“. Liegt die Flamme außerhalb der Sicht, zeigt ein goldener Pfeil am Bildschirmrand dorthin.

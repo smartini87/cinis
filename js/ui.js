@@ -10,14 +10,6 @@ import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
 import { peekSave } from './save.js';
 
-const TUTORIAL = [
-  ['Die letzte Flamme', 'Rom liegt in Asche. Im Zentrum der Ruinen brennt die <b>Ewige Flamme</b>. Erlischt sie, ist alles verloren. Halte sie <b>30 Nächte</b> lang am Leben.'],
-  ['Sammeln', 'Bewege dich mit <b>WASD</b>. Halte <b>Leertaste</b> oder die <b>linke Maustaste</b> an Bäumen, Trümmern, Feigensträuchern oder am Wasser, um Holz, Stein, Nahrung und Wasser zu sammeln. Du trägst bis zu 30 Einheiten – an der Flamme lieferst du automatisch ab.'],
-  ['Bauen', 'Wähle Gebäude mit <b>1–5</b> oder über die Bauleiste und setze sie per Klick. <b>Hütten</b> bieten Platz für neue Siedler, <b>Farmen</b> und <b>Brunnen</b> versorgen sie, <b>Mauern</b> und <b>Türme</b> schützen die Flamme.'],
-  ['Siedler', 'Siedler arbeiten selbstständig. Sie brauchen <b>Nahrung</b> und <b>Wasser</b> aus dem Lager. Jeden Morgen kommen neue hinzu, wenn Platz und Nahrung vorhanden sind. Links wählst du, was sie bevorzugt sammeln.'],
-  ['Die Nacht', 'Bei Einbruch der Nacht kriechen <b>Aschgänger</b> aus den Ruinen – jede Nacht mehr. Rote Pfeile am Rand zeigen, woher sie kommen. Kämpfe mit dem Gladius, baue Türme hinter Mauern. Das erste Sonnenlicht verbrennt sie.'],
-];
-
 const HELP = `
 <table class="keys">
 <tr><td>WASD / Pfeile</td><td>Bewegen</td></tr>
@@ -105,7 +97,7 @@ export class UI {
   buildHud() {
     const hud = (this.hud = el('div', 'hud', this.root));
     // Ressourcen (oben links)
-    const res = el('div', 'panel res-panel', hud);
+    const res = (this.resPanel = el('div', 'panel res-panel', hud));
     this.resEls = {};
     for (const k of RES_KEYS) {
       const row = el('div', 'res-row', res);
@@ -125,7 +117,7 @@ export class UI {
     this.popLbl = el('span', 'lbl', pop, 'Siedler');
     pop.title = 'Siedler / Plätze. Neue Siedler kommen, wenn Platz (Hütten) und Nahrung da sind.';
     // Arbeitsschwerpunkt der Sammler
-    const focus = el('div', 'panel focus-panel', hud);
+    const focus = (this.focusPanel = el('div', 'panel focus-panel', hud));
     el('div', 'lbl', focus, 'Siedler sammeln');
     const fb = el('div', 'focus-btns', focus);
     this.focusBtns = {};
@@ -140,7 +132,7 @@ export class UI {
       this.focusBtns[f.id] = b;
     }
     // Tag/Nacht + Zustand der Flamme (oben Mitte)
-    const day = el('div', 'panel day-panel', hud);
+    const day = (this.dayPanel = el('div', 'panel day-panel', hud));
     const top = el('div', 'day-top', day);
     this.dayEl = el('span', 'day-num', top);
     this.phaseEl = el('span', 'day-phase', top);
@@ -182,7 +174,7 @@ export class UI {
     this.dashBtn.addEventListener('pointercancel', up);
     this.dashBtn.addEventListener('pointerleave', up);
     // Traglast
-    const carry = el('div', 'panel carry-panel', hud);
+    const carry = (this.carryPanel = el('div', 'panel carry-panel', hud));
     el('div', 'lbl', carry, 'Getragen');
     this.carryBar = el('div', 'fill', el('div', 'bar', carry));
     this.carryTxt = el('div', 'carry-txt', carry);
@@ -246,6 +238,11 @@ export class UI {
     this.miniBase = null;
     this.miniWorld = null;
     this.miniFrame = 0;
+    // Ziel-Banner des Einstiegs (oben Mitte)
+    this.quest = el('div', 'panel quest-banner', hud);
+    el('div', 'quest-lbl', this.quest, 'Ziel');
+    this.questTxt = el('div', 'quest-txt', this.quest);
+    this.questProg = el('div', 'quest-prog', this.quest);
     // Hinweiszeile + Meldungen
     this.hint = el('div', 'hint', hud);
     this.toasts = el('div', 'toasts', this.root);
@@ -307,6 +304,36 @@ export class UI {
 
   setHudVisible(v) {
     this.hud.hidden = !v;
+    if (v) this.applyUnlocks();
+  }
+
+  /** HUD-Elemente zu den Freischalt-Schlüsseln. */
+  unlockElements() {
+    const map = {
+      'hud.res': [this.resPanel], 'hud.settlers': [this.focusPanel], 'hud.clock': [this.dayPanel], 'hud.energy': [this.enRow],
+      'hud.carry': [this.carryPanel], 'hud.minimap': [this.mini], buildbar: [this.buildBar], demolish: [this.buildBtns.demolish],
+    };
+    for (const type of BUILDABLE) map['b:' + type] = [this.buildBtns[type]];
+    return map;
+  }
+
+  /** Gesperrtes ausblenden, Freigeschaltetes zeigen. */
+  applyUnlocks() {
+    const pr = this.game.progress;
+    if (!pr) return;
+    for (const [key, els] of Object.entries(this.unlockElements())) for (const e of els) if (e) e.hidden = !pr.has(key);
+  }
+
+  /** Frisch freigeschaltetes Element mit kurzer Animation einblenden. */
+  reveal(key) {
+    this.applyUnlocks();
+    for (const e of this.unlockElements()[key] || []) {
+      if (!e) continue;
+      e.classList.remove('reveal');
+      void e.offsetWidth; // Animation neu starten
+      e.classList.add('reveal');
+      setTimeout(() => e.classList.remove('reveal'), 1600);
+    }
   }
 
   // ---------------------------------------------------------------- Overlays
@@ -346,6 +373,7 @@ export class UI {
     const btns = [];
     if (info) btns.push({ label: `Fortsetzen <small>Tag ${info.day} · ${info.settlers} Siedler</small>`, cls: 'primary', onClick: () => g.continueGame() });
     btns.push({ label: 'Neues Spiel', cls: info ? '' : 'primary', onClick: () => (info ? this.confirmNew() : g.startNewGame()) });
+    btns.push({ label: 'Neues Spiel <small>Tutorial überspringen – alles freigeschaltet</small>', onClick: () => (info ? this.confirmNew(true) : g.startNewGame({ skipTutorial: true })) });
     btns.push({ label: 'Steuerung', onClick: () => this.showHelp(() => this.showMainMenu()) });
     this.showOverlay('menu', `
       <div class="title">CINIS</div>
@@ -354,9 +382,9 @@ export class UI {
       Nur die Ewige Flamme hält sie fern. Sammle die Überlebenden, baue auf, verteidige das Licht – 30 Nächte lang.</p>`, btns);
   }
 
-  confirmNew() {
+  confirmNew(skipTutorial = false) {
     this.showOverlay('menu', `<h2>Neues Spiel?</h2><p>Der bisherige Spielstand wird überschrieben.</p>`, [
-      { label: 'Ja, neu beginnen', cls: 'primary danger', onClick: () => this.game.startNewGame() },
+      { label: 'Ja, neu beginnen', cls: 'primary danger', onClick: () => this.game.startNewGame({ skipTutorial }) },
       { label: 'Zurück', onClick: () => this.showMainMenu() },
     ]);
   }
@@ -373,17 +401,6 @@ export class UI {
 
   showHelp(back) {
     this.showOverlay('help', `<h2>Steuerung</h2>${HELP}`, [{ label: 'Zurück', cls: 'primary', onClick: back }]);
-  }
-
-  /** Mehrseitiges Tutorial; onDone wird nach der letzten Seite oder beim Überspringen aufgerufen. */
-  showTutorial(onDone, page = 0) {
-    const [title, text] = TUTORIAL[page];
-    const last = page === TUTORIAL.length - 1;
-    const dots = TUTORIAL.map((_, i) => `<span class="dot${i === page ? ' on' : ''}"></span>`).join('');
-    this.showOverlay('tutorial', `<div class="tut-step">Einführung ${page + 1}/${TUTORIAL.length}</div><h2>${title}</h2><p>${text}</p><div class="dots">${dots}</div>`, [
-      { label: last ? 'Los geht\'s!' : 'Weiter', cls: 'primary', onClick: () => (last ? onDone() : this.showTutorial(onDone, page + 1)) },
-      ...(last ? [] : [{ label: 'Überspringen', onClick: onDone }]),
-    ]);
   }
 
   showEnd(result) {
@@ -423,6 +440,14 @@ export class UI {
     const parts = RES_KEYS.filter((k) => p.inv[k] > 0).map((k) => `${p.inv[k]} ${RES[k].name}`);
     this.set('carryT', this.carryTxt, `${c}/${p.capacity}` + (parts.length ? ' · ' + parts.join(', ') : ''));
     this.set('hint', this.hint, this.contextHint());
+    // Ziel-Banner
+    const qb = g.progress && g.progress.banner();
+    this.set('qVis', this.quest, !qb, 'hidden');
+    if (qb) {
+      this.set('qTxt', this.questTxt, qb.text);
+      this.set('qProg', this.questProg, qb.progress);
+      this.set('qPos', this.quest, 'panel quest-banner' + (g.progress.has('hud.clock') ? ' below' : ''), 'className');
+    }
     // Tag/Nacht
     const cy = g.cycle;
     this.set('day', this.dayEl, `Tag ${Math.min(cy.day, WIN_NIGHTS)} / ${WIN_NIGHTS}`);

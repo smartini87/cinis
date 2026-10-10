@@ -1,6 +1,7 @@
 // Balancing-Lauf: ein einfacher Bot spielt 30 Nächte im Schnelldurchlauf.
 // Er baut morgens nach festen Regeln (Hütten, Versorgung, Türme, Mauerring) und bleibt kämpfend an der Flamme.
 // Ausgabe: Verlauf pro Nacht. Aufruf: node tools/smoke-test.mjs tools/scenarios/balance.mjs
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const log = await page.evaluate(() => {
     const g = window.__game, w = g.world, B = g.buildings;

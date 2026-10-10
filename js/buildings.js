@@ -176,6 +176,10 @@ export class Buildings {
 
   place(game, type, tx, ty) {
     const def = BUILDING_DEFS[type];
+    if (!game.progress.has('b:' + type)) {
+      game.ui.toast(`${def.name} ist noch nicht freigeschaltet.`, 'warn', 'locked');
+      return null;
+    }
     const chk = this.canPlace(type, tx, ty);
     if (!chk.ok) {
       game.ui.toast(chk.reason, 'warn', 'place');

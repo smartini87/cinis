@@ -257,3 +257,33 @@ html, body {
   .toasts { top: 260px; }
   .toast { font-size: 13px; }
 }
+
+/* ---------------------------------------------------------------- Einstieg: Freischaltungen, Ziel-Banner */
+.hud [hidden] { display: none !important; }
+.reveal { animation: reveal 1.4s ease-out; }
+@keyframes reveal {
+  0% { opacity: 0; transform: scale(0.85); filter: brightness(2); }
+  35% { opacity: 1; transform: scale(1.06); filter: brightness(1.6); box-shadow: 0 0 18px rgba(255, 211, 106, 0.9); }
+  100% { transform: none; filter: none; }
+}
+.day-panel.reveal { animation-name: revealCentered; }
+@keyframes revealCentered {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.85); }
+  35% { opacity: 1; transform: translateX(-50%) scale(1.06); box-shadow: 0 0 18px rgba(255, 211, 106, 0.9); }
+  100% { transform: translateX(-50%); }
+}
+.quest-banner {
+  top: 10px; left: 50%; transform: translateX(-50%); min-width: 260px; max-width: min(520px, 80vw);
+  text-align: center; padding: 6px 16px 7px; border-color: #c08a4a;
+}
+.quest-banner.below { top: 92px; }
+.quest-lbl { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #ffd36a; }
+.quest-txt { font-size: 16px; color: #fff3c4; }
+.quest-prog { font-size: 13px; color: #d9cba8; }
+.quest-prog:empty { display: none; }
+.toast.unlock { border-color: #ffd36a; background: rgba(60, 42, 14, 0.94); }
+@media (max-width: 640px) {
+  .quest-banner { top: auto; bottom: 150px; }
+  .quest-banner.below { top: auto; bottom: 150px; }
+  .quest-txt { font-size: 13px; }
+}

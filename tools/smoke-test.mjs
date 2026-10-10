@@ -11,8 +11,9 @@ import { startServer } from './serve.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(here, 'out');
 fs.mkdirSync(outDir, { recursive: true });
-const port = 8000 + Math.floor(Math.random() * 900);
-const server = await startServer(port);
+// Port 0: das Betriebssystem vergibt einen freien Port (mehrere Läufe parallel möglich)
+const server = await startServer(0);
+const port = server.address().port;
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];

@@ -1,8 +1,9 @@
 // save.js – Spielstand in localStorage: Serialisieren/Wiederherstellen des kompletten Zustands.
 // Die Welt wird aus dem Seed neu generiert; gespeichert werden nur veränderliche Daten.
 
-const KEY = 'cinis.save.v1';
-const VERSION = 1;
+const KEY = 'cinis.save.v2';
+const VERSION = 2;
+const OLD_KEYS = ['cinis.save.v1'];   // ältere Formate: nicht kompatibel, werden sauber verworfen
 
 /** Sicherer Zugriff auf localStorage (privater Modus, Speicher voll …). */
 function storage() {
@@ -15,6 +16,20 @@ function storage() {
   } catch {
     return null;
   }
+}
+
+/** Alte Spielstände entfernen; liefert true, wenn einer verworfen wurde (für einen Hinweis). */
+export function discardOldSaves() {
+  const s = storage();
+  if (!s) return false;
+  let found = false;
+  for (const k of OLD_KEYS) {
+    if (s.getItem(k) !== null) {
+      s.removeItem(k);
+      found = true;
+    }
+  }
+  return found;
 }
 
 export function hasSave() {
@@ -66,6 +81,7 @@ export function saveGame(game) {
     })),
     enemies: game.enemies.list.map((e) => ({ type: e.type, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, dmg: e.dmg, speed: e.speed })),
     loot: game.loot.serialize(),
+    progress: game.progress.serialize(),
     queue: game.enemies.queue,
     plan: game.enemies.plan,
     nightT: game.enemies.nightT,
@@ -150,6 +166,7 @@ export function loadGame(game) {
     Object.assign(e, { hp: ed.hp, maxHp: ed.maxHp, dmg: ed.dmg, speed: ed.speed });
   }
   game.loot.restore(d.loot);
+  game.progress.restore(d.progress);
   en.queue = d.queue || [];
   en.plan = d.plan || null;
   en.nightT = d.nightT || 0;

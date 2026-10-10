@@ -1,4 +1,5 @@
 // Szenario Phase 3: Gebäude per Tastatur wählen und per Mausklick platzieren.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   await page.evaluate(() => { const g = window.__game; Object.assign(g.stock, { wood: 200, stone: 200, water: 50 });
     for (const n of g.world.nodes) if (Math.hypot(n.tx - g.world.cx, n.ty - g.world.cy) < 8) g.world.removeNode(n); });

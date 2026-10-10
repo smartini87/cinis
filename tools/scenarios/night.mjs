@@ -1,4 +1,5 @@
 // Szenario Phase 5: Verteidigung bauen, bis in die Nacht springen, Kampf beobachten, Morgen erreichen.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   await page.evaluate(() => {
     const g = window.__game, w = g.world;

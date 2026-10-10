@@ -133,6 +133,7 @@ export class Player {
         this.vx = (this.x - ox) / dt;
         this.vy = (this.y - oy) / dt;
       }
+      if (steering) game.progress.notify('move', Math.hypot(this.x - ox, this.y - oy));
     }
     if (steering && !this.atk) {
       const l = Math.hypot(ax.x, ax.y);
@@ -348,6 +349,7 @@ export class Player {
     }
     this.inv[res] += 1;
     game.stats.gathered++;
+    game.progress.notify('gather', res, 1);
     game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water' }[kind]);
     effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 6, color: CHIP_COLORS[kind], speed: 50, life: 0.5, up: 35 });
     effects.text(t.x, t.y - 14, `+1 ${RES[res].name}`, RES[res].color);
@@ -472,6 +474,7 @@ export class Player {
   deposit(game) {
     let off = 0;
     game.audio.play('deposit');
+    game.progress.notify('deposit', 'all', this.carried);
     for (const k of RES_KEYS) {
       if (this.inv[k] <= 0) continue;
       game.stock[k] += this.inv[k];

@@ -191,6 +191,15 @@ export class SoundEngine {
       case 'flap':
         for (let i = 0; i < 3; i++) this.noise(0.05, { vol: v(0.08), freq: 900, type: 'bandpass', q: 1, delay: i * 0.07 });
         break;
+      case 'unlock':
+        this.tone(659, 0.12, { type: 'triangle', vol: v(0.1) });
+        this.tone(880, 0.16, { type: 'triangle', vol: v(0.1), delay: 0.1 });
+        this.tone(1319, 0.3, { type: 'sine', vol: v(0.07), delay: 0.2 });
+        break;
+      case 'questDone':
+        this.tone(784, 0.1, { type: 'triangle', vol: v(0.08) });
+        this.tone(1046, 0.18, { type: 'triangle', vol: v(0.08), delay: 0.08 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

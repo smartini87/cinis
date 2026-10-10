@@ -1,6 +1,7 @@
 // Szenario Kollision: Spieler (auch mit extrem hoher Geschwindigkeit) steckt nie in Mauer, Hütte oder Turm,
 // Siedler betreten nie Gebäude und erreichen ihre Ziele, Tore lassen nur eigene Leute durch,
 // Gegner stapeln sich nicht. Screenshot: Figur hinter einer Hütte bleibt als Silhouette sichtbar.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const r = await page.evaluate(async () => {
     const { overlaps } = await import('/js/physics.js');

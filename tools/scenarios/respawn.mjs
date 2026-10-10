@@ -1,5 +1,6 @@
 // Szenario Respawn & Kampfanimation: Schwerthieb (Ausholen → Schlag mit Trail, Trefferpause, Rückstoß),
 // Tod mit Beutehaufen und Countdown, Rückkehr an der Flamme mit Funken, Aufstehen und Unverwundbarkeit.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const sim = (sec) => page.evaluate((s) => { const g = window.__game; for (let i = 0; i < s * 60; i++) g.update(1 / 60); }, sec);
   const freeze = (on) => page.evaluate((v) => { window.__game.speed = v ? 0 : 1; }, on);

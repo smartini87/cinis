@@ -1,4 +1,5 @@
 // Szenario Phase 4: Siedler arbeiten selbstständig, Farm wird bewirtschaftet, Bedürfnisse werden gestillt.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   await page.evaluate(() => {
     const g = window.__game, c = g.world;

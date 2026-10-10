@@ -1,4 +1,5 @@
 // Szenario Phase 7: alle synthetisierten Klänge abspielen, Atmosphäre/Minikarte prüfen, Nacht-Screenshot.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const names = ['click', 'error', 'chop', 'mine', 'pick', 'water', 'deposit', 'build', 'demolish', 'swing', 'hit', 'hurt', 'death', 'enemyDie', 'claw', 'smash', 'bolt', 'horn', 'bell', 'alarm', 'collapse', 'arrive', 'victory', 'defeat'];
   const r = await page.evaluate(async (names) => {

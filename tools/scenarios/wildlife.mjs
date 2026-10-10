@@ -1,5 +1,6 @@
 // Szenario Wildlife & Dash: Obergrenzen, Flucht, Jagd liefert Nahrung, Wildschwein-Charge, Wolfsrudel greift an,
 // meidet Licht und gibt auf; Dash kostet Energie, geht nicht durch Mauern, aber durch Tore.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const r = await page.evaluate(async () => {
     const { overlaps } = await import('/js/physics.js');

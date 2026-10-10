@@ -1,4 +1,5 @@
 // Szenario Phase 2: zum nächsten Baum teleportieren, sammeln, zur Flamme zurück, abliefern.
+export const query = 'skiptut'; // alles freigeschaltet (ohne geführten Einstieg)
 export default async function (page) {
   const before = await page.evaluate(() => {
     const g = window.__game, p = g.player, w = g.world;

@@ -14,12 +14,13 @@ import { Combat } from './combat.js';
 import { DayCycle, Lighting } from './time.js';
 import { UI } from './ui.js';
 import { SoundEngine } from './audio.js';
-import { saveGame, loadGame, deleteSave } from './save.js';
+import { saveGame, loadGame, deleteSave, discardOldSaves } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
 import { SpatialHash, separateUnits, resolve } from './physics.js';
 import { Interact } from './interact.js';
 import { Loot } from './loot.js';
 import { Wildlife } from './wildlife.js';
+import { Progress } from './progress.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -68,9 +69,12 @@ class Game {
     // ?seed=123 erzwingt eine bestimmte Welt (reproduzierbare Tests), ?play überspringt das Menü
     const qs = new URLSearchParams(location.search);
     this.fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
+    this.skipTutorial = qs.has('skiptut');
     this.newGame(this.randomSeed());
+    const oldSave = discardOldSaves();
     if (qs.has('play')) this.setState('playing');
     else this.toMainMenu();
+    if (oldSave) this.ui.toast('Ein Spielstand aus einer älteren Version war nicht kompatibel und wurde verworfen.', 'warn');
     // Beim Verlassen/Verstecken der Seite speichern
     const persist = () => {
       if (this.state === 'playing' || this.state === 'paused') saveGame(this);
@@ -107,35 +111,20 @@ class Game {
     this.ui.showMainMenu();
   }
 
-  startNewGame() {
+  /** Neues Spiel; opts.skipTutorial schaltet alles frei (ohne geführten Einstieg). */
+  startNewGame(opts = {}) {
     deleteSave();
+    this.skipTutorial = !!opts.skipTutorial;
     this.newGame(this.randomSeed());
-    let done = false;
-    try {
-      done = localStorage.getItem('cinis.tutorialDone') === '1';
-    } catch {
-      done = false;
-    }
-    const begin = () => {
-      try {
-        localStorage.setItem('cinis.tutorialDone', '1');
-      } catch {
-        /* Speicher nicht verfügbar: Tutorial erscheint beim nächsten Mal erneut */
-      }
-      this.setState('playing');
-      this.ui.toast('Sammle Holz und Stein und baue eine Hütte. Die erste Nacht kommt bald.', 'info');
-      saveGame(this);
-    };
-    if (done) begin();
-    else {
-      this.setState('tutorial');
-      this.ui.showTutorial(begin);
-    }
+    this.setState('playing');
+    if (this.skipTutorial) this.ui.toast('Halte die Ewige Flamme am Leben – so viele Nächte wie möglich.', 'info');
+    saveGame(this);
   }
 
   continueGame() {
     if (loadGame(this)) {
       this.setState('playing');
+      this.ui.applyUnlocks();
       this.ui.toast(`Willkommen zurück – Tag ${this.cycle.day}.`, 'good');
     } else {
       this.ui.toast('Spielstand konnte nicht geladen werden.', 'danger');
@@ -188,6 +177,8 @@ class Game {
     this.buildings.add('center', this.world.cx - 1, this.world.cy - 1);
     this.stock = { ...START_STOCK };
     this.stats = { built: 0, kills: 0, gathered: 0, lost: 0 };
+    this.progress = new Progress(this);
+    if (this.skipTutorial) this.progress.unlockAll();
     this.effects.clear();
     this.loot.clear();
     this.wildlife.clear();
@@ -259,9 +250,9 @@ class Game {
     // Abbrechen zuerst auswerten, damit Esc + neue Auswahl im selben Frame korrekt sind
     if ((inp.wasPressed('Escape') || inp.mouse.rightClicked) && this.buildings.selected) this.buildings.select(null);
     BUILDABLE.forEach((type, i) => {
-      if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1))) this.buildings.select(type);
+      if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1)) && this.progress.has('b:' + type)) this.buildings.select(type);
     });
-    if (inp.wasPressed('KeyX')) this.buildings.select('demolish');
+    if (inp.wasPressed('KeyX') && this.progress.has('demolish')) this.buildings.select('demolish');
     if (!this.player.dead) this.buildings.updateBuildMode(this);
     if (inp.mouse.wheel) {
       this.camera.addZoom(-inp.mouse.wheel);
@@ -339,7 +330,9 @@ class Game {
       return;
     }
     this.time += dt;
-    this.cycle.update(dt, this);
+    // Im geführten Einstieg steht die Uhr, bis die erste Nacht eingeführt wird
+    if (this.progress.clockRunning) this.cycle.update(dt, this);
+    this.progress.update();
     // Flussfeld sofort bei Gebäudeänderungen; Baum/Fels-Änderungen nur, solange Gegner unterwegs sind,
     // und höchstens alle 4 s (gefällte Bäume ändern die Wege kaum)
     this.flowT -= dt;
@@ -505,6 +498,7 @@ class Game {
     camera.apply(ctx);
     this.wildlife.drawGlow(ctx, camera, this.time);
     if (!this.buildings.selected) this.drawTargetMarker(ctx);
+    this.drawQuestMarker(ctx);
     this.player.drawGatherBar(ctx);
     this.buildings.drawGhost(ctx, this.time);
 
@@ -603,10 +597,25 @@ class Game {
     }
   }
 
-  /** Randpfeile zu wichtigen Orten außerhalb der Sicht (die Flamme; später Lager und POIs). */
+  /** Randpfeile zu wichtigen Orten außerhalb der Sicht (die Flamme, das Questziel; später Lager und POIs). */
   drawPoiArrows(ctx) {
     const c = this.buildings.center;
+    const qt = this.progress.target();
+    if (qt && qt !== c && !(c && qt.x === c.x && qt.y === c.y)) drawEdgeArrow(ctx, this.camera, qt.x, qt.y - 8, { color: 'rgba(255,230,140,0.95)', outline: 'rgba(60,30,10,0.8)', size: 1.2, icon: '!', pulse: true });
     if (c && c.hp > 0) drawEdgeArrow(ctx, this.camera, c.x, c.y - 8, { color: 'rgba(255,200,90,0.95)', outline: 'rgba(60,30,10,0.8)', size: 1.3, icon: '♨', pulse: true });
+  }
+
+  /** Goldener, wippender Pfeil über dem aktuellen Questziel. */
+  drawQuestMarker(ctx) {
+    const t = this.progress.target();
+    if (!t || this.player.dead) return;
+    const bob = Math.round(Math.sin(this.time * 4) * 2);
+    const x = Math.round(t.x), y = Math.round(t.y - t.h - 6 + bob);
+    ctx.fillStyle = 'rgba(40,20,5,0.8)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(x - 4 + i - 1, y + i - 1, (4 - i) * 2 + 3, 1);
+    ctx.fillStyle = '#ffd36a';
+    for (let i = 0; i < 4; i++) ctx.fillRect(x - 3 + i, y + i, (3 - i) * 2 + 1, 1);
+    ctx.fillRect(x - 1, y - 4, 3, 4);
   }
 
   /** Pulsierende Eckklammern um eine Wasserstelle (Knoten leuchten selbst). */
