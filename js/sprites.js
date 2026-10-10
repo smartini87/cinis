@@ -1,0 +1,242 @@
+// sprites.js – sämtliche Grafik per Code: Pixel-Sprites werden einmalig in Offscreen-Canvases
+// gezeichnet (Bäume, Steine, Gebäude, Icons); Figuren werden pro Frame aus Rechtecken gebaut.
+
+import { TILE } from './config.js';
+import { hash2 } from './util.js';
+
+export const Sprites = {};
+
+function canvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  return [c, g];
+}
+
+/** Gefülltes Rechteck in Pixeln. */
+function px(g, x, y, w, h, color) {
+  g.fillStyle = color;
+  g.fillRect(x, y, w, h);
+}
+
+/** Gefüllte Ellipse aus Pixelzeilen (bleibt scharf). */
+function blob(g, cx, cy, rx, ry, color, seed = 0, rough = 0) {
+  g.fillStyle = color;
+  for (let y = -ry; y <= ry; y++) {
+    const k = 1 - (y * y) / (ry * ry);
+    if (k < 0) continue;
+    let w = Math.round(rx * Math.sqrt(k));
+    if (rough) w += Math.round((hash2(y, seed, 31) - 0.5) * rough);
+    if (w > 0) g.fillRect(cx - w, cy + y, w * 2, 1);
+  }
+}
+
+// ------------------------------------------------------------------ Bäume, Steine, Büsche
+function makePine(v) {
+  // Römische Schirmpinie: dünner Stamm, flache breite Krone
+  const [c, g] = canvas(24, 30);
+  const trunk = ['#5b3f2a', '#4e3523', '#654631'][v];
+  px(g, 11, 12, 2, 16, trunk);
+  px(g, 10, 26, 4, 2, trunk);
+  px(g, 9, 16, 2, 1, trunk);
+  px(g, 13, 14, 3, 1, trunk);
+  const greens = [['#2f5a2a', '#3d6e33', '#244820'], ['#35602c', '#467a38', '#29501f'], ['#2c5530', '#3b6a3b', '#203f24']][v];
+  blob(g, 12, 9, 11, 5, greens[2], v, 2);
+  blob(g, 12, 8, 10, 4, greens[0], v + 3, 2);
+  blob(g, 10, 6, 6, 2, greens[1], v + 5, 1);
+  for (let i = 0; i < 10; i++) px(g, 3 + Math.floor(hash2(i, v, 4) * 18), 5 + Math.floor(hash2(v, i, 9) * 7), 1, 1, greens[1]);
+  return c;
+}
+
+function makeCypress() {
+  const [c, g] = canvas(12, 30);
+  px(g, 5, 25, 2, 4, '#4e3523');
+  for (let y = 2; y < 27; y++) {
+    const w = Math.round(Math.sin(((y - 1) / 26) * Math.PI) * 4.5);
+    px(g, 6 - w, y, w * 2, 1, '#22452a');
+    if (w > 1) px(g, 6 - w + 1, y, 1, 1, '#2f5a36');
+  }
+  return c;
+}
+
+function makeStump() {
+  const [c, g] = canvas(16, 10);
+  px(g, 5, 3, 6, 5, '#5b3f2a');
+  px(g, 5, 3, 6, 1, '#a07c52');
+  px(g, 6, 4, 4, 1, '#8a6a46');
+  px(g, 3, 7, 3, 1, '#4e3523');
+  px(g, 10, 7, 3, 1, '#4e3523');
+  return c;
+}
+
+function makeRock(v) {
+  // Zerbrochene Marmorsäule bzw. Mauerbrocken
+  const [c, g] = canvas(18, 16);
+  if (v === 0) {
+    // liegende Säulentrommel
+    px(g, 2, 7, 13, 6, '#b9b4a8');
+    px(g, 2, 7, 13, 1, '#d8d4ca');
+    for (let x = 4; x < 15; x += 3) px(g, x, 8, 1, 5, '#9a958a');
+    px(g, 14, 7, 2, 6, '#e6e2d8');
+    px(g, 2, 13, 14, 1, '#6f6b63');
+  } else if (v === 1) {
+    // stehender Säulenstumpf
+    px(g, 5, 2, 8, 12, '#c3beb2');
+    px(g, 5, 2, 8, 1, '#e6e2d8');
+    px(g, 7, 3, 1, 11, '#a19c90');
+    px(g, 10, 3, 1, 11, '#a19c90');
+    px(g, 4, 13, 10, 2, '#8e8a80');
+    px(g, 6, 1, 3, 1, '#c3beb2');
+  } else {
+    // grauer Tuffsteinbrocken
+    blob(g, 9, 10, 7, 4, '#6f6b63', 3, 1);
+    blob(g, 8, 9, 6, 3, '#8e8a80', 4, 1);
+    px(g, 5, 7, 4, 1, '#a8a498');
+    px(g, 12, 10, 2, 2, '#5a5650');
+  }
+  return c;
+}
+
+function makeBush(withFruit) {
+  const [c, g] = canvas(16, 14);
+  blob(g, 8, 8, 7, 5, '#2f5a2a', 7, 1);
+  blob(g, 7, 7, 5, 3, '#3f7234', 8, 1);
+  if (withFruit) {
+    const pts = [[4, 7], [9, 5], [11, 9], [6, 10], [12, 6]];
+    for (const [x, y] of pts) {
+      px(g, x, y, 2, 2, '#6b2a5a');
+      px(g, x, y, 1, 1, '#9a4a85');
+    }
+  }
+  px(g, 3, 12, 10, 1, 'rgba(0,0,0,0.25)');
+  return c;
+}
+
+// ------------------------------------------------------------------ Icons (HUD)
+function makeIcon(kind) {
+  const [c, g] = canvas(12, 12);
+  if (kind === 'wood') {
+    px(g, 1, 6, 10, 3, '#7a5233');
+    px(g, 2, 3, 10, 3, '#8d6240');
+    px(g, 10, 3, 2, 3, '#c49a6a');
+    px(g, 0, 6, 2, 3, '#c49a6a');
+  } else if (kind === 'stone') {
+    blob(g, 6, 7, 5, 4, '#8e8a80');
+    px(g, 3, 4, 5, 2, '#c3beb2');
+  } else if (kind === 'food') {
+    blob(g, 6, 7, 4, 4, '#7a3266');
+    px(g, 4, 5, 2, 2, '#a8579a');
+    px(g, 6, 1, 1, 3, '#3f7234');
+    px(g, 7, 2, 3, 1, '#4f8a3f');
+  } else if (kind === 'water') {
+    for (let y = 1; y < 11; y++) {
+      const w = y < 5 ? Math.floor(y / 2) + 1 : Math.round(Math.sqrt(Math.max(0, 16 - (y - 7) ** 2)));
+      px(g, 6 - w, y, w * 2, 1, '#3f86c0');
+    }
+    px(g, 4, 6, 1, 2, '#9fd0f0');
+  } else if (kind === 'people') {
+    px(g, 2, 2, 3, 3, '#c99a6e');
+    px(g, 1, 5, 5, 6, '#b8a074');
+    px(g, 7, 3, 3, 3, '#c99a6e');
+    px(g, 6, 6, 5, 5, '#8a6a4a');
+  } else if (kind === 'heart') {
+    px(g, 2, 3, 3, 3, '#c0392b');
+    px(g, 7, 3, 3, 3, '#c0392b');
+    px(g, 1, 4, 10, 3, '#c0392b');
+    px(g, 2, 7, 8, 1, '#c0392b');
+    px(g, 3, 8, 6, 1, '#c0392b');
+    px(g, 5, 9, 2, 1, '#c0392b');
+    px(g, 3, 4, 1, 1, '#f08a7a');
+  } else if (kind === 'flame') {
+    px(g, 4, 3, 4, 7, '#e8742a');
+    px(g, 3, 6, 6, 4, '#e8742a');
+    px(g, 5, 1, 2, 3, '#f0a53a');
+    px(g, 5, 6, 2, 4, '#ffd36a');
+  }
+  return c;
+}
+
+/** Alle statischen Sprites erzeugen (einmalig beim Start). */
+export function buildSprites() {
+  Sprites.pine = [0, 1, 2].map(makePine);
+  Sprites.cypress = makeCypress();
+  Sprites.stump = makeStump();
+  Sprites.rock = [0, 1, 2].map(makeRock);
+  Sprites.bush = makeBush(true);
+  Sprites.bushEmpty = makeBush(false);
+  Sprites.icons = {};
+  for (const k of ['wood', 'stone', 'food', 'water', 'people', 'heart', 'flame']) Sprites.icons[k] = makeIcon(k);
+}
+
+/** Data-URL eines Icons für das DOM-HUD. */
+export function iconURL(kind) {
+  return Sprites.icons[kind].toDataURL();
+}
+
+// ------------------------------------------------------------------ Ressourcenknoten
+export function drawNode(ctx, node) {
+  const x = node.tx * TILE, y = node.ty * TILE;
+  const sh = node.shake > 0 ? Math.round(Math.sin(node.shake * 60) * 1) : 0;
+  if (node.type === 'tree') {
+    if (node.amount <= 0) {
+      ctx.drawImage(Sprites.stump, x, y + 6);
+      return;
+    }
+    if (node.variant === 2) ctx.drawImage(Sprites.cypress, x + 2 + sh, y - 14);
+    else ctx.drawImage(Sprites.pine[node.variant], x - 4 + sh, y - 14);
+  } else if (node.type === 'rock') {
+    ctx.drawImage(Sprites.rock[node.variant], x - 1 + sh, y);
+  } else if (node.type === 'bush') {
+    ctx.drawImage(node.amount > 0 ? Sprites.bush : Sprites.bushEmpty, x + sh, y + 2);
+  }
+}
+
+// ------------------------------------------------------------------ Figuren
+/**
+ * Zeichnet eine menschliche Figur mit Füßen bei (x,y).
+ * o: { flip, walk (Animationsphase), tunic, skin, hair, helmet, plume, hurt, carry }
+ */
+export function drawHumanoid(ctx, x, y, o) {
+  x = Math.round(x);
+  y = Math.round(y);
+  const f = o.flip ? -1 : 1;
+  // Rechteck relativ zur Figur, horizontal gespiegelt bei Blick nach links
+  const R = (rx, ry, w, h, c) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
+  };
+  const step = o.walk ? Math.round(Math.sin(o.walk) * 1.5) : 0;
+  const bob = o.walk ? Math.abs(Math.round(Math.sin(o.walk))) : 0;
+  const skin = o.hurt ? '#ffffff' : o.skin;
+  const tunic = o.hurt ? '#ffffff' : o.tunic;
+  R(-4, -1, 8, 2, 'rgba(0,0,0,0.28)');
+  // Beine
+  R(-3, -5, 2, 4 + Math.max(0, step), skin);
+  R(1, -5, 2, 4 + Math.max(0, -step), skin);
+  R(-3, -1 + Math.max(0, step), 2, 1, '#4a3020');
+  R(1, -1 + Math.max(0, -step), 2, 1, '#4a3020');
+  // Körper
+  R(-4, -11 - bob, 8, 7, tunic);
+  R(-4, -6 - bob, 8, 1, o.belt || '#5a3d24');
+  // Arme
+  R(-5, -10 - bob, 1, 5, skin);
+  R(4, -10 - bob, 1, 5, skin);
+  // Kopf
+  R(-3, -16 - bob, 6, 5, skin);
+  R(1, -14 - bob, 1, 1, '#1d1712');
+  if (o.helmet) {
+    R(-3, -17 - bob, 6, 3, o.helmet);
+    R(-4, -15 - bob, 1, 3, o.helmet);
+    if (o.plume) R(-2, -19 - bob, 5, 2, o.plume);
+  } else if (o.hair) {
+    R(-3, -17 - bob, 6, 2, o.hair);
+    R(-3, -15 - bob, 1, 2, o.hair);
+  }
+  if (o.carry) {
+    // getragene Ressource über dem Kopf
+    const col = { wood: '#8d6240', stone: '#b9b4a8', food: '#7a3266', water: '#3f86c0' }[o.carry];
+    R(-3, -22 - bob, 6, 4, col);
+    R(-3, -22 - bob, 6, 1, 'rgba(255,255,255,0.35)');
+  }
+}
