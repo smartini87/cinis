@@ -114,6 +114,7 @@ export class Lighting {
     };
     const flick = 1 + Math.sin(game.time * 13) * 0.03 + Math.sin(game.time * 7.3) * 0.03;
     for (const b of game.buildings.list) {
+      if (b.site) continue;
       if (b.type === 'center') {
         if (b.hp > 0) light(b.x, b.y - 8, 150 * flick, 1);
       }

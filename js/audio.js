@@ -212,6 +212,11 @@ export class SoundEngine {
         this.noise(0.12, { vol: v(0.2), freq: 900, type: 'bandpass', q: 1.5 });
         this.tone(330, 0.1, { type: 'triangle', vol: v(0.08), delay: 0.08, slide: 420 });
         break;
+      case 'place':
+        // Pflock wird eingeschlagen
+        this.noise(0.06, { vol: v(0.18), freq: 600, type: 'lowpass' });
+        this.tone(160, 0.08, { type: 'triangle', vol: v(0.1), slide: 120 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

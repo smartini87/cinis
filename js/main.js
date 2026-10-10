@@ -57,6 +57,7 @@ class Game {
     this.interact.addProvider(this.loot.provider);
     this.interact.addProvider((g, out) => g.settlers.provider(g, out));
     this.interact.addProvider((g, out) => g.pois.provider(g, out));
+    this.interact.addProvider((g, out) => g.buildings.provider(g, out));
     this.interact.addProvider((g, out) => {
       // Jagdbare Tiere in Reichweite: Glow + „Jagen“
       const p = g.player;
@@ -353,6 +354,7 @@ class Game {
     if (this._lights && this._lightsKey === key) return this._lights;
     const out = [];
     for (const b of this.buildings.list) {
+      if (b.site) continue;
       if (b.type === 'center' && b.hp > 0) out.push({ x: b.x, y: b.y - 8, r: 150, k: 1 });
       else if (b.type === 'hut') out.push({ x: b.x, y: b.y, r: 44, k: 0.75 });
       else if (b.type === 'tower') out.push({ x: b.x, y: b.y - 14, r: 58, k: 0.8 });
@@ -549,6 +551,7 @@ class Game {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
+    if (this.state !== 'menu' && this.state !== 'intro') this.buildings.drawSiteLabels(ctx, this);
     this.drawDeathOverlay(ctx);
     if (this.state === 'intro') this.intro.drawParallax(ctx);
     if (this.state !== 'menu' && this.state !== 'intro') {

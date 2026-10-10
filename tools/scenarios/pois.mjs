@@ -37,6 +37,7 @@ export default async function (page) {
     const w = g.world;
     let built = null;
     for (let d = 3; d < 9 && !built; d++) for (const [dx, dy] of [[d, 0], [-d, 0], [0, d], [0, -d]]) if (!built && g.buildings.canPlace('hut', w.cx + dx, w.cy + dy).ok) built = g.buildings.place(g, 'hut', w.cx + dx, w.cy + dy);
+    g.buildings.finishAllSites(g);
     near({ x: s.x, y: s.y }, 0.9, 0);
     pressE();
     out.follows = s.mode === 'follow';

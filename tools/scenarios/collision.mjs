@@ -15,6 +15,7 @@ export default async function (page) {
     for (let x = cx - 4; x <= cx + 4; x++) place('wall', x, cy + 5);
     const hut = place('hut', cx + 4, cy - 5);
     const tower = place('tower', cx - 5, cy - 1);
+    B.finishAllSites(g);
     g.update(1 / 60);
     const sim = (sec, check) => { for (let i = 0; i < sec * 60; i++) { g.update(1 / 60); if (check) check(); } };
     let bad = 0;
@@ -50,6 +51,7 @@ export default async function (page) {
       if (Math.abs(x - cx) < 7 && Math.abs(y - cy) < 7) continue;
       if (B.canPlace('hut', x, y).ok && B.place(g, 'hut', x, y)) huts++;
     }
+    B.finishAllSites(g);
     const gathered0 = g.stats.gathered;
     let inside = 0;
     const checkSettlers = () => {
@@ -76,6 +78,7 @@ export default async function (page) {
       const t = x === cx || y === cy ? 'gate' : 'wall';
       if (B.canPlace(t, x, y).ok) B.place(g, t, x, y);
     }
+    B.finishAllSites(g);
     g.update(1 / 60);
     const outside = [cx, cy + 18];
     const path = w.findPath(outside[0], outside[1], cx, cy + 3);

@@ -18,6 +18,7 @@ export const BUILDING_DEFS = {
 export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate'];
 
 export const WELL_INTERVAL = 9;    // Sekunden pro Wasser
+export const SITE_HP = 0.25;       // Baustellen haben ein Viertel der Lebenspunkte (steigt mit dem Material)
 export const CENTER_BEDS = 0;      // Die Flamme selbst bietet keine Wohnplätze (nachts aber Schutz)
 export const TERRITORY_CENTER = 12; // Bauradius um die Flamme (Kacheln)
 const TERRITORY_BUILDING = 6;      // Bauradius um jedes andere Gebäude
@@ -71,11 +72,21 @@ export class Buildings {
     this.version++;
   }
 
+  /** Anzahl fertiger Gebäude eines Typs (Baustellen zählen nicht). */
   count(type) {
+    return this.list.reduce((n, b) => n + (b.type === type && !b.site ? 1 : 0), 0);
+  }
+  /** Anzahl einschließlich Baustellen. */
+  countAll(type) {
     return this.list.reduce((n, b) => n + (b.type === type ? 1 : 0), 0);
   }
+  /** Fertige Gebäude eines Typs. */
   ofType(type) {
-    return this.list.filter((b) => b.type === type);
+    return this.list.filter((b) => b.type === type && !b.site);
+  }
+  /** Alle offenen Baustellen. */
+  get sites() {
+    return this.list.filter((b) => b.site);
   }
 
   /** Abstand eines Punkts zum Rand des Gebäuderechtecks (0 = innerhalb). */
@@ -187,13 +198,8 @@ export class Buildings {
       game.audio.play('error');
       return null;
     }
+    // Gebaut wird immer: Es entsteht eine Baustelle, die Material braucht
     const cost = this.costAt(type, tx, ty);
-    if (!this.canAfford(game, cost)) {
-      game.ui.toast(`Nicht genug Ressourcen für ${def.name}.`, 'warn', 'afford');
-      game.audio.play('error');
-      return null;
-    }
-    this.pay(game, cost);
     const old = this.world.buildingAt[this.world.idx(tx, ty)];
     if (old) this.remove(old); // Mauer wird durch das Tor ersetzt
     // Stümpfe/leere Sträucher unter dem Bauplatz verschwinden
@@ -204,23 +210,135 @@ export class Buildings {
       }
     }
     const b = this.add(type, tx, ty);
-    b.spawn = 0.35;
-    game.effects.burst(b.x, b.y + (def.size * TILE) / 2 - 2, { n: 14, color: ['#b9a98a', '#8e8a80', '#d8d4ca'], speed: 50, life: 0.6, up: 20 });
-    game.audio.play('build');
-    game.stats.built++;
+    const need = {};
+    for (const k of RES_KEYS) if (cost[k] > 0) need[k] = cost[k];
+    b.site = { need, got: {}, incoming: {}, since: game.time };
+    b.hp = Math.max(1, Math.round(b.maxHp * SITE_HP));
+    game.effects.burst(b.x, b.y + (def.size * TILE) / 2 - 2, { n: 10, color: ['#b9a98a', '#8e8a80', '#a07c52'], speed: 40, life: 0.5, up: 16 });
+    game.audio.play('place');
+    if (this.siteMissing(b).length === 0) this.completeSite(game, b);
     return b;
   }
 
-  /** Abriss mit 50 % Rückerstattung. */
+  /** Was fehlt der Baustelle noch? [[res, n], …] (unterwegs befindliches Material zählt nicht als fehlend, wenn incl = true) */
+  siteMissing(b, inclIncoming = false) {
+    const st = b.site, out = [];
+    if (!st) return out;
+    for (const [k, n] of Object.entries(st.need)) {
+      const have = (st.got[k] || 0) + (inclIncoming ? st.incoming[k] || 0 : 0);
+      if (have < n) out.push([k, n - have]);
+    }
+    return out;
+  }
+
+  /** Fortschritt der Baustelle 0..1 (nach Materialmenge). */
+  siteProgress(b) {
+    const st = b.site;
+    if (!st) return 1;
+    let need = 0, got = 0;
+    for (const [k, n] of Object.entries(st.need)) {
+      need += n;
+      got += Math.min(n, st.got[k] || 0);
+    }
+    return need ? got / need : 1;
+  }
+
+  /** Material an eine Baustelle liefern; liefert die tatsächlich angenommene Menge. */
+  deliverTo(game, b, res, n) {
+    const st = b.site;
+    if (!st || b.dead || !st.need[res]) return 0;
+    const take = Math.min(n, st.need[res] - (st.got[res] || 0));
+    if (take <= 0) return 0;
+    st.got[res] = (st.got[res] || 0) + take;
+    b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.75 * (take / Object.values(st.need).reduce((a, v) => a + v, 0)));
+    if (game.camera.visible(b.x, b.y, 1, 1, 0)) game.effects.text(b.x, b.y - 10, `+${take} ${RES[res].name}`, RES[res].color);
+    if (this.siteMissing(b).length === 0) this.completeSite(game, b);
+    return take;
+  }
+
+  /**
+   * Spieler liefert mit E: zuerst aus dem Inventar, dann – wenn die Baustelle im Kerngebiet der Flamme liegt –
+   * direkt aus dem Lager.
+   */
+  playerDeliver(game, b) {
+    const p = game.player;
+    let total = 0;
+    for (const [k, n] of this.siteMissing(b)) {
+      const fromInv = Math.min(n, p.inv[k] || 0);
+      if (fromInv > 0) {
+        p.inv[k] -= fromInv;
+        total += this.deliverTo(game, b, k, fromInv);
+      }
+    }
+    const nearFlame = this.center && Math.hypot(b.x - this.center.x, b.y - this.center.y) <= TERRITORY_CENTER * TILE;
+    if (nearFlame && b.site) {
+      for (const [k, n] of this.siteMissing(b, true)) {
+        const fromStock = Math.min(n, Math.floor(game.stock[k] || 0));
+        if (fromStock > 0) {
+          game.stock[k] -= fromStock;
+          total += this.deliverTo(game, b, k, fromStock);
+        }
+      }
+    }
+    if (total) game.audio.play('deposit');
+    else game.ui.toast(nearFlame ? 'Das fehlende Material liegt weder in deinem Gepäck noch im Lager.' : 'Du trägst nichts, was die Baustelle braucht.', 'warn', 'deliver');
+    return total;
+  }
+
+  /** Baustelle fertig: Aufbau-Animation, Funken, Gebäude nimmt die Arbeit auf. */
+  completeSite(game, b) {
+    if (!b.site) return;
+    b.site = null;
+    b.hp = b.maxHp;
+    b.spawn = 0.6;
+    b.flash = 0;
+    if (b.type === 'gate') b.rot = this.gateRotation(b.tx, b.ty);
+    this.changed = true;
+    this.version++;
+    this.world.navDirty = true;
+    const def = BUILDING_DEFS[b.type], s = def.size * TILE;
+    game.effects.burst(b.x, b.y + s / 2 - 2, { n: 22, color: ['#b9a98a', '#8e8a80', '#d8d4ca'], speed: 55, life: 0.7, up: 22 });
+    game.effects.burst(b.x, b.y - s / 2, { n: 16, color: ['#ffd36a', '#fff3c4', '#f0a53a'], speed: 45, life: 0.8, up: 35 });
+    game.audio.play('build');
+    game.stats.built++;
+    if (game.camera.visible(b.x, b.y, 1, 1, 0)) game.effects.text(b.x, b.y - s / 2 - 10, `${def.name} fertig!`, '#ffd36a');
+  }
+
+  /** Alle Baustellen sofort fertigstellen (nur für Tests und Debugging). */
+  finishAllSites(game) {
+    for (const b of [...this.list]) if (b.site) this.completeSite(game, b);
+  }
+
+  /** Interaktions-Provider: Baustellen in Reichweite („Material liefern“). */
+  provider = (game, out) => {
+    const p = game.player;
+    for (const b of this.list) {
+      if (!b.site || Math.abs(b.x - p.x) > 3 * TILE || Math.abs(b.y - p.y) > 3 * TILE) continue;
+      const r = (b.size * TILE) / 2;
+      out.push({
+        kind: 'site', obj: b, x: b.x, y: b.y + r - 2, label: `${BUILDING_DEFS[b.type].name}: Material liefern`, promptH: b.size * TILE + 14, prio: -2,
+        reach: r + 22,
+        hit: (mx, my) => Math.floor(mx / TILE) >= b.tx && Math.floor(mx / TILE) < b.tx + b.size && Math.floor(my / TILE) >= b.ty && Math.floor(my / TILE) < b.ty + b.size,
+        act: (g) => this.playerDeliver(g, b),
+      });
+    }
+  };
+
+  /** Abriss mit 50 % Rückerstattung; Baustellen geben 75 % des gelieferten Materials zurück. */
   demolish(game, b) {
     if (b.type === 'center') {
       game.ui.toast('Die Ewige Flamme kann nicht abgerissen werden.', 'warn', 'demo');
       return;
     }
     const def = BUILDING_DEFS[b.type];
-    for (const k of RES_KEYS) game.stock[k] += Math.floor((def.cost[k] || 0) / 2);
+    if (b.site) {
+      for (const [k, n] of Object.entries(b.site.got)) game.stock[k] += Math.floor(n * 0.75);
+      game.ui.toast(`Baustelle (${def.name}) abgerissen – 75 % des Materials zurück ins Lager.`, 'info');
+    } else {
+      for (const k of RES_KEYS) game.stock[k] += Math.floor((def.cost[k] || 0) / 2);
+      game.ui.toast(`${def.name} abgerissen (50 % erstattet).`, 'info');
+    }
     game.effects.burst(b.x, b.y, { n: 18, color: ['#8e8a80', '#6b4a2a', '#b9b4a8'], speed: 60, life: 0.7 });
-    game.ui.toast(`${def.name} abgerissen (50 % erstattet).`, 'info');
     game.audio.play('demolish');
     this.remove(b);
   }
@@ -255,7 +373,7 @@ export class Buildings {
     const tx = Math.round(wx / TILE - size / 2), ty = Math.round(wy / TILE - size / 2);
     const chk = this.canPlace(this.selected, tx, ty);
     const afford = this.canAfford(game, this.costAt(this.selected, tx, ty));
-    this.ghost = { tx, ty, ok: chk.ok && afford, reason: chk.ok ? (afford ? '' : 'Nicht genug Ressourcen') : chk.reason };
+    this.ghost = { tx, ty, ok: chk.ok, afford, reason: chk.ok ? '' : chk.reason };
     const tileKey = ty * this.world.w + tx;
     // Mauern lassen sich bei gedrückter Maustaste ziehen
     const drag = this.selected === 'wall' && input.mouse.down && tileKey !== this.lastDragTile && chk.ok;
@@ -273,6 +391,7 @@ export class Buildings {
       if (b.flash > 0) b.flash -= dt;
       if (b.pulse > 0) b.pulse = Math.max(0, b.pulse - dt * 1.5);
       if (b.spawn > 0) b.spawn -= dt;
+      if (b.site) continue; // Baustellen arbeiten nicht und werden nicht repariert
       // Siedler reparieren tagsüber beschädigte Gebäude (abstrahiert als Regeneration)
       if (sunny && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
       if (b.type === 'tower') this.updateTower(b, dt, game);
@@ -352,10 +471,14 @@ export class Buildings {
   drawBuilding(ctx, b, time) {
     const x = b.tx * TILE, y = b.ty * TILE, s = b.size * TILE;
     const bottom = y + s;
+    if (b.site) {
+      this.drawSite(ctx, b, time);
+      return;
+    }
     // Aufbau-Animation: leicht von unten einfedern
     if (b.spawn > 0) {
       ctx.save();
-      const k = 1 - b.spawn / 0.35;
+      const k = Math.max(0, 1 - b.spawn / 0.6);
       ctx.translate(x + s / 2, bottom);
       ctx.scale(1, 0.4 + 0.6 * k);
       ctx.translate(-(x + s / 2), -bottom);
@@ -402,6 +525,84 @@ export class Buildings {
     if (b.hp < b.maxHp) this.drawHpBar(ctx, x, y - (b.type === 'tower' ? 26 : b.type === 'center' ? 34 : 12), s, b.hp / b.maxHp);
   }
 
+  /** Baustelle: Grundriss, halb durchsichtiges Gebäude (wächst mit dem Material), Holzgerüst, Fortschritt. */
+  drawSite(ctx, b, time) {
+    const x = b.tx * TILE, y = b.ty * TILE, s = b.size * TILE, bottom = y + s;
+    const k = this.siteProgress(b);
+    ctx.fillStyle = 'rgba(70,52,34,0.55)';
+    ctx.fillRect(x + 1, y + 1, s - 2, s - 2);
+    // Geist des fertigen Gebäudes, von unten her „aufgebaut“
+    const h = this.spriteHeight(b) + 4;
+    const shown = Math.max(2, Math.round(h * (0.15 + 0.85 * k)));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - 4, bottom - shown, s + 8, shown + 4);
+    ctx.clip();
+    ctx.globalAlpha = 0.55;
+    const fake = { ...b, site: null, spawn: 0, hp: 1, maxHp: 1, flash: 0, growth: 0, open: 0 };
+    this.drawBuilding(ctx, fake, time);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    // Gerüst: Pfosten an den Ecken, Querbretter
+    const top = bottom - Math.max(10, Math.round(h * 0.9));
+    ctx.fillStyle = '#7a5233';
+    for (const px of [x + 1, x + s - 3]) ctx.fillRect(px, top, 2, bottom - top);
+    if (s > TILE) ctx.fillRect(x + s / 2 - 1, top + 4, 2, bottom - top - 4);
+    ctx.fillStyle = '#a07c52';
+    for (let py = bottom - 6; py > top; py -= 7) ctx.fillRect(x, py, s, 1);
+    ctx.fillStyle = '#5b3f2a';
+    ctx.fillRect(x + 2, top + 2, s - 4, 1);
+    // Fortschritt
+    const by = top - 5;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(x, by, s, 3);
+    ctx.fillStyle = '#d9b25a';
+    ctx.fillRect(x + 1, by + 1, Math.round((s - 2) * k), 1);
+    if (b.flash > 0) {
+      ctx.fillStyle = 'rgba(255,80,60,0.35)';
+      ctx.fillRect(x, top, s, bottom - top);
+    }
+  }
+
+  /** Fehlende Materialien über Baustellen (Bildschirmkoordinaten, nur in der Nähe bzw. unter dem Mauszeiger). */
+  drawSiteLabels(ctx, game) {
+    const cam = game.camera, p = game.player, dpr = window.devicePixelRatio || 1;
+    let hover = null;
+    if (game.input.mouse.inside) {
+      const w = cam.screenToWorld(game.input.mouse.x, game.input.mouse.y);
+      const tx = Math.floor(w.x / TILE), ty = Math.floor(w.y / TILE);
+      hover = this.world.inBounds(tx, ty) ? this.world.buildingAt[this.world.idx(tx, ty)] : null;
+    }
+    ctx.save();
+    ctx.font = `bold ${Math.round(11 * dpr)}px Georgia, serif`;
+    ctx.textBaseline = 'middle';
+    for (const b of this.list) {
+      if (!b.site || (b !== hover && Math.hypot(b.x - p.x, b.y - p.y) > 4.5 * TILE)) continue;
+      if (!cam.visible(b.x - 20, b.y - 60, 40, 60)) continue;
+      const miss = this.siteMissing(b);
+      if (!miss.length) continue;
+      const top = b.y + (b.size * TILE) / 2 - this.spriteHeight(b) - 20;
+      const sc = cam.worldToScreen(b.x, top);
+      const icon = 13 * dpr, gap = 4 * dpr;
+      const parts = miss.map(([k, n]) => [k, String(n), ctx.measureText(String(n)).width]);
+      const width = parts.reduce((a, [, , tw]) => a + icon + tw + gap * 2, 0);
+      let px = sc.x - width / 2;
+      ctx.fillStyle = 'rgba(20,14,10,0.85)';
+      ctx.fillRect(px - 4 * dpr, sc.y - 10 * dpr, width + 8 * dpr, 20 * dpr);
+      ctx.strokeStyle = 'rgba(217,178,90,0.8)';
+      ctx.lineWidth = dpr;
+      ctx.strokeRect(px - 4 * dpr + 0.5, sc.y - 10 * dpr + 0.5, width + 8 * dpr, 20 * dpr);
+      for (const [k, txt, tw] of parts) {
+        ctx.drawImage(Sprites.icons[k], Math.round(px), Math.round(sc.y - icon / 2), icon, icon);
+        px += icon + gap;
+        ctx.fillStyle = '#f3e6c4';
+        ctx.fillText(txt, px, sc.y + dpr);
+        px += tw + gap;
+      }
+    }
+    ctx.restore();
+  }
+
   drawHpBar(ctx, x, y, w, k) {
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(x, y, w, 3);
@@ -430,7 +631,7 @@ export class Buildings {
     ctx.globalAlpha = 0.6;
     this.drawBuilding(ctx, fake, time);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = g.ok ? 'rgba(111,191,90,0.35)' : 'rgba(208,64,42,0.4)';
+    ctx.fillStyle = g.ok ? (g.afford ? 'rgba(111,191,90,0.35)' : 'rgba(217,178,90,0.35)') : 'rgba(208,64,42,0.4)';
     ctx.fillRect(g.tx * TILE, g.ty * TILE, def.size * TILE, def.size * TILE);
     if (this.selected === 'tower') {
       // Reichweite anzeigen

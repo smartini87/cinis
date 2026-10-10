@@ -65,7 +65,15 @@ export default async function (page) {
       if (!ok && g.buildings.canPlace('hut', w.cx + dx, w.cy + dy).ok) ok = !!g.buildings.place(g, 'hut', w.cx + dx, w.cy + dy);
     }
     for (let i = 0; i < 30; i++) g.update(1 / 60);
-    const out = { afterHut: g.progress.quest, target: !!g.progress.target() };
+    // Baustelle: mit E Material aus dem Lager anliefern
+    const site = g.buildings.list.find((b) => b.type === 'hut');
+    const siteBefore = !!site.site;
+    g.player.x = site.x; g.player.y = site.y + 26; g.player.vx = g.player.vy = 0;
+    g.input.keys.add('KeyE');
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    g.input.keys.delete('KeyE');
+    for (let i = 0; i < 40; i++) g.update(1 / 60);
+    const out = { siteBefore, siteDone: !site.site, afterHut: g.progress.quest, target: !!g.progress.target() };
     // Überlebenden im nächsten Lager ansprechen (E) und zur Siedlung bringen
     const s = g.settlers.list.filter((o) => o.mode === 'waiting' && !o.wander).sort((a, b) => Math.hypot(a.x - g.player.x, a.y - g.player.y) - Math.hypot(b.x - g.player.x, b.y - g.player.y))[0];
     const p = g.player;
@@ -86,6 +94,7 @@ export default async function (page) {
     return out;
   });
   console.log('Siedler', JSON.stringify(hut));
+  if (!hut.siteBefore || !hut.siteDone) throw new Error('Hütte entsteht nicht als Baustelle bzw. wird nicht fertig');
   if (!hut.target) throw new Error('Kein Marker zum Lager');
   if (!hut.following) throw new Error('Siedler folgt nicht');
   if (!hut.joined) throw new Error('Siedler nicht in der Siedlung angekommen');

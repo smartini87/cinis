@@ -88,7 +88,7 @@ export function saveGame(game) {
     player: { x: game.player.x, y: game.player.y, hp: game.player.hp, inv: game.player.inv, dead: game.player.dead, respawnT: game.player.respawnT },
     // Knoten kompakt: [Menge, Timer, entfernt]
     nodes: game.world.nodes.map((n) => [n.amount, Math.round(n.timer * 10) / 10, n.removed ? 1 : 0]),
-    buildings: game.buildings.list.map((b) => ({ type: b.type, tx: b.tx, ty: b.ty, hp: b.hp, timer: b.timer, growth: b.growth })),
+    buildings: game.buildings.list.map((b) => ({ type: b.type, tx: b.tx, ty: b.ty, hp: b.hp, timer: b.timer, growth: b.growth, rot: b.rot, site: b.site ? { need: b.site.need, got: b.site.got } : null })),
     settlers: game.settlers.list.filter((st) => !st.wander).map((st) => ({
       name: st.name, x: st.x, y: st.y, hp: st.hp, maxHp: st.maxHp, hunger: st.hunger, thirst: st.thirst,
       hidden: !!st.hidden, home: st.home ? bIndex.get(st.home) ?? -1 : -1,
@@ -147,6 +147,8 @@ export function loadGame(game) {
     b.hp = bd.hp;
     b.timer = bd.timer || 0;
     b.growth = bd.growth || 0;
+    if (bd.rot !== undefined) b.rot = bd.rot;
+    if (bd.site) b.site = { need: { ...bd.site.need }, got: { ...bd.site.got }, incoming: {} };
     blds.push(b);
   }
 

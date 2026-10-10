@@ -88,6 +88,7 @@ export default async function (page) {
     for (const n of w.nodes) if (Math.hypot(n.tx - w.cx, n.ty - w.cy) < 11) w.removeNode(n);
     const wy = w.cy + 6;
     for (let x = w.cx - 3; x <= w.cx + 3; x++) g.buildings.place(g, x === w.cx + 2 ? 'gate' : 'wall', x, wy);
+    g.buildings.finishAllSites(g);
     g.update(1 / 60);
     let inside = 0;
     const check = () => { if (overlaps(w, p.x, p.y, p.r, 'friendly', 0.75)) inside++; };

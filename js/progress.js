@@ -55,9 +55,13 @@ export const QUESTS = [
   {
     id: 'hut',
     start: ['buildbar', 'b:hut'],
-    text: (g) => `Baue eine Hütte (Taste ${BUILDING_DEFS.hut.key} oder Bauleiste)`,
+    text: (g) => (g.buildings.countAll('hut') ? 'Liefere Holz und Stein an die Baustelle (E)' : `Setze eine Hütte (Taste ${BUILDING_DEFS.hut.key} oder Bauleiste)`),
+    progress: (g) => {
+      const b = g.buildings.list.find((x) => x.type === 'hut' && x.site);
+      return b ? `Baufortschritt ${Math.round(g.buildings.siteProgress(b) * 100)} %` : '';
+    },
     done: (g) => g.buildings.count('hut') > 0,
-    target: (g) => g.buildings.center,
+    target: (g) => g.buildings.list.find((x) => x.type === 'hut' && x.site) || g.buildings.center,
     finish: ['hud.settlers', 'hud.minimap'],
   },
   {

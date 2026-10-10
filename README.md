@@ -28,7 +28,8 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | Gebäude wählen | 1 – 6 oder Klick auf die Bauleiste | Bauleiste antippen |
 | Gebäude setzen | Linksklick (Mauern: Maustaste halten und ziehen) | Bauplatz antippen |
 | Bauen abbrechen | Rechtsklick oder Esc | Gebäude in der Bauleiste erneut antippen |
-| Abriss (50 % zurück) | X, dann Gebäude anklicken | „Abriss“ antippen, dann Gebäude |
+| Material liefern | E an einer Baustelle | Baustelle antippen |
+| Abriss (50 % zurück, Baustelle 75 % des Gelieferten) | X, dann Gebäude anklicken | „Abriss“ antippen, dann Gebäude |
 | Spieltempo 1× / 2× / 3× | F | Knopf oben rechts |
 | Pause | P oder Esc | Knopf oben rechts |
 | Ton an/aus | M | Knopf oben rechts |
@@ -80,6 +81,8 @@ Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lag
 | 6 | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; auf eine Mauer gesetzt ersetzt es sie (zahlt nur die Differenz) |
 
 Gebaut werden kann im Umkreis von 12 Feldern um die Flamme und 6 Feldern um jedes andere Gebäude. Tagsüber reparieren die Siedler beschädigte Gebäude automatisch.
+
+**Baustellen:** Gebäude lassen sich immer setzen, auch ohne Material. Es entsteht eine Baustelle mit Gerüst und Fortschrittsbalken. In der Nähe (oder unter dem Mauszeiger) zeigt sie, welches Material noch fehlt. Mit E lieferst du aus deinem Gepäck. Liegt die Baustelle im Kerngebiet der Flamme, holst du das Fehlende so auch direkt aus dem Lager. Siedler tragen Material selbstständig vom Lager zur Baustelle, höchstens die Hälfte von ihnen gleichzeitig; Baumeister tragen mehr. Ist alles da, steht das Gebäude mit einer kleinen Aufbau-Animation. Baustellen blockieren den Weg, haben anfangs nur ein Viertel der Lebenspunkte und können von Gegnern zerstört werden. Ein Abriss gibt 75 % des gelieferten Materials zurück.
 
 ### Wildnis und Jagd
 Tagsüber leben Hasen, Hirsche, Ziegen und Wildschweine in der Wildnis. Dazu kommen Tauben, Krähen, Möwen, Schmetterlinge, Libellen, Fische und Frösche. Nachts sind Eulen, Fledermäuse und Glühwürmchen unterwegs, und ab der zweiten Nacht streifen Wolfsrudel umher.
@@ -148,7 +151,7 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 - **Kampfgefühl:** Ein Schwerthieb holt aus, zieht mit Bogenspur durch und lässt die Figur nach vorn ausfallen. Bei Treffern hält das Bild für drei Frames an (Trefferpause), dazu ein leichtes Wackeln, Rückstoß und weißes Aufblitzen. Sammeln braucht gehaltene Taste und zeigt einen Fortschrittsbalken. Das Werkzeug passt zum Ziel (Axt, Spitzhacke, Eimer).
 - **Lesbarkeit:** Der Boden ist bewusst entsättigt und etwas dunkler. Gebäude, Bäume, Felsen und Sträucher haben kräftigere Farben und eine dunkle Kontur. Der Spieler trägt einen hellen Umriss, Siedler einen dunklen, Gegner einen dunkelroten, alle mit Bodenschatten. Das Ziel in Reichweite leuchtet golden und zeigt ein „E“. Liegt die Flamme außerhalb der Sicht, zeigt ein goldener Pfeil am Bildschirmrand dorthin.
 - **Kollision:** Alle Figuren haben kreisförmige Hitboxen und gleiten an Hindernissen entlang. Gebäude, Mauern, Baumstämme und Felsen blockieren jeden – auch den Spieler und die Siedler. Nur **Tore** lassen eigene Leute durch, Gegner nicht. Siedler arbeiten, liefern und schlafen an einem Zugangspunkt am Gebäuderand und betreten Gebäude nie. Wer hinter einem Gebäude oder Baum steht, scheint als Silhouette durch.
-- **Sofortbau:** Gebäude stehen sofort, ohne Bauphase. Reparatur ist als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s).
+- **Baustellen statt Sofortbau:** Die Bauzeit ergibt sich allein aus der Materiallieferung. Der Spieler darf im Kerngebiet der Flamme direkt aus dem Lager liefern, damit der Start ohne Siedler nicht stockt. Reparatur ist weiterhin als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s).
 - **Nur Siedler essen und trinken.** Die Spielfigur hat keine Bedürfnisse, regeneriert aber Leben, wenn sie eine Weile nicht getroffen wurde.
 - **Siedler-Zuzug:** Neue Siedler kommen nur durch Rettung aus Lagern und von Wanderern. Ohne Retten wächst die Siedlung nicht. Die Lager entstehen aus dem Seed, neue kommen im Lauf der Zeit hinzu.
 - **Feindlager-Wächter** stehen im Rauch ihrer Feuer und verbrennen nicht im Sonnenlicht. Wer bedrohte Lager nachts überfällt, verbrennt dagegen wie alle Aschgänger.

@@ -18,10 +18,13 @@ export default async function (page) {
     // Straßen (Achsen durch die Flamme) bleiben frei, damit Siedler überall hinkommen
     const size = { hut: 2, farm: 2 };
     const offRoad = (type, x, y) => { const s = size[type] || 1; return !(x <= cx && cx < x + s) && !(y <= cy && cy < y + s); };
+    // Was offene Baustellen noch brauchen, ist im Lager schon verplant
+    const free = (k) => g.stock[k] + p.inv[k] - B.sites.reduce((a, b) => a + (b.site.need[k] || 0) - (b.site.got[k] || 0), 0);
+    const canAfford = (cost) => Object.entries(cost).every(([k, n]) => free(k) >= n);
     const tryPlace = (type, cands) => {
       for (const [x, y] of cands) {
         if (type !== 'gate' && !offRoad(type, x, y)) continue;
-        if (B.canPlace(type, x, y).ok && B.canAfford(g, B.costAt(type, x, y))) {
+        if (B.canPlace(type, x, y).ok && canAfford(B.costAt(type, x, y))) {
           return B.place(g, type, x, y);
         }
       }
@@ -33,13 +36,20 @@ export default async function (page) {
     const homeSpots = ring(2, 4);
     const build = () => {
       const pop = g.settlers.colony.length;
-      while (g.settlers.capacity(g) < pop + 3 && B.count('hut') < 10 && tryPlace('hut', homeSpots.concat(ring(5, 8)))) {}
+      // Baustellen, die seit mehr als einem Tag stocken (z. B. unerreichbar), wieder abreißen
+      for (const b of B.sites) if (g.time - (b.site.since || 0) > 225) B.demolish(g, b);
+      while (g.settlers.capacity(g) + B.sites.filter((b) => b.type === 'hut').length * 4 < pop + 3 && B.countAll('hut') < 10 && tryPlace('hut', homeSpots.concat(ring(5, 8)))) {}
+      // Ohne Siedler liefert der Spieler selbst (wie E an der Baustelle)
+      if (!pop) for (const b of B.sites) B.playerDeliver(g, b);
       if (!pop) return;
-      while (B.count('farm') < Math.max(1, Math.ceil(pop / 5)) && tryPlace('farm', ring(3, 8))) {}
-      while (B.count('well') < Math.max(1, Math.ceil(pop / 6)) && tryPlace('well', ring(3, 8))) {}
-      while (g.stock.wood > 40 && g.stock.stone > 30 && tryPlace('tower', towerSpots)) {}
-      while (g.stock.stone > 20 && tryPlace('gate', gateSpots)) {}
-      while (g.stock.stone > 20 && tryPlace('wall', wallSpots)) {}
+      // Zerstörte Tore zuerst ersetzen, damit niemand ausgesperrt ist
+      if (B.countAll('wall')) while (free('stone') > 6 && tryPlace('gate', gateSpots)) {}
+      while (B.countAll('farm') < Math.max(1, Math.ceil(pop / 5)) && tryPlace('farm', ring(3, 8))) {}
+      while (B.countAll('well') < Math.max(1, Math.ceil(pop / 6)) && tryPlace('well', ring(3, 8))) {}
+      if (B.sites.length > 4) return; // erst die offenen Baustellen fertig werden lassen
+      while (free('wood') > 40 && free('stone') > 30 && tryPlace('tower', towerSpots)) {}
+      while (free('stone') > 20 && tryPlace('gate', gateSpots)) {}
+      while (free('stone') > 20 && tryPlace('wall', wallSpots)) {}
     };
 
     // ---------------------------------------------------------------- Autopilot-Ausflüge
@@ -74,7 +84,7 @@ export default async function (page) {
       const c = g.cycle;
       if (c.isNight || c.isEvening || c.t < 15 || p.dead) return;
       // 1) Allein und zu wenig Holz für die erste Hütte: selbst Holz holen
-      if (!g.settlers.colony.length && !B.canAfford(g, { wood: 20, stone: 5 })) {
+      if (!g.settlers.colony.length && !B.count('hut') && !canAfford({ wood: 20, stone: 5 }) && !B.sites.length) {
         const res = g.stock.wood + p.inv.wood < 20 ? 'tree' : 'rock';
         const n = w.nodes.filter((x) => x.type === res && !x.removed && x.amount > 0).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
         const ap = n && w.accessTile(n.tx, n.ty, p.x, p.y);
@@ -124,7 +134,7 @@ export default async function (page) {
     const rows = [];
     let minCenter = 1e9;
     g.onDawn = (day) => {
-      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
+      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), sites: B.sites.length, towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
       minCenter = 1e9;
       origDawn(day);
       build();

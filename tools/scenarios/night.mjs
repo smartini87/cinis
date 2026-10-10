@@ -8,6 +8,7 @@ export default async function (page) {
     g.buildings.place(g, 'hut', w.cx + 3, w.cy - 4);
     for (let i = 0; i < 3; i++) g.settlers.spawn(g.buildings.center.x - 16 + i * 16, g.buildings.center.y + 30);
     for (const [dx, dy] of [[-4, 0], [4, 0], [0, -5], [0, 5]]) g.buildings.place(g, 'tower', w.cx + dx, w.cy + dy);
+    g.buildings.finishAllSites(g);
     g.cycle.t = 125; // kurz vor der Dämmerung
   });
   const sim = (sec) => page.evaluate((s) => { const g = window.__game; for (let i = 0; i < s * 60 && !g.over; i++) g.update(1 / 60); }, sec);

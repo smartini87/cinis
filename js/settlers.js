@@ -372,7 +372,9 @@ export class Settlers {
     if (s.carry) return this.goToBuilding(s, game, { type: 'deliver' }, buildings.center);
     // 3) Farmarbeit (am Feldrand, nie auf dem Feld)
     if (s.job === 'farm' && s.farm) return this.goToBuilding(s, game, { type: 'farm', farm: s.farm }, s.farm);
-    // 4) Sammeln
+    // 4) Bauen: Material aus dem Lager zur Baustelle tragen
+    if (this.planBuild(s, game)) return true;
+    // 5) Sammeln
     const res = this.wantedResource(game);
     if (res === 'water') {
       const found = game.world.findPathToWater(s.tx, s.ty);
@@ -396,6 +398,83 @@ export class Settlers {
     // 5) Nichts zu tun: in der Nähe der Flamme umherschlendern
     const c = buildings.center;
     return this.goTo(s, game, { type: 'idle', t: 2 + Math.random() * 3 }, c.tx + 1 + Math.round((Math.random() - 0.5) * 8), c.ty + 1 + Math.round((Math.random() - 0.5) * 8));
+  }
+
+  /**
+   * Baustelle mit Bedarf suchen, für den das Lager genug hat; höchstens die Hälfte der Siedler baut gleichzeitig
+   * (Baumeister zuerst). Erst zum Lager (holen), dann zur Baustelle (abliefern).
+   */
+  planBuild(s, game) {
+    const sites = game.buildings.sites;
+    if (!sites.length) return false;
+    const colony = this.colony;
+    const builders = colony.filter((o) => o.task && (o.task.type === 'fetch' || o.task.type === 'build')).length;
+    const limit = Math.max(1, Math.floor(colony.length / 2)) + (s.trait === 'builder' ? 1 : 0);
+    if (builders >= limit) return false;
+    let best = null, bd = Infinity;
+    const w = game.world, B = game.buildings;
+    const home = B.accessPoint(B.center, s.x, s.y);
+    const homeRegion = home ? w.regionNear(home[0], home[1]) : -1;
+    for (const b of sites) {
+      const miss = B.siteMissing(b, true).find(([k]) => Math.floor(game.stock[k] || 0) > 0);
+      if (!miss) continue;
+      // Nur Baustellen, die vom Lager aus erreichbar sind
+      const ap = B.accessPoint(b, B.center.x, B.center.y);
+      if (!ap || w.regionNear(ap[0], ap[1]) !== homeRegion) continue;
+      const d = Math.hypot(b.x - s.x, b.y - s.y);
+      if (d < bd) {
+        bd = d;
+        best = [b, miss[0]];
+      }
+    }
+    if (!best) return false;
+    return this.goToBuilding(s, game, { type: 'fetch', site: best[0], res: best[1] }, game.buildings.center);
+  }
+
+  /** Am Lager: Material für die Baustelle aufnehmen (wird an der Baustelle als unterwegs vermerkt). */
+  doFetch(s, t, game) {
+    const b = t.site, st = b.site;
+    if (!st || b.dead) {
+      s.task = null;
+      return;
+    }
+    const cap = SETTLER.carry * (s.trait === 'builder' ? 1.6 : 1);
+    const missing = (st.need[t.res] || 0) - (st.got[t.res] || 0) - (st.incoming[t.res] || 0);
+    const n = Math.min(Math.floor(cap), missing, Math.floor(game.stock[t.res] || 0));
+    if (n <= 0) {
+      s.task = null;
+      return;
+    }
+    game.stock[t.res] -= n;
+    st.incoming[t.res] = (st.incoming[t.res] || 0) + n;
+    s.carry = { res: t.res, n, site: b };
+    if (!this.goToBuilding(s, game, { type: 'build', site: b }, b)) this.abortBuild(s, game);
+  }
+
+  /** An der Baustelle abliefern; Reste (oder bei zerstörter Baustelle alles) gehen zurück ins Lager. */
+  doBuild(s, t, game) {
+    const b = t.site, c = s.carry;
+    if (!c) {
+      s.task = null;
+      return;
+    }
+    if (b.site) b.site.incoming[c.res] = Math.max(0, (b.site.incoming[c.res] || 0) - c.n);
+    const took = b.dead || !b.site ? 0 : game.buildings.deliverTo(game, b, c.res, c.n);
+    if (took < c.n) game.stock[c.res] += c.n - took;
+    s.carry = null;
+    s.task = null;
+    if (s.flip !== b.x < s.x) s.flip = b.x < s.x;
+  }
+
+  /** Bauauftrag abbrechen (kein Weg): Material zurück ins Lager. */
+  abortBuild(s, game) {
+    const c = s.carry;
+    if (c && c.site) {
+      if (c.site.site) c.site.site.incoming[c.res] = Math.max(0, (c.site.site.incoming[c.res] || 0) - c.n);
+      game.stock[c.res] += c.n;
+      s.carry = null;
+    }
+    s.task = null;
   }
 
   /** Nächsten ergiebigen Knoten (optional eines Typs) finden, der nicht überlaufen ist. */
@@ -582,6 +661,12 @@ export class Settlers {
         this.doDeliver(s, game);
         s.task = null;
         break;
+      case 'fetch':
+        this.doFetch(s, t, game);
+        break;
+      case 'build':
+        this.doBuild(s, t, game);
+        break;
       case 'gather':
         this.doGather(s, t, dt, game);
         break;
@@ -629,9 +714,10 @@ export class Settlers {
 
   doDeliver(s, game) {
     if (!s.carry) return;
+    if (s.carry.site && s.carry.site.site) s.carry.site.site.incoming[s.carry.res] = Math.max(0, (s.carry.site.site.incoming[s.carry.res] || 0) - s.carry.n);
     game.stock[s.carry.res] += s.carry.n;
     if (game.camera.visible(s.x, s.y, 1, 1, 0)) game.effects.text(s.x, s.y - 20, `+${s.carry.n} ${RES[s.carry.res].name}`, RES[s.carry.res].color);
-    game.stats.gathered += s.carry.n;
+    if (!s.carry.site) game.stats.gathered += s.carry.n;
     s.carry = null;
   }
 

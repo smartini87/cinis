@@ -24,6 +24,7 @@ export default async function (page) {
     g.buildings.place(g, 'farm', w.cx - 5, w.cy + 2);
     for (let i = -3; i <= 3; i++) g.buildings.place(g, 'wall', w.cx + i, w.cy + 6);
     for (const [dx, dy] of [[-4, 0], [4, 0], [0, -5], [2, 5]]) g.buildings.place(g, 'tower', w.cx + dx, w.cy + dy);
+    g.buildings.finishAllSites(g);
     g.cycle.day = 10; g.cycle.t = 140;
     for (let i = 0; i < 60 * 40; i++) g.update(1 / 60);
     const e = g.enemies.list.find((x) => x.type === 'boss') || g.enemies.list[0];

@@ -7,6 +7,7 @@ export default async function (page) {
     for (const n of c.nodes) if (Math.hypot(n.tx - c.cx, n.ty - c.cy) < 6) c.removeNode(n);
     g.buildings.place(g, 'farm', c.cx + 3, c.cy + 2);
     g.buildings.place(g, 'hut', c.cx - 5, c.cy + 2);
+    g.buildings.finishAllSites(g);
     const ctr = g.buildings.center;
     for (let i = 0; i < 3; i++) g.settlers.spawn(ctr.x - 16 + i * 16, ctr.y + 30);
     g.settlers.colony[0].hunger = 20; // muss essen gehen
