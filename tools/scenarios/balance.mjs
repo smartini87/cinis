@@ -1,4 +1,4 @@
-// Balancing-Lauf: ein Bot spielt im Schnelldurchlauf (bis Nacht 30).
+// Balancing-Lauf: ein Bot spielt im Schnelldurchlauf (endlos, höchstens 60 Nächte).
 // Er startet allein: holt Holz für die erste Hütte, rettet tagsüber per Autopilot (A*) Überlebende aus den Lagern,
 // baut morgens nach festen Regeln (Hütten, Versorgung, Türme, Mauerring mit Toren) und kämpft nachts an der Flamme.
 // Ausgabe: Verlauf pro Nacht. Aufruf: node tools/smoke-test.mjs tools/scenarios/balance.mjs
@@ -168,7 +168,7 @@ export default async function (page) {
     };
     build();
     const t0 = performance.now();
-    for (let i = 0; i < 31 * 225 * 60 && !g.over; i++) {
+    for (let i = 0; i < 60 * 225 * 60 && !g.over; i++) {
       const dt = 1 / 60;
       if (trip) runTrip(dt);
       else {

@@ -1070,7 +1070,7 @@ export function buildingPreviewURL(type) {
 export function drawEnemy(ctx, e, time, sil = null, outline = null) {
   if (outline && !sil) {
     const big = e.type === 'brute' || e.type === 'boss';
-    drawShadow(ctx, e.x, e.y, e.type === 'boss' ? 9 : big ? 7 : e.type === 'dog' ? 6 : 5, 0.36);
+    drawShadow(ctx, e.x, e.y, e.type === 'boss' ? 9 : big ? 7 : e.type === 'dog' || e.type === 'breaker' ? 6 : e.type === 'swarm' ? 2 : 5, 0.36);
     for (const [dx, dy] of OUTLINE_OFFSETS) drawEnemy(ctx, { ...e, x: e.x + dx, y: e.y + dy }, time, outline);
     drawEnemy(ctx, e, time, '');
     return;
@@ -1135,6 +1135,46 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
       R(1 + lunge, -21, 2, 1, eye);
       break;
     }
+    case 'swarm': {
+      // Aschfalter: flatternde Glutmotte, schwebt über dem Boden
+      const up = Math.sin(time * 26 + x) > 0;
+      const h = -6 + Math.round(Math.sin(time * 5 + y) * 1.5);
+      R(-1, -1, 3, 1, 'rgba(0,0,0,0.25)');
+      R(-1, h, 3, 2, '#2a2420');
+      R(1, h, 1, 1, eye);
+      R(-3, h + (up ? -2 : 1), 2, 2, '#5a5450');
+      R(2, h + (up ? -2 : 1), 2, 2, '#5a5450');
+      R(-3, h + (up ? -2 : 1), 1, 1, '#b8401c');
+      break;
+    }
+    case 'breaker': {
+      // Brecher: breitschultrig, trägt einen Rammbock aus verkohltem Holz
+      R(-6, -1, 12, 2, 'rgba(0,0,0,0.3)');
+      R(-4, -5, 3, 5 + Math.max(0, step), '#3b3634');
+      R(1, -5, 3, 5 + Math.max(0, -step), '#3b3634');
+      R(-5 + lunge, -14, 10, 10, '#4a4542');
+      R(-5 + lunge, -14, 10, 2, '#6a6460');
+      R(-2 + lunge, -18, 6, 5, '#5a5450');
+      R(2 + lunge, -17, 1, 1, eye);
+      R(1 + lunge * 2, -11, 9, 3, '#5b3f2a');
+      R(9 + lunge * 2, -12, 2, 5, '#3b2a1a');
+      R(-1 + lunge, -9, 1, 4, '#e8742a');
+      break;
+    }
+    case 'archer': {
+      // Aschenwerfer: hager, glühende Wurfhand
+      R(-4, -1, 8, 2, 'rgba(0,0,0,0.3)');
+      R(-2, -5, 1, 5 + Math.max(0, step), '#4a4542');
+      R(1, -5, 1, 5 + Math.max(0, -step), '#4a4542');
+      R(-3, -12, 6, 7, '#3b3634');
+      R(-3, -12, 6, 1, '#5a5450');
+      R(-2, -16, 5, 4, '#6a6460');
+      R(1, -15, 1, 1, eye);
+      const throwUp = e.attack > 0.5;
+      R(3, throwUp ? -17 : -11, 1, throwUp ? 6 : 4, '#6a6460');
+      R(3, throwUp ? -19 : -8, 2, 2, (time * 8) % 2 < 1 ? '#ffd36a' : '#e8742a');
+      break;
+    }
     case 'boss': {
       // Prätor der Asche: gerüstet, roter Umhang, Lorbeerkranz aus Glut
       R(-9, -1, 18, 3, 'rgba(0,0,0,0.4)');
@@ -1150,7 +1190,7 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
       R(8 + lunge * 2, -30 + lunge, 2, 18, '#9aa0a6');
       R(6 + lunge * 2, -13 + lunge, 6, 2, '#8a7a4a');
       R(-4 + lunge, -29, 9, 7, '#6a6460');
-      R(-5 + lunge, -31, 11, 2, (time * 4) % 2 < 1 ? '#f0a53a' : '#e8742a');
+      R(-5 + lunge, -31, 11, 2, e.ability === 'summon' ? ((time * 4) % 2 < 1 ? '#b060d0' : '#8a3aa0') : (time * 4) % 2 < 1 ? '#f0a53a' : '#e8742a');
       R(1 + lunge, -27, 1, 1, '#ffe08a');
       R(3 + lunge, -27, 1, 1, '#ffe08a');
       break;

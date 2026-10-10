@@ -7,6 +7,12 @@ import { dist } from './util.js';
 export class Combat {
   constructor() {
     this.projectiles = [];
+    this.shots = [];   // Glutwürfe der Aschenwerfer { x, y, target, dmg, building, life }
+  }
+
+  /** Glutwurf eines Fernkämpfers auf eine Einheit oder ein Gebäude. */
+  fireShot(x, y, target, dmg, building) {
+    this.shots.push({ x, y, target, dmg, building, life: 3, speed: 130 });
   }
 
   /** Zielsuchenden Bolzen abfeuern. */
@@ -31,14 +37,44 @@ export class Combat {
       }
       if (p.life <= 0) ps.splice(i, 1);
     }
+    const ss = this.shots;
+    for (let i = ss.length - 1; i >= 0; i--) {
+      const s = ss[i], t = s.target;
+      s.life -= dt;
+      if (!t || t.dead || s.life <= 0) {
+        ss.splice(i, 1);
+        continue;
+      }
+      const ty = s.building ? t.y : t.y - 6;
+      const dx = t.x - s.x, dy = ty - s.y, d = Math.hypot(dx, dy);
+      const step = s.speed * dt;
+      const hit = s.building ? game.buildings.distTo(t, s.x, s.y) < 3 : d < 5;
+      if (hit) {
+        if (s.building) damageBuilding(game, t, s.dmg);
+        else damageUnit(game, t, s.dmg, (dx / (d || 1)) * 2, (dy / (d || 1)) * 2);
+        game.effects.burst(s.x, s.y, { n: 5, color: ['#ffb040', '#e8742a', '#5a5450'], speed: 30, life: 0.35 });
+        ss.splice(i, 1);
+        continue;
+      }
+      s.x += (dx / d) * Math.min(step, d);
+      s.y += (dy / d) * Math.min(step, d);
+      if (Math.random() < dt * 30) game.effects.burst(s.x, s.y, { n: 1, color: ['#e8742a', '#5a5450'], speed: 4, life: 0.3, up: 4, gravity: -5 });
+    }
   }
 
   draw(ctx) {
     for (const p of this.projectiles) drawBolt(ctx, p.x, p.y, p.angle);
+    for (const s of this.shots) {
+      ctx.fillStyle = '#ffd36a';
+      ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) - 1, 2, 2);
+      ctx.fillStyle = 'rgba(232,116,42,0.6)';
+      ctx.fillRect(Math.round(s.x) - 2, Math.round(s.y), 1, 1);
+    }
   }
 
   clear() {
     this.projectiles.length = 0;
+    this.shots.length = 0;
   }
 }
 

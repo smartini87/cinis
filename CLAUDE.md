@@ -10,12 +10,12 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `endless`, `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt), `?skiptut` schaltet alles frei (ohne Questpfad). Szenarien, die bauen, setzen `export const query = 'skiptut'`.
-- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt 30 Nächte im Schnelldurchlauf (~15 s) und gibt den Verlauf pro Nacht aus.
+- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt im Schnelldurchlauf (endlos, höchstens 60 Nächte) und gibt den Verlauf pro Nacht aus.
 - `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
 - Eingabe-Flanken (`wasPressed`, `mouse.clicked`) nur in `Game.handleFrameInput()` auswerten – sie gelten genau einen Frame.
 
@@ -34,7 +34,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
 | `buildings.js` | Gebäudedefinitionen + Kosten, Bausystem (Vorschau/Platzieren/Abriss, Bauradius), Baustellen (`b.site`, `deliverTo`, `playerDeliver`, `completeSite`), Belegungsraster (`world.buildingAt`), Brunnen-Produktion, Zeichnen |
 | `settlers.js` | Siedler: Hunger/Durst, Jobvergabe (Farm), Aufgaben-Automat (gather/water/farm/eat/deliver/idle), A*-Wegfolgen, Arbeitsschwerpunkt |
-| `enemies.js` | Gegnertypen, Wellenplanung `waveFor(n)`, Gegner-KI (Flussfeld → Flamme, Gebäude/Einheiten angreifen), Sonnenbrand, Randindikatoren |
+| `enemies.js` | Gegnertypen (Aschgänger, Läufer, Schwarm, Brecher, Fernkämpfer, Koloss, Boss, Elite), endlose Wellenplanung `waveFor(n)`, Gegner-KI (Flussfeld bzw. Brecher-Flussfeld → Flamme, Fernkampf, Boss-Fähigkeiten, Wächter, Fallen), Sonnenbrand, Randindikatoren |
 | `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
 | `save.js` | Spielstand in localStorage (`cinis.save.v3`, ältere werden verworfen): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
@@ -47,6 +47,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `inventory.js` | Slot-Inventar (`add/remove/count/room`, Kurzzugriffe `inv.wood`) |
 | `recipes.js` | Rezepte je Station (`RECIPES`, `craft`, `recipeUnlocked`) |
 | `flame.js` | Ewige Flamme als Fortschritt: `FLAME_LEVELS` (Kosten, Licht, Bauradius, Siedler, Aura, Brennstoff), Glut (`vigor`), `burnForNight`, `feed`, `upgrade` |
+| `highscore.js` | Bestenliste (`cinis.highscore.v1`): `recordScore`, `loadScores`, `bestScore` |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |

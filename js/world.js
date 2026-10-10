@@ -502,9 +502,20 @@ export class World {
    */
   computeFlowField() {
     this.nodesChanged = false;
+    const n = this.w * this.h;
+    if (!this.flow) {
+      this.flow = new Float32Array(n);
+      this.flowB = new Float32Array(n);
+    }
+    // Normale Gegner meiden Mauern (teuer), Brecher gehen mitten hindurch (Mauern/Tore fast so billig wie Boden)
+    this.dijkstra(this.flow, (b) => (b.type === 'wall' ? 14 : b.type === 'gate' ? 12 : 8));
+    this.dijkstra(this.flowB, (b) => (b.type === 'wall' || b.type === 'gate' ? 1.5 : 6));
+  }
+
+  /** Dijkstra vom Zentrum über die ganze Karte; buildingCost(b) = Zusatzkosten einer Gebäudekachel. */
+  dijkstra(flow, buildingCost) {
     const W = this.w, H = this.h, n = W * H;
-    if (!this.flow) this.flow = new Float32Array(n);
-    const flow = this.flow, ba = this.buildingAt, tiles = this.tiles;
+    const ba = this.buildingAt, tiles = this.tiles;
     flow.fill(Infinity);
     const closed = new Uint8Array(n);
     const heap = new MinHeap();
@@ -533,7 +544,7 @@ export class World {
           if (dx && dy && (!free(cx + dx, cy) || !free(cx, cy + dy))) continue;
           let c = tiles[ni] === T.SHALLOW ? 1.8 : 1;
           const b = ba[ni];
-          if (b && b.type !== 'center' && b.type !== 'trap') c += b.type === 'wall' ? 14 : b.type === 'gate' ? 12 : 8;
+          if (b && b.type !== 'center' && b.type !== 'trap') c += buildingCost(b);
           const nd = flow[cur] + c * (dx && dy ? 1.414 : 1);
           if (nd < flow[ni]) {
             flow[ni] = nd;
@@ -544,8 +555,9 @@ export class World {
     }
   }
 
-  flowAt(tx, ty) {
-    return this.inBounds(tx, ty) && this.flow ? this.flow[ty * this.w + tx] : Infinity;
+  flowAt(tx, ty, breaker = false) {
+    const f = breaker ? this.flowB : this.flow;
+    return this.inBounds(tx, ty) && f ? f[ty * this.w + tx] : Infinity;
   }
 
   // ---------------------------------------------------------------- Kollision

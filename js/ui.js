@@ -6,7 +6,8 @@ import { iconURL, buildingPreviewURL } from './sprites.js';
 import { BUILDING_DEFS, BUILDABLE, BUILD_CATEGORIES } from './buildings.js';
 import { FLAME_LEVELS, MAX_LEVEL } from './flame.js';
 import { FOCI } from './settlers.js';
-import { SETTLER, WIN_NIGHTS, TILE } from './config.js';
+import { SETTLER, TILE } from './config.js';
+import { loadScores, bestScore } from './highscore.js';
 import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
 import { peekSave } from './save.js';
@@ -507,7 +508,16 @@ export class UI {
       <div class="title">CINIS</div>
       <div class="subtitle">Die letzte Flamme</div>
       <p class="lore">Rom ist gefallen, Asche bedeckt die sieben Hügel. Nachts kriecht sie als Gestalt aus den Ruinen.
-      Nur die Ewige Flamme hält sie fern. Finde Überlebende, baue auf und halte das Licht am Leben, Nacht für Nacht, so lange du kannst.</p>`, btns);
+      Nur die Ewige Flamme hält sie fern. Finde Überlebende, baue auf und halte das Licht am Leben, Nacht für Nacht, so lange du kannst.</p>
+      ${this.scoreHtml()}`, btns);
+  }
+
+  /** Bestwert und Bestenliste (Hauptmenü, Game Over). */
+  scoreHtml(highlight = null) {
+    const top = loadScores().top;
+    if (!top.length) return '<p class="best">Noch kein Rekord – wie viele Nächte hältst du durch?</p>';
+    const rows = top.map((e, i) => `<tr class="${e === highlight || (highlight && e.date === highlight.date) ? 'me' : ''}"><td>${i + 1}.</td><td>${e.nights} ${e.nights === 1 ? 'Nacht' : 'Nächte'}</td><td>${e.kills} Feinde</td><td>${e.rescued} gerettet</td><td class="seed">Seed ${e.seed}</td></tr>`).join('');
+    return `<div class="best">Rekord: <b>${top[0].nights} ${top[0].nights === 1 ? 'Nacht' : 'Nächte'}</b></div><table class="scores">${rows}</table>`;
   }
 
   confirmNew(skipTutorial = false) {
@@ -519,7 +529,8 @@ export class UI {
 
   showPause() {
     const g = this.game;
-    this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.colony.length} Siedler · ${g.stats.kills} Feinde besiegt</p>`, [
+    const best = bestScore();
+    this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.colony.length} Siedler · ${g.stats.kills} Feinde besiegt</p><p class="sub">Seed ${g.seed}${best ? ` · Rekord: ${best.nights} Nächte` : ''}</p>`, [
       { label: 'Weiter', cls: 'primary', onClick: () => g.resume() },
       { label: 'Steuerung', onClick: () => this.showHelp(() => this.showPause()) },
       { label: `Ton: ${g.audio.muted ? 'aus' : 'an'}`, onClick: () => { g.toggleSound(); this.showPause(); } },
@@ -532,20 +543,25 @@ export class UI {
   }
 
   showEnd(result) {
-    const g = this.game, st = g.stats;
-    const win = result === 'victory';
-    const nights = win ? WIN_NIGHTS : Math.max(0, g.cycle.day - 1);
-    this.showOverlay(win ? 'end victory' : 'end defeat', `
-      <div class="title small">${win ? 'Sieg' : 'Die Flamme erlischt'}</div>
-      <p>${win ? 'Dreißig Nächte hat das Licht der Asche getrotzt. Aus der Ruine wird wieder eine Stadt.' : 'Die Asche hat das letzte Licht Roms verschlungen.'}</p>
+    const g = this.game, st = g.stats, sc = g.score || { entry: { nights: Math.max(0, g.cycle.day - 1) }, record: false };
+    const nights = sc.entry.nights;
+    const why = g.overReason === 'out' ? 'Die Glut ist verloschen – kein Brennstoff mehr.' : 'Die Asche hat den Tempel der Flamme eingerissen.';
+    this.showOverlay('end defeat', `
+      <div class="title small">Die Flamme erlischt</div>
+      <p>${why}</p>
+      ${sc.record ? '<div class="record">★ Neuer Rekord! ★</div>' : ''}
       <table class="stats">
-        <tr><td>Überstandene Nächte</td><td>${nights} / ${WIN_NIGHTS}</td></tr>
+        <tr><td>Überstandene Nächte</td><td>${nights}</td></tr>
         <tr><td>Besiegte Feinde</td><td>${st.kills}</td></tr>
+        <tr><td>Gerettete Siedler</td><td>${st.rescued || 0}</td></tr>
+        <tr><td>Flammenstufe</td><td>${g.flame.level}</td></tr>
         <tr><td>Errichtete Gebäude</td><td>${st.built}</td></tr>
-        <tr><td>Siedler am Ende</td><td>${g.settlers.colony.length}</td></tr>
         <tr><td>Verlorene Siedler</td><td>${st.lost || 0}</td></tr>
-      </table>`, [
-      { label: 'Neues Spiel', cls: 'primary', onClick: () => g.startNewGame() },
+        <tr><td>Seed</td><td>${g.seed}</td></tr>
+      </table>
+      ${this.scoreHtml(sc.entry)}`, [
+      { label: 'Neues Spiel', cls: 'primary', onClick: () => g.startNewGame({ skipTutorial: g.progress.done }) },
+      { label: `Neues Spiel (gleicher Seed ${g.seed})`, onClick: () => g.startNewGame({ seed: g.seed, skipTutorial: g.progress.done }) },
       { label: 'Hauptmenü', onClick: () => g.toMainMenu() },
     ]);
   }
@@ -580,7 +596,7 @@ export class UI {
     }
     // Tag/Nacht
     const cy = g.cycle;
-    this.set('day', this.dayEl, `Tag ${Math.min(cy.day, WIN_NIGHTS)} / ${WIN_NIGHTS}`);
+    this.set('day', this.dayEl, `Tag ${cy.day}`);
     let phase;
     if (cy.isNight) phase = `Nacht · Morgengrauen in ${fmtTime(cy.timeToDawn)} · ${g.enemies.list.filter((e) => !e.guard).length + g.enemies.queue.length} Feinde`;
     else if (cy.isEvening) phase = `Dämmerung · Nacht in ${fmtTime(cy.timeToNight)}`;

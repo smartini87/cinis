@@ -240,6 +240,16 @@ export class SoundEngine {
         for (let i = 0; i < 4; i++) this.tone([392, 523, 659, 784][i], 0.5, { type: 'triangle', vol: v(0.1), delay: i * 0.12 });
         this.noise(1.2, { vol: v(0.12), freq: 500, type: 'lowpass', attack: 0.3 });
         break;
+      case 'throw':
+        this.noise(0.12, { vol: v(0.12), freq: 1500, type: 'bandpass', q: 1, slide: 600 });
+        break;
+      case 'summon':
+        this.tone(110, 0.8, { type: 'sawtooth', vol: v(0.08), slide: 220, attack: 0.2 });
+        this.noise(0.6, { vol: v(0.1), freq: 400, type: 'lowpass', attack: 0.2 });
+        break;
+      case 'record':
+        for (let i = 0; i < 5; i++) this.tone([523, 659, 784, 1046, 1318][i], 0.35, { type: 'triangle', vol: v(0.1), delay: i * 0.1 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

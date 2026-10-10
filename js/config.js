@@ -70,7 +70,6 @@ export const PLAYER_ATTACK_RANGE = 22;
 export const PLAYER_ATTACK_TIME = 0.42;
 export const PLAYER_RESPAWN = 8;
 export const TOWER = { range: 6 * TILE, damage: 14, cooldown: 1.0, boltSpeed: 300 };
-export const WIN_NIGHTS = 30;            // so viele Nächte überleben
 export const REPAIR_RATE = 0.01;          // Anteil max. LP pro Sekunde (tagsüber)
 export const SUN_BURN = 30;               // Schaden pro Sekunde an Gegnern im Tageslicht
 export const RUBBLE_PER_DAY = 5;          // neue Säulentrümmer pro Morgen (Ruinen zerfallen)

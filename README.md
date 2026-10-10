@@ -1,6 +1,6 @@
 # CINIS – Die letzte Flamme
 
-Rom ist gefallen. Asche bedeckt die sieben Hügel, und nachts kriecht sie als Gestalt aus den Ruinen. Im Zentrum brennt die **Ewige Flamme** – das letzte Licht der Stadt. Sammle Rohstoffe, versorge deine Siedler, baue Mauern und Ballistentürme und verteidige die Flamme **30 Nächte** lang.
+Rom ist gefallen. Asche bedeckt die sieben Hügel, und nachts kriecht sie als Gestalt aus den Ruinen. Im Zentrum brennt die **Ewige Flamme**, das letzte Licht der Stadt. Du beginnst allein: Finde Überlebende in der Wildnis, baue eine Siedlung, entfache die Flamme Stufe um Stufe und halte sie am Leben. Die Nächte werden immer härter, ein Ende gibt es nicht. Wie viele Nächte hältst du durch?
 
 Single-Player Survival-/Colony-Builder als HTML5-Spiel: Canvas 2D, Vanilla JavaScript (ES-Module), keine Libraries, keine externen Assets. Grafik (Pixel-Look) und Sound (WebAudio) werden komplett per Code erzeugt.
 
@@ -63,7 +63,7 @@ Ein neues Spiel beginnt mit fast leerem Bildschirm: Lebenspunkte und ein Ziel-Ba
 HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, jeweils mit kurzer Einblendung und einem Satz Erklärung („Neu: Mauer“). Bis zum Nacht-Ziel bleibt es heller Tag. Die ersten drei Nächte sind Lernnächte mit wenigen, langsamen Gegnern. Im Hauptmenü startet „Neues Spiel – Tutorial überspringen“ mit allem freigeschaltet.
 
 ### Ziel
-Überlebe 30 Nächte. Mit dem Morgengrauen nach der 30. Nacht hast du gewonnen. Wird die Ewige Flamme zerstört, ist das Spiel verloren. Fällt deine Spielfigur, ruft die Flamme sie nach 8 Sekunden zurück: Funken sammeln sich, die Figur steht auf und ist 1,5 Sekunden unverwundbar. Die Hälfte der getragenen Rohstoffe bleibt als Beutehaufen an der Todesstelle liegen und kann mit E wieder aufgehoben werden.
+Überlebe so viele Nächte wie möglich. Das Spiel endet, wenn die Ewige Flamme **erlischt** (Glut 0, weil Brennstoff fehlt) oder ihr Tempel **zerstört** wird. Gewertet werden die überstandenen Nächte, bei Gleichstand die besiegten Gegner und geretteten Siedler. Bestwert und die fünf besten Läufe (mit Seed) stehen im Hauptmenü und auf dem Game-Over-Bildschirm. Ein neuer Bestwert wird als „Neuer Rekord!“ gefeiert. Dort kannst du auch mit demselben Seed neu beginnen. Den Seed des laufenden Spiels zeigt das Pausemenü. Fällt deine Spielfigur, ruft die Flamme sie nach 8 Sekunden zurück: Funken sammeln sich, die Figur steht auf und ist 1,5 Sekunden unverwundbar. Die Hälfte der getragenen Rohstoffe bleibt als Beutehaufen an der Todesstelle liegen und kann mit E wieder aufgehoben werden.
 
 ### Ressourcen
 | Ressource | Quelle |
@@ -183,14 +183,18 @@ Dazu kommen Wanderer auf den Straßen (manche wollen sich anschließen), Rauchs�
 - Nachts und wenn Gegner in der Nähe sind, flüchten Siedler in Hütten oder zur Flamme. Wird ihre Hütte zerstört, fliehen sie ins Freie.
 
 ### Nächte und Gegner
-Ein Tag dauert 150 s, eine Nacht 75 s. In der Abenddämmerung wird angekündigt, wie viele Feinde aus welcher Richtung kommen. Rote Pfeile am Bildschirmrand und die Minikarte zeigen Gegner außerhalb der Sicht. Mit jeder Nacht kommen mehr und stärkere Gegner. Das erste Sonnenlicht verbrennt alle Überlebenden.
+Ein Tag dauert 150 s, eine Nacht 75 s. In der Abenddämmerung wird angekündigt, wie viele Feinde aus welchen Richtungen kommen. Rote Pfeile am Bildschirmrand und die Minikarte zeigen Gegner außerhalb der Sicht. Die ersten drei Nächte sind Lernnächte. Danach wächst die Welle jede Nacht (etwa 4 + 1,7·n + 0,03·n² Gegner), die Gegner werden zäher (LP ×(1 + 0,09·n + 0,002·n²)) und stärker, und sie kommen aus bis zu vier Richtungen. Das erste Sonnenlicht verbrennt alle Überlebenden.
 
 | Gegner | ab Nacht | Eigenschaften |
 |---|---|---|
 | Aschgänger | 1 | Standardgegner |
-| Ruinenhund | 3 | schnell, schwach, jagt Einheiten |
-| Aschkoloss | 5 | langsam, zäh, doppelter Schaden an Gebäuden |
-| Prätor der Asche | 10, 20, 25, 30 | Boss |
+| Ruinenhund (Läufer) | 4 | schnell, schwach, jagt Einheiten |
+| Aschfalter (Schwarm) | 4 | Gruppen von 6–10 winzigen, schnellen Gegnern |
+| Brecher | 6 | geht mitten durch Mauern und Tore, dreifacher Gebäudeschaden |
+| Aschenwerfer (Fernkampf) | 8 | hält Abstand und wirft Glut auf Türme, dich und die Siedler |
+| Aschkoloss | 9 | langsam, zäh, doppelter Gebäudeschaden |
+| Elite | 11 | jeder Typ kann Elite sein: 2,5× LP, 1,5× Schaden, Glut-Aura, lässt Eisen fallen |
+| Prätor der Asche (Boss) | alle 5 Nächte | abwechselnd **Stampfer** (Bodenstoß mit Vorwarnring) und **Beschwörer** (ruft Schwärme) |
 
 Gegner laufen auf dem kürzesten Weg zur Flamme. Ist der Umweg um eine Mauer zu lang, schlagen sie sich durch. Spieler und Siedler in ihrer Nähe greifen sie direkt an.
 
@@ -198,10 +202,11 @@ Gegner laufen auf dem kürzesten Weg zur Flamme. Ist der Umweg um eine Mauer zu 
 - Baue vor der ersten Nacht eine Hütte und einen Turm.
 - Brunnen und Farm früh bauen – Siedler ohne Versorgung arbeiten nicht lange.
 - Furten im Fluss und Straßen sind natürliche Engstellen. Türme hinter Mauerringen sind am wirksamsten.
-- In den Bossnächten (10, 20, 25, 30) lohnt es sich, selbst an der Flamme zu kämpfen.
+- In den Bossnächten (alle 5 Nächte) lohnt es sich, selbst an der Flamme zu kämpfen. Beim Stampfer aus dem roten Ring springen (Dash)!
+- Brecher gehen gezielt auf Mauern los: Fallen und Feuerschalen hinter der Mauer halten sie auf.
 
 ### Speichern
-Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden, bei jedem Morgengrauen, beim Verlassen der Seite und über „Speichern & Hauptmenü“. Im Hauptmenü setzt „Fortsetzen“ den letzten Stand fort. Nach Sieg oder Niederlage wird der Spielstand gelöscht.
+Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden, bei jedem Morgengrauen, beim Verlassen der Seite und über „Speichern & Hauptmenü“. Im Hauptmenü setzt „Fortsetzen“ den letzten Stand fort. Nach dem Game Over wird der Spielstand gelöscht, die Bestenliste bleibt.
 
 ## Getroffene Annahmen (Designentscheidungen)
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
@@ -220,8 +225,9 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 - **Baupläne** aus Feindlagern (Fallen, Feuerschale, Eisenschmiede) werden gespeichert und schalten die Gebäude frei, sobald die passende Flammenstufe erreicht ist.
 - **Stein wächst nach:** Ohne Nachschub ginge der Stein ab etwa Nacht 19 aus (im Balancing-Bot beobachtet). Deshalb erzeugen zerfallende Ruinen jeden Morgen 5 neue Trümmer.
 - **Gegner sterben bei Tagesanbruch** (Sonnenbrand). Es geht ums Durchhalten, nicht ums vollständige Aufräumen.
+- **Endlos:** Es gibt keinen Sieg. Die Wertung zählt die überstandenen Nächte (die Nacht, in der die Flamme fällt, zählt nicht).
 - **Schwierigkeit:** Ein Bot mit festen Bauregeln gewinnt mit etwa 48 Türmen knapp. Die Nächte 2–3 und die Bossnächte sind am gefährlichsten. Feinjustierung über `js/config.js` und `waveFor()` in `js/enemies.js`.
-- **Spieltempo:** 1×, 2× und 3× wählbar, weil 30 volle Tage bei 1× rund 110 Minuten dauern.
+- **Spieltempo:** 1×, 2× und 3× wählbar, weil ein Tag mit Nacht bei 1× knapp 4 Minuten dauert.
 
 ## Entwicklung
 Architektur, Konventionen und Testablauf stehen in [`CLAUDE.md`](CLAUDE.md). Kurzfassung:

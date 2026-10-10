@@ -1,7 +1,8 @@
 // main.js – Einstiegspunkt: Spielzustand, fester Zeitschritt (Game Loop), Spielereignisse
 // (Dämmerung/Nacht/Morgen, Sieg/Niederlage) und Render-Reihenfolge.
 
-import { TILE, STEP, START_STOCK, START_SETTLERS, WIN_NIGHTS, RUBBLE_PER_DAY } from './config.js';
+import { TILE, STEP, START_STOCK, START_SETTLERS, RUBBLE_PER_DAY } from './config.js';
+import { recordScore } from './highscore.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
@@ -39,7 +40,7 @@ class Game {
     this.last = performance.now();
     this.fps = 60;
     this.showFps = false;
-    this.over = null;     // null | 'defeat' | 'victory'
+    this.over = null;     // null | 'defeat' (endlos: es gibt keinen Sieg)
     this.state = 'menu';  // menu | tutorial | playing | paused | over
     this.speed = 1;       // Spieltempo (1×, 2×, 3×)
     this.saveT = 0;
@@ -143,7 +144,7 @@ class Game {
   startNewGame(opts = {}) {
     deleteSave();
     this.skipTutorial = !!opts.skipTutorial;
-    this.newGame(this.randomSeed());
+    this.newGame(opts.seed ?? this.randomSeed());
     const begin = () => {
       this.setState('playing');
       if (this.skipTutorial) this.ui.toast('Halte die Ewige Flamme am Leben – so viele Nächte wie möglich.', 'info');
@@ -554,11 +555,7 @@ class Game {
   }
 
   onDawn(day) {
-    if (day > WIN_NIGHTS) {
-      this.endGame('victory');
-      return;
-    }
-    this.ui.toast(`Tag ${day} von ${WIN_NIGHTS}. Die Asche weicht dem Licht.`, 'good');
+    this.ui.toast(`Nacht ${day - 1} überstanden – Tag ${day} bricht an. Die Asche weicht dem Licht.`, 'good');
     this.audio.play('bell');
     this.world.crumbleRuins(RUBBLE_PER_DAY);
     this.world.spawnAshPiles(4);
@@ -614,15 +611,22 @@ class Game {
     return BUILD_CATEGORIES[this.buildCat].types.filter((t) => this.isAvailable(t));
   }
 
+  /** Spielende (endlos: nur Niederlage) – Highscore eintragen, Ergebnis zeigen. */
   endGame(result) {
     if (this.over) return;
     this.over = result;
     this.buildings.select(null);
+    this.panel = null;
     deleteSave();
     this.setState('over');
-    this.audio.play(result === 'victory' ? 'victory' : 'defeat');
-    // Kurz verzögert, damit der Einsturz bzw. der Morgen noch sichtbar ist
-    setTimeout(() => this.ui.showEnd(result), 1200);
+    const nights = Math.max(0, this.cycle.day - 1);
+    this.score = recordScore({ nights, kills: this.stats.kills, rescued: this.stats.rescued || 0, seed: this.seed, level: this.flame.level, date: Date.now() });
+    this.audio.play('defeat');
+    // Kurz verzögert, damit der Einsturz noch sichtbar ist
+    setTimeout(() => {
+      this.ui.showEnd(result);
+      if (this.score.record) this.audio.play('record');
+    }, 1200);
   }
 
   // ---------------------------------------------------------------- Rendering
