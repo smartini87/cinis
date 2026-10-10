@@ -294,9 +294,13 @@ class Game {
       if (inp.wasPressed('Digit' + (i + 1), 'Numpad' + (i + 1)) && this.progress.has('b:' + type)) this.buildings.select(type);
     });
     if (inp.wasPressed('KeyX') && this.progress.has('demolish')) this.buildings.select('demolish');
+    // Mauern und Tore drehen: R oder Mausrad im Baumodus (sonst zoomt das Mausrad)
+    const rotatable = this.buildings.selected === 'wall' || this.buildings.selected === 'gate';
+    if (rotatable && inp.wasPressed('KeyR')) this.buildings.rotate(1);
     if (!this.player.dead) this.buildings.updateBuildMode(this);
     if (inp.mouse.wheel) {
-      this.camera.addZoom(-inp.mouse.wheel);
+      if (rotatable) this.buildings.rotate(Math.sign(inp.mouse.wheel));
+      else this.camera.addZoom(-inp.mouse.wheel);
       inp.mouse.wheel = 0;
     }
     if (inp.wasPressed('F3')) this.showFps = !this.showFps;

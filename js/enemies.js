@@ -240,13 +240,22 @@ export class Enemies {
         this.tryAttack(e, def, game, () => damageUnit(game, t, e.dmg, ((t.x - e.x) / (d || 1)) * 4, ((t.y - e.y) / (d || 1)) * 4), t.x);
         return;
       }
+      // Steht ein Gebäude zwischen Gegner und Ziel (z. B. eingemauerter Spieler), wird es eingerissen
+      if (e.breach && !e.breach.dead && buildings.distTo(e.breach, e.x, e.y) <= e.r + 5) {
+        this.tryAttack(e, def, game, () => damageBuilding(game, e.breach, e.dmg * def.bld), e.breach.x);
+        return;
+      }
+      if (e.breach && e.breach.dead) e.breach = null;
       const blocked = this.step(e, t.x - e.x, t.y - e.y, dt, world);
       if (blocked) {
         e.blockedT += dt;
-        if (e.blockedT > 0.6) {
-          e.target = null; // Hindernis: zurück auf das Flussfeld
-          e.retarget = 1.5;
+        if (e.blockedT > 0.8) {
           e.blockedT = 0;
+          e.breach = this.nearestBlocker(e, world, buildings, t);
+          if (!e.breach) {
+            e.target = null; // Gelände im Weg: zurück auf das Flussfeld
+            e.retarget = 1.5;
+          }
         }
       } else e.blockedT = 0;
       return;
@@ -254,6 +263,33 @@ export class Enemies {
 
     // 2) Dem Flussfeld Richtung Flamme folgen; Gebäude im Weg werden angegriffen
     const tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
+    // Festgefahren (z. B. an einer Ecke)? Dann das nächste Gebäude in Laufrichtung angreifen
+    if (e.breach && !e.breach.dead) {
+      if (buildings.distTo(e.breach, e.x, e.y) <= e.r + 5) {
+        this.tryAttack(e, def, game, () => damageBuilding(game, e.breach, e.dmg * def.bld), e.breach.x);
+        return;
+      }
+      // Hinlaufen; klappt das nicht bald, wieder dem Flussfeld folgen
+      e.breachT = (e.breachT || 0) + dt;
+      if (e.breachT < 2) {
+        this.step(e, e.breach.x - e.x, e.breach.y - e.y, dt, world);
+        return;
+      }
+    }
+    e.breach = null;
+    e.breachT = 0;
+    e.progT = (e.progT || 0) + dt;
+    if (e.progT >= 0.5) {
+      const moved = Math.hypot(e.x - (e.lastX ?? e.x), e.y - (e.lastY ?? e.y));
+      e.stuckT = moved < e.speed * 0.5 * 0.15 ? (e.stuckT || 0) + e.progT : 0;
+      e.progT = 0;
+      e.lastX = e.x;
+      e.lastY = e.y;
+      if (e.stuckT > 2) {
+        e.stuckT = 0;
+        e.breach = this.nearestBlocker(e, world, buildings);
+      }
+    }
     let bestI = -1, bestF = world.flowAt(tx, ty), bx = tx, by = ty;
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
@@ -288,6 +324,27 @@ export class Enemies {
       }
     }
     this.step(e, (bx + 0.5) * TILE - e.x, (by + 0.5) * TILE - e.y, dt, world);
+  }
+
+  /** Gebäude direkt um den Gegner, bevorzugt in Richtung Flamme (Ausweg, wenn er festhängt). */
+  nearestBlocker(e, world, buildings, toward = null) {
+    const c = toward || buildings.center, tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
+    let best = null, bs = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!world.inBounds(tx + dx, ty + dy)) continue;
+        const b = world.buildingAt[world.idx(tx + dx, ty + dy)];
+        if (!b || b.dead || b.type === 'center') continue;
+        const d = buildings.distTo(b, e.x, e.y);
+        if (d > e.r + 6) continue; // nur, was direkt anliegt
+        const score = d + (c ? Math.hypot(b.x - c.x, b.y - c.y) * 0.2 : 0);
+        if (score < bs) {
+          bs = score;
+          best = b;
+        }
+      }
+    }
+    return best;
   }
 
   /** Schritt in Richtung (dx,dy); liefert true, wenn blockiert. */

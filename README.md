@@ -26,7 +26,8 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | Dash / Sprint | Shift drücken = Dash (kurzer Schub, kurz unverwundbar); Shift halten = Sprinten | Knopf „Dash“ (halten = Sprint) |
 | Sammeln & angreifen | Leertaste, E oder linke Maustaste **halten** (zielt auf den Mauszeiger) | Ziel antippen und halten |
 | Gebäude wählen | 1 – 6 oder Klick auf die Bauleiste | Bauleiste antippen |
-| Gebäude setzen | Linksklick (Mauern: Maustaste halten und ziehen) | Bauplatz antippen |
+| Gebäude setzen | Linksklick (Mauern: Maustaste halten und eine Linie ziehen) | Bauplatz antippen |
+| Mauer/Tor drehen | R oder Mausrad im Baumodus (Auto, waagerecht, senkrecht, diagonal ↘, diagonal ↗) | – |
 | Bauen abbrechen | Rechtsklick oder Esc | Gebäude in der Bauleiste erneut antippen |
 | Material liefern | E an einer Baustelle | Baustelle antippen |
 | Abriss (50 % zurück, Baustelle 75 % des Gelieferten) | X, dann Gebäude anklicken | „Abriss“ antippen, dann Gebäude |
@@ -81,6 +82,8 @@ Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lag
 | 6 | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; auf eine Mauer gesetzt ersetzt es sie (zahlt nur die Differenz) |
 
 Gebaut werden kann im Umkreis von 12 Feldern um die Flamme und 6 Feldern um jedes andere Gebäude. Tagsüber reparieren die Siedler beschädigte Gebäude automatisch.
+
+**Mauern und Tore:** Mauern lassen sich als Linie ziehen. In der Einstellung „Auto“ folgt die Ausrichtung der Ziehrichtung (waagerecht, senkrecht oder diagonal). Mit R oder dem Mausrad legst du sie fest. Die Vorschau zeigt jede Kachel grün (gültig) oder rot. Mauern verbinden sich mit ihren Nachbarn, diagonale Reihen sind lückenlos dicht. Ein Tor setzt du in eine gerade Mauer, es übernimmt deren Richtung und kostet nur die Differenz. Eigene Leute gehen hindurch (es öffnet sich), Gegner nicht. Du kannst dich und die Flamme vollständig einmauern: Gegner suchen dann den billigsten Weg (Tore sind etwas schwächer als Mauern) und brechen durch. Wer beim Verfolgen an einer Mauer hängen bleibt, reißt sie ein.
 
 **Baustellen:** Gebäude lassen sich immer setzen, auch ohne Material. Es entsteht eine Baustelle mit Gerüst und Fortschrittsbalken. In der Nähe (oder unter dem Mauszeiger) zeigt sie, welches Material noch fehlt. Mit E lieferst du aus deinem Gepäck. Liegt die Baustelle im Kerngebiet der Flamme, holst du das Fehlende so auch direkt aus dem Lager. Siedler tragen Material selbstständig vom Lager zur Baustelle, höchstens die Hälfte von ihnen gleichzeitig; Baumeister tragen mehr. Ist alles da, steht das Gebäude mit einer kleinen Aufbau-Animation. Baustellen blockieren den Weg, haben anfangs nur ein Viertel der Lebenspunkte und können von Gegnern zerstört werden. Ein Abriss gibt 75 % des gelieferten Materials zurück.
 

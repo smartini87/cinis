@@ -4,7 +4,7 @@
 import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE } from './config.js';
 import { dist } from './util.js';
 import { T } from './world.js';
-import { Sprites, drawFlame, drawCrops, drawBallista, drawGate } from './sprites.js';
+import { Sprites, drawFlame, drawCrops, drawBallista, drawGate, drawWall } from './sprites.js';
 
 export const BUILDING_DEFS = {
   center: { name: 'Ewige Flamme', size: 3, hp: 1200, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
@@ -32,13 +32,14 @@ export class Buildings {
     this.center = null;
     this.selected = null;     // gewählter Bautyp oder 'demolish'
     this.ghost = null;        // { tx, ty, ok, reason }
-    this.lastDragTile = -1;   // für Mauer-Ziehen
+    this.dragStart = null;    // Startkachel beim Ziehen einer Mauerlinie
+    this.rotation = 'auto';   // Mauer/Tor: 'auto' (Ziehrichtung/Nachbarn) oder 0 waagerecht, 1 senkrecht, 2 ↘, 3 ↗
     this.changed = true;      // Belegung geändert (Wegfindung neu berechnen)
     this.version = 0;         // zählt jede Änderung der Gebäudeliste (Caches)
   }
 
   /** Gebäude anlegen und Kacheln belegen (ohne Kostenprüfung). */
-  add(type, tx, ty) {
+  add(type, tx, ty, rot = null) {
     const def = BUILDING_DEFS[type];
     const b = {
       id: nextId++, type, tx, ty, size: def.size,
@@ -47,7 +48,8 @@ export class Buildings {
       flash: 0, timer: 0, growth: 0, worker: null, aim: -Math.PI / 2, cooldown: 0, recoil: 0,
       sleepers: [], rot: 0, open: 0,
     };
-    if (type === 'gate') b.rot = this.gateRotation(tx, ty);
+    if (type === 'gate') b.rot = rot ?? this.gateRotation(tx, ty);
+    if (type === 'wall') b.rot = rot ?? this.wallRotation(tx, ty);
     this.setTiles(b, b);
     this.list.push(b);
     if (type === 'center') this.center = b;
@@ -119,6 +121,31 @@ export class Buildings {
     return best;
   }
 
+  /** Ausrichtung einer einzelnen Mauer nach den Nachbarn (ohne Nachbarn waagerecht). */
+  wallRotation(tx, ty) {
+    return this.gateRotation(tx, ty);
+  }
+
+  /** Mauer-Verbindungen zu den vier Nachbarn (für Zeichnen und Kollision). */
+  wallArms(b) {
+    const w = this.world, at = (dx, dy) => {
+      const o = w.inBounds(b.tx + dx, b.ty + dy) ? w.buildingAt[w.idx(b.tx + dx, b.ty + dy)] : null;
+      return !!o && (o.type === 'wall' || o.type === 'gate');
+    };
+    return { w: at(-1, 0), e: at(1, 0), n: at(0, -1), s: at(0, 1) };
+  }
+
+  /** Rotation weiterschalten (R bzw. Mausrad im Baumodus). */
+  rotate(dir = 1) {
+    const opts = this.selected === 'gate' ? ['auto', 0, 1] : ['auto', 0, 1, 2, 3];
+    const i = opts.indexOf(this.rotation);
+    this.rotation = opts[(i + dir + opts.length * 2) % opts.length];
+  }
+
+  get rotationLabel() {
+    return { auto: 'Auto', 0: 'waagerecht', 1: 'senkrecht', 2: 'diagonal ↘', 3: 'diagonal ↗' }[this.rotation];
+  }
+
   /** Tor-Ausrichtung nach den Nachbarmauern: 0 = Mauer läuft waagerecht, 1 = senkrecht. */
   gateRotation(tx, ty) {
     const w = this.world;
@@ -168,6 +195,7 @@ export class Buildings {
         if (w.props[w.idx(x, y)]) return { ok: false, reason: 'Platz ist belegt' };
         const occ = w.buildingAt[w.idx(x, y)];
         if (occ && !(type === 'gate' && occ.type === 'wall')) return { ok: false, reason: 'Platz ist belegt' };
+        if (occ && occ.rot >= 2) return { ok: false, reason: 'Tore nur in geraden Mauern' };
         const n = w.nodeAtTile(x, y);
         if (n && !n.removed && (n.amount > 0 || n.type === 'rock')) return { ok: false, reason: `${n.type === 'tree' ? 'Baum' : n.type === 'rock' ? 'Trümmer' : 'Strauch'} im Weg – erst abbauen` };
       }
@@ -186,7 +214,7 @@ export class Buildings {
     return out;
   }
 
-  place(game, type, tx, ty) {
+  place(game, type, tx, ty, rot = null) {
     const def = BUILDING_DEFS[type];
     if (!game.progress.has('b:' + type)) {
       game.ui.toast(`${def.name} ist noch nicht freigeschaltet.`, 'warn', 'locked');
@@ -201,7 +229,10 @@ export class Buildings {
     // Gebaut wird immer: Es entsteht eine Baustelle, die Material braucht
     const cost = this.costAt(type, tx, ty);
     const old = this.world.buildingAt[this.world.idx(tx, ty)];
-    if (old) this.remove(old); // Mauer wird durch das Tor ersetzt
+    if (old) {
+      if (rot === null && type === 'gate') rot = old.rot; // Tor übernimmt die Richtung der Mauer
+      this.remove(old); // Mauer wird durch das Tor ersetzt
+    }
     // Stümpfe/leere Sträucher unter dem Bauplatz verschwinden
     for (let y = ty; y < ty + def.size; y++) {
       for (let x = tx; x < tx + def.size; x++) {
@@ -209,7 +240,7 @@ export class Buildings {
         if (n) this.world.removeNode(n);
       }
     }
-    const b = this.add(type, tx, ty);
+    const b = this.add(type, tx, ty, rot);
     const need = {};
     for (const k of RES_KEYS) if (cost[k] > 0) need[k] = cost[k];
     b.site = { need, got: {}, incoming: {}, since: game.time };
@@ -292,7 +323,6 @@ export class Buildings {
     b.hp = b.maxHp;
     b.spawn = 0.6;
     b.flash = 0;
-    if (b.type === 'gate') b.rot = this.gateRotation(b.tx, b.ty);
     this.changed = true;
     this.version++;
     this.world.navDirty = true;
@@ -371,17 +401,71 @@ export class Buildings {
     }
     const size = BUILDING_DEFS[this.selected].size;
     const tx = Math.round(wx / TILE - size / 2), ty = Math.round(wy / TILE - size / 2);
-    const chk = this.canPlace(this.selected, tx, ty);
-    const afford = this.canAfford(game, this.costAt(this.selected, tx, ty));
-    this.ghost = { tx, ty, ok: chk.ok, afford, reason: chk.ok ? '' : chk.reason };
-    const tileKey = ty * this.world.w + tx;
-    // Mauern lassen sich bei gedrückter Maustaste ziehen
-    const drag = this.selected === 'wall' && input.mouse.down && tileKey !== this.lastDragTile && chk.ok;
-    if (input.mouse.clicked || input.wasPressed('Enter') || drag) {
-      this.lastDragTile = tileKey;
-      this.place(game, this.selected, tx, ty);
+    const line = this.selected === 'wall';
+    // Mauern: Linie vom Startpunkt (Maustaste gedrückt) bis zum Mauszeiger, beim Loslassen setzen
+    if (line && input.mouse.clicked) this.dragStart = [tx, ty];
+    if (line && this.dragStart && !input.mouse.down) {
+      this.placeTiles(game, this.ghost ? this.ghost.tiles : []);
+      this.dragStart = null;
     }
-    if (!input.mouse.down) this.lastDragTile = -1;
+    const from = line && this.dragStart ? this.dragStart : [tx, ty];
+    const tiles = this.lineTiles(from[0], from[1], tx, ty).map(([x, y, rot]) => {
+      const chk = this.canPlace(this.selected, x, y);
+      return { tx: x, ty: y, rot, ok: chk.ok, reason: chk.reason };
+    });
+    const cost = tiles.reduce((acc, t) => {
+      if (t.ok) for (const [k, n] of Object.entries(this.costAt(this.selected, t.tx, t.ty))) acc[k] = (acc[k] || 0) + n;
+      return acc;
+    }, {});
+    const bad = tiles.find((t) => !t.ok);
+    this.ghost = { tx, ty, tiles, ok: tiles.some((t) => t.ok), afford: this.canAfford(game, cost), reason: bad && tiles.length === 1 ? bad.reason : '' };
+    if (!line && (input.mouse.clicked || input.wasPressed('Enter'))) this.placeTiles(game, tiles);
+    if (line && input.wasPressed('Enter')) this.placeTiles(game, tiles);
+  }
+
+  /**
+   * Kacheln einer Linie (Bresenham, 8er-Nachbarschaft) mit Ausrichtung: feste Rotation oder – bei „Auto“ –
+   * aus der Ziehrichtung (waagerecht, senkrecht, diagonal). Für andere Gebäude nur die eine Kachel.
+   */
+  lineTiles(x0, y0, x1, y1) {
+    const sel = this.selected;
+    if (sel !== 'wall') return [[x1, y1, sel === 'gate' && this.rotation !== 'auto' ? this.rotation : null]];
+    const dx = x1 - x0, dy = y1 - y0, adx = Math.abs(dx), ady = Math.abs(dy);
+    let rot = this.rotation;
+    if (rot === 'auto') {
+      if (!adx && !ady) return [[x1, y1, null]]; // Einzelstück: nach den Nachbarn ausrichten
+      rot = adx >= ady * 2 ? 0 : ady >= adx * 2 ? 1 : dx * dy > 0 ? 2 : 3;
+    }
+    const out = [];
+    if (rot === 0) {
+      const sx = Math.sign(dx) || 1;
+      for (let i = 0; i <= adx; i++) out.push([x0 + sx * i, y0, 0]);
+    } else if (rot === 1) {
+      const sy = Math.sign(dy) || 1;
+      for (let i = 0; i <= ady; i++) out.push([x0, y0 + sy * i, 1]);
+    } else {
+      // exakte 45°-Diagonale: ↘ läuft (+1,+1), ↗ läuft (+1,−1) bzw. jeweils rückwärts
+      const k = Math.max(adx, ady);
+      const sx = rot === 2 ? Math.sign(dx) || Math.sign(dy) || 1 : Math.sign(dx) || -Math.sign(dy) || 1;
+      const sy = rot === 2 ? sx : -sx;
+      for (let i = 0; i <= k; i++) out.push([x0 + sx * i, y0 + sy * i, rot]);
+    }
+    return out;
+  }
+
+  /** Alle gültigen Kacheln einer Vorschau als Baustellen setzen. */
+  placeTiles(game, tiles) {
+    let placed = 0;
+    for (const t of tiles) {
+      if (!this.canPlace(this.selected, t.tx, t.ty).ok) continue;
+      if (this.place(game, this.selected, t.tx, t.ty, t.rot)) placed++;
+    }
+    if (!placed && tiles.length) {
+      const bad = tiles.find((t) => !t.ok);
+      if (bad) game.ui.toast(bad.reason, 'warn', 'place');
+      game.audio.play('error');
+    }
+    return placed;
   }
 
   // ---------------------------------------------------------------- Simulation
@@ -461,7 +545,7 @@ export class Buildings {
       case 'center': return Sprites.center.height - 6 + 16;
       case 'hut': return Sprites.hut.height - 2;
       case 'well': return Sprites.well.height - 2;
-      case 'wall': return Sprites.wall.height - 1;
+      case 'wall': return b.rot >= 2 ? Sprites.wallD[0].height : Sprites.wallV.height - 2;
       case 'tower': return Sprites.tower.height - 2;
       case 'gate': return 24;
       default: return b.size * TILE;
@@ -506,7 +590,7 @@ export class Buildings {
         ctx.drawImage(Sprites.well, x, bottom - Sprites.well.height + 2);
         break;
       case 'wall':
-        ctx.drawImage(Sprites.wall, x, bottom - Sprites.wall.height + 1);
+        drawWall(ctx, x, bottom, b.rot || 0, b.ghostArms || this.wallArms(b));
         break;
       case 'tower':
         ctx.drawImage(Sprites.tower, x - 2, bottom - Sprites.tower.height + 2);
@@ -627,12 +711,21 @@ export class Buildings {
       return;
     }
     const def = BUILDING_DEFS[this.selected];
-    const fake = { ...g, type: this.selected, size: def.size, hp: 1, maxHp: 1, growth: 0, aim: -Math.PI / 2, recoil: 0, open: 0, rot: this.selected === 'gate' ? this.gateRotation(g.tx, g.ty) : 0 };
-    ctx.globalAlpha = 0.6;
-    this.drawBuilding(ctx, fake, time);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = g.ok ? (g.afford ? 'rgba(111,191,90,0.35)' : 'rgba(217,178,90,0.35)') : 'rgba(208,64,42,0.4)';
-    ctx.fillRect(g.tx * TILE, g.ty * TILE, def.size * TILE, def.size * TILE);
+    const set = new Set(g.tiles.map((t) => t.ty * this.world.w + t.tx));
+    for (const t of g.tiles) {
+      const occ = this.world.inBounds(t.tx, t.ty) ? this.world.buildingAt[this.world.idx(t.tx, t.ty)] : null;
+      let rot = t.rot ?? (this.selected === 'gate' ? (occ && occ.type === 'wall' ? occ.rot : this.gateRotation(t.tx, t.ty)) : this.wallRotation(t.tx, t.ty));
+      // Arme der Vorschau: zu bestehenden Mauern und zu den Nachbarn in der gezogenen Linie
+      const inLine = (dx, dy) => set.has((t.ty + dy) * this.world.w + t.tx + dx);
+      const near = this.wallArms({ tx: t.tx, ty: t.ty });
+      const arms = { w: near.w || inLine(-1, 0), e: near.e || inLine(1, 0), n: near.n || inLine(0, -1), s: near.s || inLine(0, 1) };
+      const fake = { tx: t.tx, ty: t.ty, x: (t.tx + def.size / 2) * TILE, y: (t.ty + def.size / 2) * TILE, type: this.selected, size: def.size, hp: 1, maxHp: 1, growth: 0, aim: -Math.PI / 2, recoil: 0, open: 0, rot, ghostArms: arms };
+      ctx.globalAlpha = 0.6;
+      this.drawBuilding(ctx, fake, time);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = t.ok ? (g.afford ? 'rgba(111,191,90,0.35)' : 'rgba(217,178,90,0.35)') : 'rgba(208,64,42,0.4)';
+      ctx.fillRect(t.tx * TILE, t.ty * TILE, def.size * TILE, def.size * TILE);
+    }
     if (this.selected === 'tower') {
       // Reichweite anzeigen
       ctx.strokeStyle = 'rgba(255,230,160,0.5)';

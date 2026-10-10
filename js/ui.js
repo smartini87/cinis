@@ -539,7 +539,8 @@ export class UI {
       const def = BUILDING_DEFS[bs.selected];
       if (bs.ghost && !bs.ghost.ok) return `${def.name}: ${bs.ghost.reason}`;
       const tail = bs.ghost && !bs.ghost.afford ? ' – das Material wird nach und nach angeliefert' : '';
-      return touch ? `${def.name} – zum Bauen tippen${tail}` : `${def.name} – Klick: Baustelle setzen${bs.selected === 'wall' ? ' (ziehen für Reihen)' : ''}${tail} · Rechtsklick/Esc: abbrechen`;
+      const rot = bs.selected === 'wall' || bs.selected === 'gate' ? ` · R/Mausrad: Ausrichtung (${bs.rotationLabel})` : '';
+      return touch ? `${def.name} – zum Bauen tippen${tail}` : `${def.name} – Klick: Baustelle setzen${bs.selected === 'wall' ? ' (ziehen für Linien)' : ''}${rot}${tail} · Rechtsklick/Esc: abbrechen`;
     }
     if (p.carried >= p.capacity) return 'Voll beladen – zurück zur Ewigen Flamme, um abzuliefern.';
     if (g.enemies.list.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 40)) return `${key} Angreifen`;

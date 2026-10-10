@@ -26,16 +26,28 @@ export function buildingPassable(b, mask) {
   return b.type === 'gate' && mask === 'friendly' && !b.site;
 }
 
+const isWallish = (o) => !!o && (o.type === 'wall' || o.type === 'gate');
+
 /**
- * Rechteck eines Gebäudes innerhalb einer belegten Kachel (Weltkoordinaten).
- * Mauern/Tore können später schmaler sein (Rotation); Standard ist die volle Kachel.
+ * Feste Rechtecke eines Gebäudes in einer belegten Kachel (Weltkoordinaten). Mauern und Tore sind schmale Balken
+ * (waagerecht/senkrecht je nach Rotation) mit Armen zu benachbarten Mauern; diagonale Mauern füllen die Kachel.
+ * Die Rechtecke werden in out geschrieben; zurück kommt ihre Anzahl.
  */
-export function buildingTileRect(b, tx, ty) {
+export function buildingRects(world, b, tx, ty, out) {
   const x = tx * TILE, y = ty * TILE;
-  if (b.thin === 'h') return [x, y + 4, TILE, 8];
-  if (b.thin === 'v') return [x + 4, y, 8, TILE];
-  return [x, y, TILE, TILE];
+  if ((b.type !== 'wall' && b.type !== 'gate') || b.rot >= 2) {
+    out[0] = [x, y, TILE, TILE];
+    return 1;
+  }
+  const at = (dx, dy) => (world.inBounds(tx + dx, ty + dy) ? world.buildingAt[(ty + dy) * world.w + tx + dx] : null);
+  const w = b.rot === 0 || isWallish(at(-1, 0)), e = b.rot === 0 || isWallish(at(1, 0));
+  const n = b.rot === 1 || isWallish(at(0, -1)), s = b.rot === 1 || isWallish(at(0, 1));
+  let k = 0;
+  out[k++] = [w ? x : x + 4, y + 4, (e ? x + TILE : x + 12) - (w ? x : x + 4), 8];
+  if (n || s) out[k++] = [x + 4, n ? y : y + 4, 8, (s ? y + TILE : y + 12) - (n ? y : y + 4)];
+  return k;
 }
+const RECTS = [null, null];
 
 /**
  * Löst Überlappungen eines Kreises (e.x, e.y, Radius r) mit allen festen Formen in der Nähe auf.
@@ -59,8 +71,11 @@ export function resolve(world, e, r, mask) {
         }
         const b = world.buildingAt[ty * world.w + tx];
         if (b && !b.dead && !buildingPassable(b, mask)) {
-          const [rx, ry, rw, rh] = buildingTileRect(b, tx, ty);
-          moved = pushRect(e, r, rx, ry, rw, rh) || moved;
+          const k = buildingRects(world, b, tx, ty, RECTS);
+          for (let i = 0; i < k; i++) {
+            const [rx, ry, rw, rh] = RECTS[i];
+            moved = pushRect(e, r, rx, ry, rw, rh) || moved;
+          }
         }
         const id = world.nodeAt[ty * world.w + tx];
         if (id >= 0) {

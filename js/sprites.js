@@ -522,6 +522,37 @@ function makeWall() {
   return c;
 }
 
+function makeWallV() {
+  // Senkrechte Mauer von oben-vorn: lange Mauerkrone, unten die Stirnseite (16 x 24, Kachel ab Zeile 8)
+  const [c, g] = canvas(16, 24);
+  px(g, 4, 0, 8, 17, '#b9b4a8');
+  px(g, 4, 0, 1, 17, '#d0ccc0');
+  px(g, 11, 0, 1, 17, '#8e8a80');
+  for (let y = 1; y < 16; y += 5) {
+    px(g, 4, y, 2, 2, '#d0ccc0');
+    px(g, 10, y, 2, 2, '#d0ccc0');
+  }
+  px(g, 4, 16, 8, 8, '#9a958a');
+  px(g, 4, 16, 8, 1, '#c3beb2');
+  px(g, 4, 19, 8, 1, '#7a766d');
+  px(g, 7, 20, 1, 3, '#7a766d');
+  px(g, 4, 23, 8, 1, '#5a5650');
+  return c;
+}
+
+function makeWallD(flip) {
+  // Diagonale Mauer: Krone und Front laufen schräg über die Kachel (16 x 26)
+  const [c, g] = canvas(16, 26);
+  for (let i = 0; i < 16; i++) {
+    const x = flip ? 15 - i : i;
+    px(g, x, i, 1, 3, '#c3beb2');
+    px(g, x, i + 3, 1, 7, i % 4 === 0 ? '#7a766d' : '#9a958a');
+    px(g, x, i + 9, 1, 1, '#5a5650');
+    if (i % 4 === 1) px(g, x, i - 1 < 0 ? 0 : i - 1, 1, 2, '#d8d4ca');
+  }
+  return c;
+}
+
 function makeTower() {
   const [c, g] = canvas(20, 40);
   px(g, 3, 14, 14, 26, '#9a958a');
@@ -567,6 +598,8 @@ export function buildSprites() {
   Sprites.hut = inkSprite(makeHut());
   Sprites.well = inkSprite(makeWell());
   Sprites.wall = inkSprite(makeWall());
+  Sprites.wallV = inkSprite(makeWallV());
+  Sprites.wallD = [inkSprite(makeWallD(false)), inkSprite(makeWallD(true))];
   Sprites.tower = inkSprite(makeTower());
   Sprites.farm = inkSprite(makeFarm(), { edge: 0.3 });
   Sprites.sack = inkSprite(makeSack());
@@ -1000,6 +1033,29 @@ export function drawGate(ctx, x, bottom, rot, open) {
       P(6, -16, 4, h, '#7a5233');
       P(6, -16, 4, 1, '#a07c52');
     }
+  }
+}
+
+/**
+ * Mauerkachel mit Unterkante bei bottom. rot: 0 waagerecht, 1 senkrecht, 2 diagonal ↘, 3 diagonal ↗.
+ * arms: { w, e, n, s } – Verbindungen zu Nachbarmauern (zeichnet nur die nötigen Teilstücke).
+ */
+export function drawWall(ctx, x, bottom, rot, arms) {
+  if (rot >= 2) {
+    const spr = Sprites.wallD[rot - 2];
+    ctx.drawImage(spr, x, bottom - spr.height + (rot === 2 ? 0 : 0));
+    return;
+  }
+  const H = Sprites.wall, V = Sprites.wallV;
+  const vert = rot === 1 || arms.n || arms.s;
+  const horiz = rot === 0 || arms.w || arms.e;
+  if (vert) {
+    const y0 = arms.n || rot === 1 ? 0 : 4, y1 = arms.s || rot === 1 ? V.height : V.height - 4;
+    ctx.drawImage(V, 0, y0, V.width, y1 - y0, x, bottom - V.height + y0, V.width, y1 - y0);
+  }
+  if (horiz) {
+    const x0 = arms.w || rot === 0 ? 0 : 4, x1 = arms.e || rot === 0 ? H.width : H.width - 4;
+    ctx.drawImage(H, x0, 0, x1 - x0, H.height, x + x0, bottom - H.height + 1, x1 - x0, H.height);
   }
 }
 

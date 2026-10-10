@@ -96,7 +96,7 @@ export default async function (page) {
     p.aimX = 0; p.aimY = 1;
     p.requestDash = true;
     sim(0.6, check);
-    out.dashBlocked = p.y < wy * TILE;
+    out.dashBlocked = p.y < wy * TILE + 8; // vor der Mauermitte (schmale Mauer: Balken bei +4..+12)
     out.energyAfterDash = Math.round(p.energy);
     p.x = (w.cx + 2 + 0.5) * TILE; p.y = (wy - 1.5) * TILE; p.vx = p.vy = 0;
     p.dashCd = 0; p.requestDash = true;

@@ -22,16 +22,17 @@ export default async function (page) {
     const free = (k) => g.stock[k] + p.inv[k] - B.sites.reduce((a, b) => a + (b.site.need[k] || 0) - (b.site.got[k] || 0), 0);
     const canAfford = (cost) => Object.entries(cost).every(([k, n]) => free(k) >= n);
     const tryPlace = (type, cands) => {
-      for (const [x, y] of cands) {
+      for (const [x, y, rot] of cands) {
         if (type !== 'gate' && !offRoad(type, x, y)) continue;
         if (B.canPlace(type, x, y).ok && canAfford(B.costAt(type, x, y))) {
-          return B.place(g, type, x, y);
+          return B.place(g, type, x, y, rot ?? null);
         }
       }
       return null;
     };
     const towerSpots = ring(5, 7).filter(([x, y]) => (x + y) % 3 === 0).concat(ring(10, 12).filter(([x, y]) => (x + y) % 2 === 0));
-    const wallSpots = ring(9, 9);
+    // Mauerring: Seiten senkrecht, oben/unten waagerecht
+    const wallSpots = ring(9, 9).map(([x, y]) => [x, y, Math.abs(x - cx) === 9 && Math.abs(y - cy) < 9 ? 1 : 0]);
     const gateSpots = wallSpots.filter(([x, y]) => x === cx || y === cy);
     const homeSpots = ring(2, 4);
     const build = () => {

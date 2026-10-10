@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
@@ -28,7 +28,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `input.js` | Tastatur/Maus/Touch, Flanken pro Frame (`pressed`, `mouse.clicked`) |
 | `camera.js` | Kamera, ganzzahliger Pixel-Zoom, Welt↔Bildschirm |
 | `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, A* (Navigationsraster + Zusammenhangskomponenten) + BFS-zum-Wasser (Freunde), Dijkstra-Flussfeld zur Flamme (Gegner, Gebäude = teuer, Bäume/Felsen = Hindernis), Gelände-Rendering |
-| `physics.js` | Kreis-Hitboxen gegen Rechtecke/Kreise mit Gleiten, Substeps (`moveCircle`), Masken `friendly`/`enemy`/`animal` (Tore nur für `friendly`), `SpatialHash`, Trennung der Einheiten |
+| `physics.js` | Kreis-Hitboxen gegen Rechtecke/Kreise mit Gleiten, Substeps (`moveCircle`), Masken `friendly`/`enemy`/`animal` (Tore nur für `friendly`), Mauerformen nach Rotation/Nachbarn (`buildingRects`), `SpatialHash`, Trennung der Einheiten |
 | `sprites.js` | Prozedurale Pixel-Grafik (Offscreen-Canvases, `inkSprite` = kräftiger + Kontur), Figuren-Zeichner (Umriss/Silhouette/Schatten), `tinted`, `drawOutlinedImage` |
 | `interact.js` | Interaktionsziel in Reichweite (Provider-Liste: Knoten, Wasser, …; `addProvider`), Glow (`glowFor`), „E“-Prompt. Kandidat mit `act(game)` = eigene Aktion statt Sammeln |
 | `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
@@ -63,6 +63,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - Szenario-Tests können die Simulation synchron vorspulen: `for (...) game.update(1/60)`. Für Screenshots eines bestimmten Moments `game.speed = 0` setzen (friert ein, Rendering läuft weiter).
 - `Game.update` pausiert für `game.hitStop` Schritte (Trefferpause) – Tests, die exakte Schrittzahlen erwarten, berücksichtigen das.
 - POI-Generierung muss beim Laden identisch sein: Zufallswerte aus dem Seed-RNG immer ziehen, auch wenn (beim Laden) keine Siedler/Wächter erzeugt werden. Feste Requisiten setzen `world.props` (blockiert alle, Flussfeld und Navigation).
+- Mauern/Tore haben `rot` (0 waagerecht, 1 senkrecht, 2 ↘, 3 ↗; Tore nur 0/1). `buildings.place(game, type, tx, ty, rot)`; Linien über `lineTiles`/`placeTiles`.
 - `buildings.place` legt immer eine Baustelle an; `count()`/`ofType()` zählen nur fertige Gebäude (`countAll` inkl. Baustellen). Tests, die fertige Gebäude brauchen, rufen `buildings.finishAllSites(game)`.
 - Siedler mit `mode` ('waiting'/'follow') gehören nicht zur Kolonie – Kolonie immer über `settlers.colony`.
 - Neue Gebäude/HUD-Teile/Mechaniken immer über `progress` freischalten (`UNLOCKS`-Eintrag); gesperrte Gebäude erscheinen nicht in der Bauleiste und lassen sich nicht platzieren.
