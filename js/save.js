@@ -1,9 +1,9 @@
 // save.js – Spielstand in localStorage: Serialisieren/Wiederherstellen des kompletten Zustands.
 // Die Welt wird aus dem Seed neu generiert; gespeichert werden nur veränderliche Daten.
 
-const KEY = 'cinis.save.v3';
-const VERSION = 3;
-const OLD_KEYS = ['cinis.save.v1', 'cinis.save.v2'];   // ältere Formate: nicht kompatibel, werden sauber verworfen
+const KEY = 'cinis.save.v4';
+const VERSION = 4;
+const OLD_KEYS = ['cinis.save.v1', 'cinis.save.v2', 'cinis.save.v3'];   // ältere Formate: nicht kompatibel, werden sauber verworfen
 
 /** Sicherer Zugriff auf localStorage (privater Modus, Speicher voll …). */
 function storage() {

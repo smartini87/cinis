@@ -1,7 +1,7 @@
 // settlers.js – Siedler: Bedürfnisse (Hunger/Durst), Jobvergabe (Farm/Sammeln), Aufgaben-Zustandsautomat,
 // Wegfolgen und Zeichnen. Siedler arbeiten vollautomatisch; der Spieler setzt nur den Arbeitsschwerpunkt.
 
-import { TILE, RES, GATHER_KEYS, SETTLER, FARM_GROW_TIME, FARM_YIELD } from './config.js';
+import { TILE, RES, GATHER_KEYS, SETTLER, FARM_GROW_TIME, FARM_YIELD, RUBBLE_IRON } from './config.js';
 import { NODE_DEFS, T } from './world.js';
 import { CENTER_BEDS, BUILDING_DEFS, TERRITORY_CENTER } from './buildings.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
@@ -188,7 +188,11 @@ export class Settlers {
         return;
       }
       const hit = game.world.moveEntity(s, s.wander.dx * 18 * dt, s.wander.dy * 18 * dt, s.r, 'friendly');
-      if (hit) s.gone = !game.camera.visible(s.x, s.y, 1, 1, 40);
+      if (hit) {
+        // Weg versperrt (z. B. Mauer über der Straße): umkehren
+        s.wander.dx = -s.wander.dx;
+        s.wander.dy = -s.wander.dy;
+      }
       s.moving = true;
       s.walk += dt * 6;
       if (s.wander.dx) s.flip = s.wander.dx < 0;
@@ -748,6 +752,10 @@ export class Settlers {
   }
 
   doDeliver(s, game) {
+    if (s.bonusIron) {
+      game.stock.iron += s.bonusIron;
+      s.bonusIron = 0;
+    }
     if (!s.carry) return;
     if (s.carry.site && s.carry.site.site) s.carry.site.site.incoming[s.carry.res] = Math.max(0, (s.carry.site.site.incoming[s.carry.res] || 0) - s.carry.n);
     game.stock[s.carry.res] += s.carry.n;
@@ -769,6 +777,8 @@ export class Settlers {
     s.timer = 0;
     const res = NODE_DEFS[n.type].res;
     const got = game.world.harvest(n, 1);
+    // Säulentrümmer geben manchmal Eisenschrott (kommt direkt ins Lager, sobald der Siedler abliefert)
+    if (got > 0 && n.type === 'rock' && Math.random() < RUBBLE_IRON) s.bonusIron = (s.bonusIron || 0) + 1;
     if (got > 0) {
       s.carry = { res, n: (s.carry && s.carry.res === res ? s.carry.n : 0) + got };
       if (game.camera.visible(n.x, n.y, 1, 1, 0)) {

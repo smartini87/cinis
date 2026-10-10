@@ -59,6 +59,9 @@ Ein neues Spiel beginnt mit fast leerem Bildschirm: Lebenspunkte und ein Ziel-Ba
 8. Farm bauen
 9. Erste Nacht überstehen (vorher kommen Dash und Kampf)
 10. Turm bauen
+11. Die Flamme auf Stufe 2 entfachen
+12. Werkbank bauen
+13. Etwas herstellen
 
 HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, jeweils mit kurzer Einblendung und einem Satz Erklärung („Neu: Mauer“). Bis zum Nacht-Ziel bleibt es heller Tag. Die ersten drei Nächte sind Lernnächte mit wenigen, langsamen Gegnern. Im Hauptmenü startet „Neues Spiel – Tutorial überspringen“ mit allem freigeschaltet.
 
@@ -69,11 +72,11 @@ HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, j
 | Ressource | Quelle |
 |---|---|
 | **Holz** | Pinien und Zypressen fällen. Stümpfe wachsen nach einiger Zeit nach. |
-| **Stein** | Säulentrümmer in Ruinen brechen. Die Ruinen zerfallen weiter: jeden Morgen entstehen neue Trümmer. |
+| **Stein** | Säulentrümmer in Ruinen brechen. Die Ruinen zerfallen weiter: jeden Morgen entstehen 8 neue Trümmer. |
 | **Nahrung** | Feigensträucher (wachsen nach), Farmen, Jagd |
 | **Wasser** | Am Ufer von Fluss und Teich schöpfen; Brunnen fördern automatisch. |
 | **Fell** | Jagd (Hirsch, Ziege, Wildschwein, Wolf), Kisten, Händler |
-| **Eisenschrott** | Kisten in Ruinen und Lagern, Kolosse und Eliten, Händler |
+| **Eisenschrott** | Beim Steinbrechen (8 % Chance), Kisten in Ruinen und Lagern, Kolosse und Eliten, Händler |
 | **Stoff** | Kisten, Händler |
 | **Kohle** | Aschehaufen auf verbrannter Erde (jeden Morgen entstehen neue), Aschgänger, Kisten |
 | **Kräuter** | Kräuterbüsche auf Wiesen (wachsen nach), Kisten |
@@ -88,7 +91,7 @@ An der Ewigen Flamme, der Werkbank (ab Flammenstufe 2) und der Schmiede stellst 
 
 | Station | Rezept | Kosten | Wirkung |
 |---|---|---|---|
-| Flamme | Bolzen ×10 | 3 Holz, 1 Stein | Turm-Munition (ins Lager) |
+| Flamme | Bolzen ×10 | 4 Holz, 2 Stein | Turm-Munition (ins Lager) |
 | Flamme | Verband ×2 | 1 Stoff, 1 Kräuter | Q: +40 LP |
 | Werkbank | Fackel ×2 | 2 Holz, 1 Stoff, 1 Harz | T: 3 Minuten Licht, Wölfe meiden dich |
 | Werkbank | Axt / Spitzhacke | Holz, Stein, 1 Eisen | Holz bzw. Stein 80 % schneller |
@@ -98,21 +101,28 @@ An der Ewigen Flamme, der Werkbank (ab Flammenstufe 2) und der Schmiede stellst 
 | Schmiede | Bolzen ×25 | 1 Eisen, 3 Holz, 1 Kohle | Turm-Munition (ins Lager) |
 | Werkbank | Kräuteröl | 3 Kräuter, 1 Harz | Brennstoff hoher Flammenstufen |
 
-Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; das kostet anteilig Baumaterial aus dem Lager.
+Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; eine volle Reparatur kostet 35 % der Baukosten aus dem Lager.
 
 **Händler:** Alle drei Tage schlägt eine Händler-Karawane für anderthalb Tage ihr Lager auf, bevorzugt in einem befreiten Aschgänger-Lager. Sie tauscht Rohstoffe und manchmal einen Bauplan (E zum Handeln, ⚖ auf der Karte).
 
 ### Gebäude
-| Taste | Gebäude | Kosten | Wirkung |
+| Kategorie | Gebäude | Kosten | Wirkung |
 |---|---|---|---|
-| 1 | Hütte (2×2) | 20 Holz, 5 Stein | +4 Siedlerplätze, nachts Schutz für 4 Siedler |
-| 2 | Farm (2×2) | 14 Holz, 6 Wasser | Ein Siedler baut Nahrung an (4 pro Ernte) |
-| 3 | Brunnen | 4 Holz, 12 Stein | +1 Wasser alle 9 s |
-| 4 | Mauer | 4 Stein | 320 LP, blockiert alle – Gegner, Siedler und dich |
-| 5 | Turm | 20 Holz, 18 Stein | Ballista, 6 Felder Reichweite |
-| 6 | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; auf eine Mauer gesetzt ersetzt es sie (zahlt nur die Differenz) |
+| – | Ewige Flamme (3×3) | – | Zentrum und Lager, 1500 LP. Fällt sie, ist das Spiel verloren. |
+| Siedlung | Hütte (2×2) | 20 Holz, 5 Stein | +4 Siedlerplätze, nachts Schutz für 4 Siedler |
+| Siedlung | Farm (2×2) | 14 Holz, 6 Wasser | Ein Siedler baut Nahrung an (4 pro Ernte) |
+| Siedlung | Brunnen | 4 Holz, 12 Stein | +1 Wasser alle 9 s |
+| Siedlung | Lagerhaus (2×2, Stufe 3) | 40 Holz, 30 Stein | zweite Annahmestelle |
+| Wehr | Mauer | 3 Stein | 320 LP, blockiert alle – Gegner, Siedler und dich |
+| Wehr | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; in eine Mauer gesetzt zahlst du nur die Differenz |
+| Wehr | Turm | 20 Holz, 18 Stein | Ballista, 6 Felder Reichweite, 1 Bolzen pro Schuss |
+| Wehr | Wachturm II (Stufe 5) | 20 Holz, 30 Stein, 6 Eisen | 8 Felder, Doppelschuss |
+| Wehr | Falle (Bauplan) | 6 Holz, 2 Eisen | 50 Schaden + Verlangsamung, 3 Auslösungen |
+| Wehr | Feuerschale (Stufe 3 oder Bauplan) | 8 Stein, 1 Eisen, 2 Kohle | Licht, 9 Brennschaden/s im Umkreis von 3 Feldern, 1 Kohle pro Nacht |
+| Handwerk | Werkbank (Stufe 2) | 24 Holz, 8 Stein | Werkzeug, Fackeln, Stiefel, Kräuteröl |
+| Handwerk | Schmiede (2×2, Stufe 4 + Bauplan) | 20 Holz, 40 Stein, 10 Eisen | Eisenschwert, Rüstung, Bolzen ×25 |
 
-Gebaut werden kann im Umkreis von 12 Feldern um die Flamme und 6 Feldern um jedes andere Gebäude. Tagsüber reparieren die Siedler beschädigte Gebäude automatisch.
+Gebaut werden kann im Umkreis der Flamme (12 Felder auf Stufe 1, wächst mit jeder Stufe) und 6 Feldern um jedes andere Gebäude.
 
 **Mauern und Tore:** Mauern lassen sich als Linie ziehen. In der Einstellung „Auto“ folgt die Ausrichtung der Ziehrichtung (waagerecht, senkrecht oder diagonal). Mit R oder dem Mausrad legst du sie fest. Die Vorschau zeigt jede Kachel grün (gültig) oder rot. Mauern verbinden sich mit ihren Nachbarn, diagonale Reihen sind lückenlos dicht. Ein Tor setzt du in eine gerade Mauer, es übernimmt deren Richtung und kostet nur die Differenz. Eigene Leute gehen hindurch (es öffnet sich), Gegner nicht. Du kannst dich und die Flamme vollständig einmauern: Gegner suchen dann den billigsten Weg (Tore sind etwas schwächer als Mauern) und brechen durch. Wer beim Verfolgen an einer Mauer hängen bleibt, reißt sie ein.
 
@@ -155,8 +165,8 @@ Fehlt Brennstoff, verliert die Flamme Glut (bis zu 40 % pro Nacht). Licht, Baura
 | Gebäude | Wirkung |
 |---|---|
 | Lagerhaus | Zweite Annahmestelle für Rohstoffe, kürzere Wege für dich und die Siedler |
-| Falle | Flach am Boden: Gegner nehmen 40 Schaden und werden 3 s langsamer. Hält 3 Auslösungen. |
-| Feuerschale | Licht und Brennschaden ringsum; verbrennt jede Nacht 1 Kohle |
+| Falle | Flach am Boden: Gegner nehmen 50 Schaden und werden 3 s langsamer. Hält 3 Auslösungen. |
+| Feuerschale | Licht und Brennschaden ringsum (3 Felder); verbrennt jede Nacht 1 Kohle |
 | Schmiede | Eisenschwert, Rüstung, Bolzen ×25 |
 | Wachturm II | 8 Felder Reichweite, Doppelschuss; auf einen Turm gesetzt zahlst du nur die Differenz |
 
@@ -176,21 +186,21 @@ Dazu kommen Wanderer auf den Straßen (manche wollen sich anschließen), Rauchs�
 
 ### Siedler
 - Du beginnst **allein**. Siedler findest du in Lagern in der Wildnis. Sprich sie mit E an, dann folgen sie dir. In der Siedlung angekommen, gehören sie dazu.
-- Mitnehmen geht nur mit freiem Wohnplatz: Jede Hütte bietet 4 Plätze. Fehlt einer, heißt es „Du brauchst eine weitere Hütte“.
+- Mitnehmen geht nur mit freiem Wohnplatz: Jede Hütte bietet 4 Plätze. Fehlt einer, heißt es „Du brauchst eine weitere Hütte“. Wie viele Siedler die Flamme schützen kann, hängt von ihrer Stufe ab (8 auf Stufe 1, 40 auf Stufe 8).
 - Jeder Siedler hat eine Gabe: Bauer (Farmen +35 %), Holzfäller, Steinmetz, Jäger (Nahrung sammeln +35 %), Baumeister, Läufer (+20 % Tempo), Zäh (+50 % LP) oder Arbeiter (ohne Bonus).
 - Siedler haben **Hunger** und **Durst**. Sie essen und trinken selbstständig aus dem Lager. Fehlt beides zu lange, verlieren sie Leben und sterben.
-- Farmen bekommen automatisch einen Arbeiter. Alle anderen sammeln. Links im HUD legst du den **Arbeitsschwerpunkt** fest (Auto, Holz, Stein, Nahrung, Wasser). „Auto“ sammelt, was gerade am knappsten ist.
+- Farmen bekommen automatisch einen Arbeiter, Baustellen bekommen Träger. Alle anderen sammeln. Links im HUD legst du den **Arbeitsschwerpunkt** fest (Auto, Holz, Stein, Nahrung, Wasser). „Auto“ sammelt, was gerade am knappsten ist, sobald es Werkbank oder Kohlebedarf gibt auch Kohle und Kräuter.
 - Nachts und wenn Gegner in der Nähe sind, flüchten Siedler in Hütten oder zur Flamme. Wird ihre Hütte zerstört, fliehen sie ins Freie.
 
 ### Nächte und Gegner
-Ein Tag dauert 150 s, eine Nacht 75 s. In der Abenddämmerung wird angekündigt, wie viele Feinde aus welchen Richtungen kommen. Rote Pfeile am Bildschirmrand und die Minikarte zeigen Gegner außerhalb der Sicht. Die ersten drei Nächte sind Lernnächte. Danach wächst die Welle jede Nacht (etwa 4 + 1,7·n + 0,03·n² Gegner), die Gegner werden zäher (LP ×(1 + 0,09·n + 0,002·n²)) und stärker, und sie kommen aus bis zu vier Richtungen. Das erste Sonnenlicht verbrennt alle Überlebenden.
+Ein Tag dauert 150 s, eine Nacht 75 s. In der Abenddämmerung wird angekündigt, wie viele Feinde aus welchen Richtungen kommen. Rote Pfeile am Bildschirmrand und die Minikarte zeigen Gegner außerhalb der Sicht. Die ersten drei Nächte sind Lernnächte (2, 4, 6 langsame Aschgänger). Danach wächst die Welle jede Nacht (etwa 1 + 1,5·n + 0,028·n² Gegner plus Schwärme), die Gegner werden zäher (LP ×(1 + 0,09·n + 0,002·n²)) und stärker (Schaden ×(1 + 0,05·n)), und sie kommen aus bis zu vier Richtungen. Das erste Sonnenlicht verbrennt alle Überlebenden.
 
 | Gegner | ab Nacht | Eigenschaften |
 |---|---|---|
 | Aschgänger | 1 | Standardgegner |
 | Ruinenhund (Läufer) | 4 | schnell, schwach, jagt Einheiten |
-| Aschfalter (Schwarm) | 4 | Gruppen von 6–10 winzigen, schnellen Gegnern |
-| Brecher | 6 | geht mitten durch Mauern und Tore, dreifacher Gebäudeschaden |
+| Aschfalter (Schwarm) | 5 | Gruppen von 6–10 winzigen, schnellen Gegnern |
+| Brecher | 7 | geht mitten durch Mauern und Tore, dreifacher Gebäudeschaden |
 | Aschenwerfer (Fernkampf) | 8 | hält Abstand und wirft Glut auf Türme, dich und die Siedler |
 | Aschkoloss | 9 | langsam, zäh, doppelter Gebäudeschaden |
 | Elite | 11 | jeder Typ kann Elite sein: 2,5× LP, 1,5× Schaden, Glut-Aura, lässt Eisen fallen |
@@ -199,9 +209,11 @@ Ein Tag dauert 150 s, eine Nacht 75 s. In der Abenddämmerung wird angekündigt,
 Gegner laufen auf dem kürzesten Weg zur Flamme. Ist der Umweg um eine Mauer zu lang, schlagen sie sich durch. Spieler und Siedler in ihrer Nähe greifen sie direkt an.
 
 ### Tipps
-- Baue vor der ersten Nacht eine Hütte und einen Turm.
+- Rette früh möglichst viele Überlebende – sie sammeln, bauen und tragen Material.
 - Brunnen und Farm früh bauen – Siedler ohne Versorgung arbeiten nicht lange.
-- Furten im Fluss und Straßen sind natürliche Engstellen. Türme hinter Mauerringen sind am wirksamsten.
+- Behalte den Brennstoffbedarf im Auge (HUD) und entfache die Flamme erst, wenn der Vorrat für mehrere Nächte reicht.
+- Türme allein reichen nicht: Sie fressen Bolzen. Mauerring mit Toren, Fallen vor der Mauer und Feuerschalen dahinter verteilen die Last.
+- Ein leichtes Aschgänger-Lager zu räumen lohnt sich: Die Truhe enthält einen Bauplan.
 - In den Bossnächten (alle 5 Nächte) lohnt es sich, selbst an der Flamme zu kämpfen. Beim Stampfer aus dem roten Ring springen (Dash)!
 - Brecher gehen gezielt auf Mauern los: Fallen und Feuerschalen hinter der Mauer halten sie auf.
 
@@ -210,24 +222,34 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 
 ## Getroffene Annahmen (Designentscheidungen)
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
-- **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und einziges Lager. Ressourcen zählen erst nach dem Abliefern.
-- **Einstieg statt Textwand:** Das frühere Tutorial mit mehreren Textseiten ist durch den Questpfad ersetzt. H zeigt nur noch die Tastenübersicht. Der Spielstand speichert den Questschritt und alle Freischaltungen (Format v2). Spielstände der Vorversion sind nicht kompatibel und werden mit einem Hinweis verworfen.
-- **Ausrüstung ohne Ausrüsten:** Werkzeuge, Schwert, Rüstung und Stiefel wirken, solange sie im Gepäck liegen. Fallen und Feuerschalen sind Gebäude (Phase 8), keine Gegenstände. Herstellungs-Stationen öffnen sich nur mit E, damit Leertaste oder Klick im Kampf kein Menü öffnen.
-- **Spielstand v3:** Neue Rohstoffknoten ändern die Weltgenerierung, deshalb werden ältere Spielstände verworfen.
-- **Wildlife:** Tiere entstehen in einem Ring um die Kamera, passend zum Boden und zur Tageszeit, und verschwinden weit außerhalb der Sicht wieder. Es sind höchstens 60 gleichzeitig, davon höchstens 30 dekorative. Deko-Tiere und Tiere außerhalb der Sicht werden vereinfacht aktualisiert. Tiere werden nicht gespeichert. Fell ist eine neue Ressource, für Rezepte ab Phase 7.
+- **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und Lager (ab Stufe 3 kommen Lagerhäuser hinzu). Ressourcen zählen erst nach dem Abliefern. Das Gepäck des Spielers dient zum Transport und für Ausrüstung.
+- **Einstieg statt Textwand:** Das frühere Tutorial mit mehreren Textseiten ist durch den Questpfad ersetzt. H zeigt nur noch die Tastenübersicht. Der Spielstand speichert den Questschritt und alle Freischaltungen. Die Tageszeit steht im Einstieg, bis die erste Nacht an der Reihe ist.
+- **Ausrüstung ohne Ausrüsten:** Werkzeuge, Schwert, Rüstung und Stiefel wirken, solange sie im Gepäck liegen. Fallen und Feuerschalen sind Gebäude, keine Gegenstände. Herstellungs-Stationen öffnen sich nur mit E, damit Leertaste oder Klick im Kampf kein Menü öffnen.
+- **Spielstand v4:** Die Weltgenerierung und der Inhalt des Spielstands haben sich mehrfach geändert (neue Rohstoffknoten, Orte, Flamme). Ältere Spielstände (v1–v3) werden beim Start mit einem Hinweis sauber verworfen, statt sie fehlerhaft zu laden. Die Bestenliste ist davon unabhängig.
+- **Wildlife:** Tiere entstehen in einem Ring um die Kamera, passend zum Boden und zur Tageszeit, und verschwinden weit außerhalb der Sicht wieder. Es sind höchstens 60 gleichzeitig, davon höchstens 30 dekorative. Deko-Tiere und Tiere außerhalb der Sicht werden vereinfacht aktualisiert. Tiere werden nicht gespeichert.
 - **Kampfgefühl:** Ein Schwerthieb holt aus, zieht mit Bogenspur durch und lässt die Figur nach vorn ausfallen. Bei Treffern hält das Bild für drei Frames an (Trefferpause), dazu ein leichtes Wackeln, Rückstoß und weißes Aufblitzen. Sammeln braucht gehaltene Taste und zeigt einen Fortschrittsbalken. Das Werkzeug passt zum Ziel (Axt, Spitzhacke, Eimer).
 - **Lesbarkeit:** Der Boden ist bewusst entsättigt und etwas dunkler. Gebäude, Bäume, Felsen und Sträucher haben kräftigere Farben und eine dunkle Kontur. Der Spieler trägt einen hellen Umriss, Siedler einen dunklen, Gegner einen dunkelroten, alle mit Bodenschatten. Das Ziel in Reichweite leuchtet golden und zeigt ein „E“. Liegt die Flamme außerhalb der Sicht, zeigt ein goldener Pfeil am Bildschirmrand dorthin.
 - **Kollision:** Alle Figuren haben kreisförmige Hitboxen und gleiten an Hindernissen entlang. Gebäude, Mauern, Baumstämme und Felsen blockieren jeden – auch den Spieler und die Siedler. Nur **Tore** lassen eigene Leute durch, Gegner nicht. Siedler arbeiten, liefern und schlafen an einem Zugangspunkt am Gebäuderand und betreten Gebäude nie. Wer hinter einem Gebäude oder Baum steht, scheint als Silhouette durch.
-- **Baustellen statt Sofortbau:** Die Bauzeit ergibt sich allein aus der Materiallieferung. Der Spieler darf im Kerngebiet der Flamme direkt aus dem Lager liefern, damit der Start ohne Siedler nicht stockt. Reparatur ist weiterhin als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s).
+- **Baustellen statt Sofortbau:** Die Bauzeit ergibt sich allein aus der Materiallieferung. Der Spieler darf im Kerngebiet der Flamme direkt aus dem Lager liefern, damit der Start ohne Siedler nicht stockt. Reparatur ist als tägliche Regeneration abstrahiert (1 % LP/s, Flamme 0,5 % LP/s), kostet aber anteilig Material.
 - **Nur Siedler essen und trinken.** Die Spielfigur hat keine Bedürfnisse, regeneriert aber Leben, wenn sie eine Weile nicht getroffen wurde.
 - **Siedler-Zuzug:** Neue Siedler kommen nur durch Rettung aus Lagern und von Wanderern. Ohne Retten wächst die Siedlung nicht. Die Lager entstehen aus dem Seed, neue kommen im Lauf der Zeit hinzu.
 - **Feindlager-Wächter** stehen im Rauch ihrer Feuer und verbrennen nicht im Sonnenlicht. Wer bedrohte Lager nachts überfällt, verbrennt dagegen wie alle Aschgänger.
 - **Baupläne** aus Feindlagern (Fallen, Feuerschale, Eisenschmiede) werden gespeichert und schalten die Gebäude frei, sobald die passende Flammenstufe erreicht ist.
-- **Stein wächst nach:** Ohne Nachschub ginge der Stein ab etwa Nacht 19 aus (im Balancing-Bot beobachtet). Deshalb erzeugen zerfallende Ruinen jeden Morgen 5 neue Trümmer.
+- **Stein und Kohle wachsen nach:** Zerfallende Ruinen erzeugen jeden Morgen 8 neue Trümmer, verbrannte Erde 4 neue Aschehaufen. Ohne diesen Nachschub gingen Stein und Kohle im Endlosspiel aus.
 - **Gegner sterben bei Tagesanbruch** (Sonnenbrand). Es geht ums Durchhalten, nicht ums vollständige Aufräumen.
 - **Endlos:** Es gibt keinen Sieg. Die Wertung zählt die überstandenen Nächte (die Nacht, in der die Flamme fällt, zählt nicht).
-- **Schwierigkeit:** Ein Bot mit festen Bauregeln gewinnt mit etwa 48 Türmen knapp. Die Nächte 2–3 und die Bossnächte sind am gefährlichsten. Feinjustierung über `js/config.js` und `waveFor()` in `js/enemies.js`.
+- **Schwierigkeit:** siehe „Balancing“. Feinjustierung über `js/config.js`, `FLAME_LEVELS` in `js/flame.js`, `RECIPES` in `js/recipes.js` und `waveFor()` in `js/enemies.js`.
 - **Spieltempo:** 1×, 2× und 3× wählbar, weil ein Tag mit Nacht bei 1× knapp 4 Minuten dauert.
+
+## Balancing
+Ein Bot spielt das Spiel im Schnelldurchlauf (`tools/scenarios/balance.mjs`). Er läuft den Questpfad (ohne Intro), sammelt per Autopilot (A*) selbst Holz und Stein, baut die erste Hütte, rettet Überlebende, jagt unterwegs, entfacht die Flamme, wenn danach Brennstoff für zwei Nächte da ist, räumt ein leichtes Aschgänger-Lager, kauft Baupläne beim Händler und verteidigt sich mit Mauerring und Toren, Feuerschalen, Fallen und einigen Türmen. Nachts kämpft er an der Flamme. Hängt ein Ausflug zehn Sekunden fest (etwa wegen eines Wolfsrudels), kehrt er zur Flamme zurück.
+
+Ergebnis (sechs Seeds, Stand Phase 10): **10–15 Nächte, im Mittel etwa 13**. Den Questpfad schafft der Bot an Tag 2–3, er erreicht Flammenstufe 3–4. Eine reine Turm-Strategie (`BOT=towers`) landet im selben Bereich (10–15 Nächte), ist aber auf viel Holz und Stein für Bolzen angewiesen und nicht überlegen. Das Spiel streut deutlich (Lager, Wildlife, Wellenrichtungen sind zufällig). Die gefährlichsten Momente sind die ersten Brecher-Nächte (ab 7) und die Bossnächte.
+
+```bash
+SEED=777 CHROMIUM_PATH=/usr/bin/chromium node tools/smoke-test.mjs tools/scenarios/balance.mjs
+BOT=towers CHROMIUM_PATH=/usr/bin/chromium node tools/smoke-test.mjs tools/scenarios/balance.mjs
+```
 
 ## Entwicklung
 Architektur, Konventionen und Testablauf stehen in [`CLAUDE.md`](CLAUDE.md). Kurzfassung:
@@ -235,5 +257,5 @@ Architektur, Konventionen und Testablauf stehen in [`CLAUDE.md`](CLAUDE.md). Kur
 ```bash
 npm install                                   # nur Dev-Abhängigkeit: Playwright
 CHROMIUM_PATH=/usr/bin/chromium npm test      # Headless-Smoke-Test (Konsole muss fehlerfrei sein)
-node tools/smoke-test.mjs tools/scenarios/balance.mjs   # Bot spielt 30 Nächte im Schnelldurchlauf
+node tools/smoke-test.mjs tools/scenarios/balance.mjs   # Balancing-Bot (endlos, höchstens 60 Nächte)
 ```

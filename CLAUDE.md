@@ -15,7 +15,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt), `?skiptut` schaltet alles frei (ohne Questpfad). Szenarien, die bauen, setzen `export const query = 'skiptut'`.
-- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt im Schnelldurchlauf (endlos, höchstens 60 Nächte) und gibt den Verlauf pro Nacht aus.
+- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt den Questpfad und dann endlos (höchstens 60 Nächte) im Schnelldurchlauf (~20–40 s) und gibt den Verlauf pro Nacht aus. `SEED=…` wählt die Welt, `BOT=towers` die Vergleichsstrategie „nur Türme“. Ziel: im Mittel 12–18 Nächte.
+- `?intro` erzwingt das Intro.
 - `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
 - Eingabe-Flanken (`wasPressed`, `mouse.clicked`) nur in `Game.handleFrameInput()` auswerten – sie gelten genau einen Frame.
 
@@ -27,17 +28,17 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `util.js` | Mathe, Seed-Zufall (mulberry32), Rauschen, MinHeap |
 | `input.js` | Tastatur/Maus/Touch, Flanken pro Frame (`pressed`, `mouse.clicked`) |
 | `camera.js` | Kamera, ganzzahliger Pixel-Zoom, Welt↔Bildschirm |
-| `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten, A* (Navigationsraster + Zusammenhangskomponenten) + BFS-zum-Wasser (Freunde), Dijkstra-Flussfeld zur Flamme (Gegner, Gebäude = teuer, Bäume/Felsen = Hindernis), Gelände-Rendering |
+| `world.js` | Kachelkarte, Generierung per Seed, Ressourcenknoten (Baum, Fels, Strauch, Kräuter, Aschehaufen), Requisiten (`props`), Erkundung (`explored`), A* (Navigationsraster + Zusammenhangskomponenten) + BFS-zum-Wasser (Freunde), Dijkstra-Flussfelder zur Flamme (normal: Mauern teuer; Brecher: Mauern billig), Gelände-Rendering |
 | `physics.js` | Kreis-Hitboxen gegen Rechtecke/Kreise mit Gleiten, Substeps (`moveCircle`), Masken `friendly`/`enemy`/`animal` (Tore nur für `friendly`), Mauerformen nach Rotation/Nachbarn (`buildingRects`), `SpatialHash`, Trennung der Einheiten |
 | `sprites.js` | Prozedurale Pixel-Grafik (Offscreen-Canvases, `inkSprite` = kräftiger + Kontur), Figuren-Zeichner (Umriss/Silhouette/Schatten), `tinted`, `drawOutlinedImage` |
 | `interact.js` | Interaktionsziel in Reichweite (Provider-Liste: Knoten, Wasser, …; `addProvider`), Glow (`glowFor`), „E“-Prompt. Kandidat mit `act(game)` = eigene Aktion statt Sammeln |
-| `player.js` | Spielerfigur: Bewegung, Zielwahl, Sammeln, Inventar, Abliefern |
+| `player.js` | Spielerfigur: Bewegung mit Beschleunigung, Dash/Sprint/Energie, Angriff (Ausholen/Schlag/Trail/Trefferpause), Sammeln mit Fortschritt, Gepäck, Abliefern, Tod/Rückkehr, Fackel/Verband, Autopilot `botMove` (Bot) |
 | `buildings.js` | Gebäudedefinitionen + Kosten, Bausystem (Vorschau/Platzieren/Abriss, Bauradius), Baustellen (`b.site`, `deliverTo`, `playerDeliver`, `completeSite`), Belegungsraster (`world.buildingAt`), Brunnen-Produktion, Zeichnen |
-| `settlers.js` | Siedler: Hunger/Durst, Jobvergabe (Farm), Aufgaben-Automat (gather/water/farm/eat/deliver/idle), A*-Wegfolgen, Arbeitsschwerpunkt |
+| `settlers.js` | Siedler: Gaben (`TRAITS`), wartend/folgend/Kolonie, Hunger/Durst, Jobvergabe (Farm), Aufgaben-Automat (gather/water/farm/eat/deliver/fetch/build/shelter/idle), A*-Wegfolgen, Rettungsnetz `unstick`, Arbeitsschwerpunkt |
 | `enemies.js` | Gegnertypen (Aschgänger, Läufer, Schwarm, Brecher, Fernkämpfer, Koloss, Boss, Elite), endlose Wellenplanung `waveFor(n)`, Gegner-KI (Flussfeld bzw. Brecher-Flussfeld → Flamme, Fernkampf, Boss-Fähigkeiten, Wächter, Fallen), Sonnenbrand, Randindikatoren |
-| `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
+| `combat.js` | Turmbolzen, Glutwürfe der Fernkämpfer (`fireShot`), `damageBuilding`, `damageUnit` (Rüstung, Unverwundbarkeit) |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
-| `save.js` | Spielstand in localStorage (`cinis.save.v3`, ältere werden verworfen): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
+| `save.js` | Spielstand in localStorage (`cinis.save.v4`, v1–v3 werden mit Hinweis verworfen): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
 | `particles.js` | Partikel, `converge` (Funken fliegen zu einem Punkt), `corpse` (zerfallende Figuren), schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
 | `wildlife.js` | Tiere: `ANIMAL_DEFS` (game/neutral/hostile/deco), Spawn im Ring nach Biom/Tageszeit, Statemachine (Flucht, Herde, Charge, Rudeljagd, Licht meiden), Deko vereinfacht, Beute ins Inventar, Klänge |
 | `progress.js` | Freischaltungen (`UNLOCKS`, `game.progress.has/unlock`) und Einstiegs-Questpfad (`QUESTS`: text/start/done/progress/target/finish), Ziel-Banner und Marker |
@@ -50,7 +51,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `highscore.js` | Bestenliste (`cinis.highscore.v1`): `recordScore`, `loadScores`, `bestScore` |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
-| `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
+| `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`) mit Freischalt-Sichtbarkeit, Ziel-Banner, Bauleiste mit Kategorien, Flammen-/Glut-Anzeige, Gepäck-Hotbar, Minikarte mit Nebel und Orten, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü (Bestenliste), Pause, Hilfe, Inventar, Herstellen, Flamme, Händler, Game Over |
 
 ## Balancing-Stellschrauben
 - `js/config.js` (Spieler, Siedler, Turm, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP/Freischaltung) in `buildings.js`, `FLAME_LEVELS` in `flame.js`, `RECIPES` in `recipes.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.

@@ -1,17 +1,17 @@
 // buildings.js – Gebäudedefinitionen, Bausystem (Vorschau, Platzierung, Abriss), Belegungsraster,
 // Produktion (Brunnen) und Zeichnen. Das Zentrum (Ewige Flamme) ist das Lager der Siedlung.
 
-import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE } from './config.js';
+import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE, REPAIR_COST } from './config.js';
 import { dist } from './util.js';
 import { T } from './world.js';
 import { Sprites, drawFlame, drawCrops, drawBallista, drawGate, drawWall, drawCampfire } from './sprites.js';
 
 export const BUILDING_DEFS = {
-  center: { name: 'Ewige Flamme', size: 3, hp: 1200, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
+  center: { name: 'Ewige Flamme', size: 3, hp: 1500, cost: {}, desc: 'Herz der Siedlung und Lager. Fällt sie, ist alles verloren.' },
   hut: { name: 'Hütte', size: 2, hp: 180, cost: { wood: 20, stone: 5 }, key: '1', beds: 4, desc: '+4 Siedlerplätze. Siedler schlafen hier geschützt.' },
   farm: { name: 'Farm', size: 2, hp: 120, cost: { wood: 14, water: 6 }, key: '2', desc: 'Ein Siedler baut hier tagsüber Nahrung an.' },
   well: { name: 'Brunnen', size: 1, hp: 150, cost: { stone: 12, wood: 4 }, key: '3', desc: 'Fördert stetig Wasser ins Lager.' },
-  wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
+  wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 3 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
   tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
   gate: { name: 'Tor', size: 1, hp: 420, cost: { wood: 8, stone: 6 }, key: '6', desc: 'Eigene Leute gehen hindurch, Gegner nicht. Lässt sich in Mauern setzen.' },
   workbench: { name: 'Werkbank', size: 1, hp: 200, cost: { wood: 24, stone: 8 }, unlock: { level: 2 }, desc: 'Hier stellst du Werkzeuge, Fackeln, Stiefel und Kräuteröl her (E).' },
@@ -540,13 +540,13 @@ export class Buildings {
   }
 
   /**
-   * Reparatur am Tag: je Prozent wiederhergestellter LP ein halbes Prozent der Baukosten (Flamme kostenlos).
+   * Reparatur am Tag: je Prozent wiederhergestellter LP REPAIR_COST Prozent der Baukosten (Flamme kostenlos).
    * Fehlt Material im Lager, ruht die Reparatur.
    */
   repair(b, dt, game) {
     const heal = Math.min(b.maxHp - b.hp, b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
     if (b.type !== 'center') {
-      const cost = BUILDING_DEFS[b.type].cost, frac = (heal / b.maxHp) * 0.5;
+      const cost = BUILDING_DEFS[b.type].cost, frac = (heal / b.maxHp) * REPAIR_COST;
       b.repairDebt = b.repairDebt || {};
       for (const [k, n] of Object.entries(cost)) {
         b.repairDebt[k] = (b.repairDebt[k] || 0) + n * frac;
@@ -575,10 +575,10 @@ export class Buildings {
 
   /** Feuerschale: Gegner in der Nähe nehmen Brennschaden. */
   updateFirebowl(b, dt, game) {
-    const r = 2.5 * TILE;
+    const r = 3 * TILE;
     for (const e of game.enemies.list) {
       if (e.dead || Math.abs(e.x - b.x) > r || Math.abs(e.y - b.y) > r || Math.hypot(e.x - b.x, e.y - b.y) > r) continue;
-      e.hp -= 6 * dt;
+      e.hp -= 9 * dt;
       if (Math.random() < dt * 5) game.effects.burst(e.x, e.y - 8, { n: 1, color: ['#ffb040', '#e8742a'], speed: 10, life: 0.5, up: 20, gravity: -20 });
       if (e.hp <= 0) game.enemies.kill(e, game, false);
     }

@@ -390,3 +390,13 @@ html, body {
 .scores td.seed { color: #8a7a68; font-size: 11px; }
 .scores tr.me td { color: #ffd36a; }
 .record { font-size: 22px; color: #ffd36a; letter-spacing: 2px; margin: 4px 0 8px; animation: pulse 1s infinite; text-shadow: 0 0 12px rgba(255, 200, 80, 0.7); }
+
+/* ---------------------------------------------------------------- Mobile: Platz für Gepäck-Leiste, Dash und Tagesanzeige */
+@media (max-width: 640px) {
+  .carry-panel { top: 10px; right: 10px; width: 156px; }
+  .hp-panel { top: 122px; right: 10px; width: 156px; }
+  .ctl-panel { top: 186px; right: 10px; }
+  .dash-btn { bottom: 268px; right: 14px; width: 64px; height: 64px; }
+  .hint { bottom: 205px; }
+  .bag-btn { font-size: 10px; padding: 0 4px; }
+}

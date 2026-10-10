@@ -9,7 +9,7 @@ import { ITEMS, itemInfo } from './items.js';
  * out: { item, n } → Gepäck, { res, n } → Lager. unique: nur einmal nötig (Werkzeug/Ausrüstung).
  */
 export const RECIPES = [
-  { id: 'bolts', station: 'flame', cost: { wood: 3, stone: 1 }, out: { res: 'bolts', n: 10 }, desc: 'Munition für die Türme (ins Lager).' },
+  { id: 'bolts', station: 'flame', cost: { wood: 4, stone: 2 }, out: { res: 'bolts', n: 10 }, desc: 'Munition für die Türme (ins Lager).' },
   { id: 'bandage', station: 'flame', cost: { cloth: 1, herbs: 1 }, out: { item: 'bandage', n: 2 }, desc: 'Q: heilt 40 Lebenspunkte.' },
   { id: 'torch', station: 'workbench', cost: { wood: 2, cloth: 1, resin: 1 }, out: { item: 'torch', n: 2 }, desc: 'Licht in der Nacht, hält Wölfe fern.' },
   { id: 'axe', station: 'workbench', cost: { wood: 4, stone: 2, iron: 1 }, out: { item: 'axe', n: 1 }, unique: true },

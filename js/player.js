@@ -4,7 +4,7 @@
 import {
   TILE, RES, RES_KEYS, DEPOSIT_RANGE, GATHER_TIME,
   PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
-  DASH, ENERGY,
+  DASH, ENERGY, RUBBLE_IRON,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
@@ -420,8 +420,9 @@ export class Player {
     }
     if (t.kind === 'node' && world.harvest(t.node, 1) <= 0) return;
     this.inv.add(res, 1);
-    // Pinien geben manchmal Harz
+    // Pinien geben manchmal Harz, Säulentrümmer manchmal Eisenschrott
     if (kind === 'tree' && t.node.variant !== 2 && Math.random() < 0.18 && this.inv.add('resin', 1) === 0) effects.text(t.x, t.y - 22, `+1 ${RES.resin.name}`, RES.resin.color);
+    if (kind === 'rock' && Math.random() < RUBBLE_IRON && this.inv.add('iron', 1) === 0) effects.text(t.x, t.y - 22, `+1 ${RES.iron.name}`, RES.iron.color);
     game.stats.gathered++;
     game.progress.notify('gather', res, 1);
     game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water', herb: 'pick', ashpile: 'mine' }[kind]);

@@ -38,7 +38,7 @@ export const RES_STACK = 20;
 export const PLAYER_CAPACITY = 30;   // (veraltet) früher: maximale Traglast – heute begrenzen Inventar-Slots
 export const PLAYER_ACCEL = 700;     // Beschleunigung (Welteinheiten/s²)
 export const PLAYER_DECEL = 1000;    // Abbremsen ohne Eingabe
-export const PLAYER_REACH = 22;
+export const PLAYER_REACH = 24;      // Sammelreichweite (auch von einer diagonalen Nachbarkachel aus)
 /** Dash (Shift): kurzer Schub, kostet Energie, kurze Unverwundbarkeit */
 export const DASH = { cost: 30, time: 0.2, speed: 270, cooldown: 0.35, iframes: 0.15 };
 /** Energie: Maximum, Regeneration pro Sekunde nach kurzer Pause; Sprint (Shift halten) */
@@ -55,7 +55,7 @@ export const SETTLER = {
   thirstRate: 100 / 240,
   needAt: 45,              // ab hier gehen Siedler essen/trinken
   gain: 35,                // Sättigung pro Einheit Nahrung/Wasser
-  carry: 5,                // Traglast
+  carry: 6,                // Traglast
   workTime: 1.5,           // Sekunden pro gesammelter Einheit
   starveDamage: 1,         // LP pro Sekunde bei leerem Magen/Durst
 };
@@ -71,5 +71,7 @@ export const PLAYER_ATTACK_TIME = 0.42;
 export const PLAYER_RESPAWN = 8;
 export const TOWER = { range: 6 * TILE, damage: 14, cooldown: 1.0, boltSpeed: 300 };
 export const REPAIR_RATE = 0.01;          // Anteil max. LP pro Sekunde (tagsüber)
+export const REPAIR_COST = 0.35;          // Anteil der Baukosten je vollständig reparierter LP
 export const SUN_BURN = 30;               // Schaden pro Sekunde an Gegnern im Tageslicht
-export const RUBBLE_PER_DAY = 5;          // neue Säulentrümmer pro Morgen (Ruinen zerfallen)
+export const RUBBLE_PER_DAY = 5;
+export const RUBBLE_IRON = 0.08;          // Chance auf Eisenschrott beim Steinbrechen          // neue Säulentrümmer pro Morgen (Ruinen zerfallen)

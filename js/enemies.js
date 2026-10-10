@@ -27,18 +27,18 @@ const EDGE_NAMES = { n: 'Norden', s: 'Süden', w: 'Westen', e: 'Osten' };
 
 /**
  * Zusammensetzung der Welle in Nacht n – endlos: mehr Gegner, neue Typen, höhere Werte.
- * Läufer ab 4, Schwärme ab 4, Brecher ab 6, Fernkämpfer ab 8, Kolosse ab 9, Eliten ab 11, Boss alle 5 Nächte.
+ * Läufer ab 4, Schwärme ab 5, Brecher ab 7, Fernkämpfer ab 8, Kolosse ab 9, Eliten ab 11, Boss alle 5 Nächte.
  */
 export function waveFor(n) {
   // Lernnächte: wenige, langsame Aschgänger
   if (n <= 3) return { walker: [2, 4, 6][n - 1], hpMul: 1, dmgMul: 1, speedMul: [0.7, 0.85, 0.95][n - 1], edges: 1, elite: 0, swarmGroups: 0 };
-  const total = Math.round(4 + 1.7 * n + 0.03 * n * n);
-  const weights = { walker: 1, dog: 0.5, breaker: n >= 6 ? 0.22 : 0, archer: n >= 8 ? 0.28 : 0, brute: n >= 9 ? 0.16 : 0 };
+  const total = Math.round(1 + 1.5 * n + 0.028 * n * n);
+  const weights = { walker: 1, dog: 0.5, breaker: n >= 7 ? 0.18 : 0, archer: n >= 8 ? 0.28 : 0, brute: n >= 9 ? 0.16 : 0 };
   const sum = Object.values(weights).reduce((a, b) => a + b, 0);
   const w = { speedMul: 1 };
   for (const [k, v] of Object.entries(weights)) w[k] = Math.floor((total * v) / sum);
   w.walker += total - Object.keys(weights).reduce((a, k) => a + w[k], 0);
-  w.swarmGroups = n >= 4 ? 1 + Math.floor((n - 4) / 5) : 0;
+  w.swarmGroups = n >= 5 ? 1 + Math.floor((n - 5) / 5) : 0;
   w.boss = n % 5 === 0 ? 1 + Math.floor(n / 25) : 0;
   w.bossAbility = (n / 5) % 2 === 1 ? 'stomp' : 'summon';
   w.hpMul = 1 + 0.09 * n + 0.002 * n * n;
@@ -221,7 +221,7 @@ export class Enemies {
     e.slowT = 3;
     game.effects.burst(e.x, e.y - 4, { n: 8, color: ['#9aa0a6', '#8a1c1c'], speed: 40, life: 0.4 });
     game.audio.play('trap', 0.6);
-    this.hit(e, 40, game);
+    this.hit(e, 50, game);
     if (b.uses <= 0) {
       b.flash = 0.2;
       game.buildings.remove(b);

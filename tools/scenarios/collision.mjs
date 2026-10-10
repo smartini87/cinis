@@ -58,8 +58,13 @@ export default async function (page) {
       for (const s of g.settlers.list) {
         if (s.hidden) continue;
         const b = w.buildingAt[w.idx(Math.floor(s.x / TILE), Math.floor(s.y / TILE))];
-        if ((b && b.type !== 'gate') || overlaps(w, s.x, s.y, s.r, 'friendly', 0.75)) {
+        // Mauern/Tore sind schmale Balken: dort zählt nur die echte Überlappung, sonst schon die Kachel
+        if ((b && b.type !== 'gate' && b.type !== 'wall') || overlaps(w, s.x, s.y, s.r, 'friendly', 0.75)) {
           inside++;
+          if (!out.insideDbg) {
+            const tx = Math.floor(s.x / TILE), ty = Math.floor(s.y / TILE), n = w.nodeAtTile(tx, ty);
+            out.insideDbg = [b && b.type, tx - cx, ty - cy, s.mode, !!s.wander, s.task && s.task.type, w.props[w.idx(tx, ty)], w.tileAt(tx, ty), n && n.type + ':' + n.amount, Math.round(s.x % TILE), Math.round(s.y % TILE)];
+          }
         }
       }
     };

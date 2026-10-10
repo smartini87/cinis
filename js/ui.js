@@ -28,16 +28,21 @@ function lockText(game, r) {
 const HELP = `
 <table class="keys">
 <tr><td>WASD / Pfeile</td><td>Bewegen</td></tr>
+<tr><td>Shift (halten)</td><td>Dash (kurz unverwundbar) · Sprint</td></tr>
 <tr><td>Leertaste / E / Linksklick</td><td>Sammeln &amp; angreifen (gedrückt halten)</td></tr>
-<tr><td>1 – 5 / Bauleiste</td><td>Gebäude wählen, Klick setzt es</td></tr>
+<tr><td>E</td><td>Interagieren: Siedler mitnehmen, Baustelle beliefern, Kiste, Schrein, Händler, Flamme, Werkbank</td></tr>
+<tr><td>B, 1 – 9 / Bauleiste</td><td>Baukategorie wechseln, Gebäude wählen</td></tr>
+<tr><td>R / Mausrad (im Baumodus)</td><td>Mauer bzw. Tor drehen</td></tr>
 <tr><td>Rechtsklick / Esc</td><td>Bauen abbrechen</td></tr>
-<tr><td>X</td><td>Abriss (50 % Rückerstattung)</td></tr>
+<tr><td>X</td><td>Abriss</td></tr>
+<tr><td>I</td><td>Gepäck (Inventar)</td></tr>
+<tr><td>T / Q</td><td>Fackel an/aus · Verband anlegen</td></tr>
 <tr><td>F</td><td>Tempo 1× / 2× / 3×</td></tr>
 <tr><td>P / Esc</td><td>Pause</td></tr>
 <tr><td>M</td><td>Ton an/aus</td></tr>
 <tr><td>Mausrad</td><td>Zoom</td></tr>
 <tr><td>H</td><td>Diese Hilfe</td></tr>
-<tr><td>Touch</td><td>Links ziehen = laufen, tippen = Aktion/Bauen</td></tr>
+<tr><td>Touch</td><td>Links ziehen = laufen, tippen = Aktion/Bauen, Knopf „Dash“</td></tr>
 </table>`;
 
 /**
@@ -616,6 +621,7 @@ export class UI {
     this.set('enT', this.enTxt, `${Math.floor(p.energy)}`);
     this.set('enCls', this.enRow, 'stat-row en-row' + (p.emptyFlash > 0 ? ' empty' : '') + (p.sprinting ? ' sprint' : ''), 'className');
     this.set('touch', this.root, g.input.usingTouch ? 'touch' : '', 'className');
+    this.set('dashVis', this.dashBtn, !g.progress.has('hud.energy'), 'hidden');
     this.set('speed', this.speedBtn, `${g.speed}×`);
     this.set('sound', this.soundBtn, g.audio.muted ? '✕' : '♪');
     this.set('soundCls', this.soundBtn, g.audio.muted ? 'cbtn off' : 'cbtn', 'className');
