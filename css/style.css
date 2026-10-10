@@ -287,3 +287,18 @@ html, body {
   .quest-banner.below { top: auto; bottom: 150px; }
   .quest-txt { font-size: 13px; }
 }
+
+/* ---------------------------------------------------------------- Intro */
+.intro {
+  position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; pointer-events: none; transition: background 1.6s ease-in;
+}
+.intro.fade { background: rgba(0, 0, 0, 0); }
+.intro.fade .intro-lines { opacity: 0; transition: opacity 1.2s; }
+.intro-lines { max-width: min(680px, 86vw); text-align: center; }
+.intro-lines p {
+  font-size: clamp(16px, 2.6vw, 24px); font-style: italic; color: #e9dcc0; line-height: 1.5; margin: 0 0 14px; min-height: 1.5em;
+  text-shadow: 0 0 12px rgba(240, 140, 60, 0.35);
+}
+.intro-lines p.typing::after { content: '▌'; color: #f0a53a; animation: pulse 0.6s infinite; }
+.intro-skip { position: absolute; bottom: 18px; right: 22px; font-size: 13px; color: rgba(230, 220, 200, 0.55); letter-spacing: 1px; }

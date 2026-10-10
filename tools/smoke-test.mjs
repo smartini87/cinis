@@ -27,9 +27,11 @@ const mod = scenario ? await import(pathToFileURL(path.resolve(scenario)).href) 
 const extra = mod && mod.query ? `&${mod.query}` : '';
 await page.goto(`http://localhost:${port}/?seed=${process.env.SEED || 4242}&play${extra}`);
 await page.waitForTimeout(1500);
-// Standardablauf: ein wenig herumlaufen
-for (const k of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
-  await page.keyboard.down(k); await page.waitForTimeout(300); await page.keyboard.up(k);
+// Standardablauf: ein wenig herumlaufen (Szenarien können das mit export const noWalk = true abschalten)
+if (!(mod && mod.noWalk)) {
+  for (const k of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
+    await page.keyboard.down(k); await page.waitForTimeout(300); await page.keyboard.up(k);
+  }
 }
 if (mod) {
   try {

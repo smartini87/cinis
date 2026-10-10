@@ -16,7 +16,7 @@ python3 -m http.server 8080
 
 Dann **http://localhost:8080** öffnen. Wegen der ES-Module funktioniert das direkte Öffnen per `file://` nicht.
 
-URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das Hauptmenü.
+URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das Hauptmenü, `?skiptut` schaltet alles frei, `?intro` spielt das Intro ab.
 
 ## Steuerung
 
@@ -37,6 +37,9 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | FPS-Anzeige | F3 | – |
 
 ## Spielanleitung
+
+### Intro
+Beim allerersten neuen Spiel läuft eine kurze Sequenz von etwa 20 Sekunden: vier Sätze auf Schwarz, eine Kamerafahrt über die Aschelandschaft zur Flamme und die Ankunft des Hüters in einem Funkenregen. Jede Taste oder ein Tipp überspringt sie. Im Hauptmenü lässt sich das Intro jederzeit über „Intro ansehen“ abspielen.
 
 ### Einstieg
 Ein neues Spiel beginnt mit fast leerem Bildschirm: Lebenspunkte und ein Ziel-Banner oben. Ein goldener Pfeil zeigt jeweils auf das nächste Ziel, ein Randpfeil hilft, wenn es außerhalb der Sicht liegt. Die Ziele bauen aufeinander auf:

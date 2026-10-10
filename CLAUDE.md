@@ -10,7 +10,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `balance`.
+  `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt), `?skiptut` schaltet alles frei (ohne Questpfad). Szenarien, die bauen, setzen `export const query = 'skiptut'`.
@@ -21,7 +22,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 ## Architektur (js/)
 | Modul | Verantwortung |
 |---|---|
-| `main.js` | `Game`: Game Loop mit festem Zeitschritt (60 Hz, Tempo 1–3×), Zustände `menu/tutorial/playing/paused/over`, Spielereignisse, Render-Reihenfolge |
+| `main.js` | `Game`: Game Loop mit festem Zeitschritt (60 Hz, Tempo 1–3×), Zustände `menu/intro/playing/paused/over`, Spielereignisse, Render-Reihenfolge |
 | `config.js` | Konstanten + Balancing |
 | `util.js` | Mathe, Seed-Zufall (mulberry32), Rauschen, MinHeap |
 | `input.js` | Tastatur/Maus/Touch, Flanken pro Frame (`pressed`, `mouse.clicked`) |
@@ -40,6 +41,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `particles.js` | Partikel, `converge` (Funken fliegen zu einem Punkt), `corpse` (zerfallende Figuren), schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
 | `wildlife.js` | Tiere: `ANIMAL_DEFS` (game/neutral/hostile/deco), Spawn im Ring nach Biom/Tageszeit, Statemachine (Flucht, Herde, Charge, Rudeljagd, Licht meiden), Deko vereinfacht, Beute ins Inventar, Klänge |
 | `progress.js` | Freischaltungen (`UNLOCKS`, `game.progress.has/unlock`) und Einstiegs-Questpfad (`QUESTS`: text/start/done/progress/target/finish), Ziel-Banner und Marker |
+| `intro.js` | Intro-Sequenz (Zustand `intro`): Schreibmaschinentext, Kamerafahrt mit Parallax, Ankunft mit Funken/Aufstehen; überspringbar |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |

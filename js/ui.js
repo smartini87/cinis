@@ -374,12 +374,13 @@ export class UI {
     if (info) btns.push({ label: `Fortsetzen <small>Tag ${info.day} · ${info.settlers} Siedler</small>`, cls: 'primary', onClick: () => g.continueGame() });
     btns.push({ label: 'Neues Spiel', cls: info ? '' : 'primary', onClick: () => (info ? this.confirmNew() : g.startNewGame()) });
     btns.push({ label: 'Neues Spiel <small>Tutorial überspringen – alles freigeschaltet</small>', onClick: () => (info ? this.confirmNew(true) : g.startNewGame({ skipTutorial: true })) });
+    btns.push({ label: 'Intro ansehen', onClick: () => g.watchIntro() });
     btns.push({ label: 'Steuerung', onClick: () => this.showHelp(() => this.showMainMenu()) });
     this.showOverlay('menu', `
       <div class="title">CINIS</div>
       <div class="subtitle">Die letzte Flamme</div>
-      <p class="lore">Rom ist gefallen. Asche bedeckt die sieben Hügel, und nachts kriecht sie als Gestalt aus den Ruinen.
-      Nur die Ewige Flamme hält sie fern. Sammle die Überlebenden, baue auf, verteidige das Licht – 30 Nächte lang.</p>`, btns);
+      <p class="lore">Rom ist gefallen, Asche bedeckt die sieben Hügel. Nachts kriecht sie als Gestalt aus den Ruinen.
+      Nur die Ewige Flamme hält sie fern. Finde Überlebende, baue auf und halte das Licht am Leben, Nacht für Nacht, so lange du kannst.</p>`, btns);
   }
 
   confirmNew(skipTutorial = false) {

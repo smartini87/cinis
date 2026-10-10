@@ -492,7 +492,7 @@ export class Player {
 
   /** Zeichnen; sil = Farbe für die Silhouette (hinter Gebäuden). */
   draw(ctx, sil = null, time = 0) {
-    if (this.dead) return;
+    if (this.dead || this.introHidden) return;
     // Unverwundbar: Blinken
     const blink = this.invuln > 0 && this.invulnBlink && !sil && Math.floor(this.invuln * 14) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;

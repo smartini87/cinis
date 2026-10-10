@@ -21,6 +21,7 @@ import { Interact } from './interact.js';
 import { Loot } from './loot.js';
 import { Wildlife } from './wildlife.js';
 import { Progress } from './progress.js';
+import { Intro } from './intro.js';
 import { drawEdgeArrow } from './ui.js';
 
 class Game {
@@ -47,6 +48,7 @@ class Game {
     this.enemies = new Enemies();
     this.lighting = new Lighting();
     this.interact = new Interact();
+    this.intro = new Intro(this);
     this.loot = new Loot();
     this.wildlife = new Wildlife();
     this.noises = [];     // Kampflärm { x, y, r, t } – schreckt Tiere auf
@@ -72,7 +74,8 @@ class Game {
     this.skipTutorial = qs.has('skiptut');
     this.newGame(this.randomSeed());
     const oldSave = discardOldSaves();
-    if (qs.has('play')) this.setState('playing');
+    if (qs.has('intro')) this.startNewGame({ forceIntro: true });
+    else if (qs.has('play')) this.setState('playing');
     else this.toMainMenu();
     if (oldSave) this.ui.toast('Ein Spielstand aus einer älteren Version war nicht kompatibel und wurde verworfen.', 'warn');
     // Beim Verlassen/Verstecken der Seite speichern
@@ -96,7 +99,7 @@ class Game {
   // ---------------------------------------------------------------- Zustände
   setState(st) {
     this.state = st;
-    this.ui.setHudVisible(st !== 'menu');
+    this.ui.setHudVisible(st !== 'menu' && st !== 'intro');
     if (st === 'playing') this.ui.hideOverlay();
     this.last = performance.now();
     this.acc = 0;
@@ -111,14 +114,34 @@ class Game {
     this.ui.showMainMenu();
   }
 
-  /** Neues Spiel; opts.skipTutorial schaltet alles frei (ohne geführten Einstieg). */
+  /**
+   * Neues Spiel; opts.skipTutorial schaltet alles frei (ohne geführten Einstieg).
+   * Beim allerersten Spiel (oder mit opts.forceIntro) läuft vorher die Intro-Sequenz.
+   */
   startNewGame(opts = {}) {
     deleteSave();
     this.skipTutorial = !!opts.skipTutorial;
     this.newGame(this.randomSeed());
-    this.setState('playing');
-    if (this.skipTutorial) this.ui.toast('Halte die Ewige Flamme am Leben – so viele Nächte wie möglich.', 'info');
-    saveGame(this);
+    const begin = () => {
+      this.setState('playing');
+      if (this.skipTutorial) this.ui.toast('Halte die Ewige Flamme am Leben – so viele Nächte wie möglich.', 'info');
+      saveGame(this);
+    };
+    let seen = true;
+    try {
+      seen = localStorage.getItem('cinis.introSeen') === '1';
+      localStorage.setItem('cinis.introSeen', '1');
+    } catch {
+      seen = true; // ohne Speicher kein automatisches Intro
+    }
+    if (opts.forceIntro || (!seen && !this.skipTutorial)) this.intro.start(begin);
+    else begin();
+  }
+
+  /** Intro aus dem Hauptmenü ansehen; danach zurück ins Menü. */
+  watchIntro() {
+    this.newGame(this.randomSeed());
+    this.intro.start(() => this.toMainMenu());
   }
 
   continueGame() {
@@ -216,6 +239,11 @@ class Game {
         if (this.state !== 'playing') break;
       }
       if (steps >= maxSteps) this.acc = 0; // Spirale des Todes vermeiden
+    } else if (this.state === 'intro') {
+      this.intro.update(frameDt);
+      this.effects.update(frameDt);
+      if (this.camera.shake > 0) this.camera.shake = Math.max(0, this.camera.shake - frameDt);
+      if (this.flashT > 0) this.flashT -= frameDt;
     } else if (this.state === 'menu') {
       // Langsamer Kameraschwenk im Hauptmenü
       this.time += frameDt;
@@ -231,6 +259,11 @@ class Game {
   /** Eingaben mit Flanken (Tastendruck/Klick) – genau einmal pro Frame ausgewertet. */
   handleFrameInput() {
     const inp = this.input;
+    if (this.state === 'intro') {
+      // Jede Taste, jeder Klick oder Tipp überspringt das Intro
+      if (inp.pressed.size || inp.mouse.clicked) this.intro.skip();
+      return;
+    }
     if (inp.wasPressed('KeyM')) this.toggleSound();
     if (this.state === 'paused' && inp.wasPressed('Escape', 'KeyP')) {
       this.resume();
@@ -505,7 +538,8 @@ class Game {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
     this.drawDeathOverlay(ctx);
-    if (this.state !== 'menu') {
+    if (this.state === 'intro') this.intro.drawParallax(ctx);
+    if (this.state !== 'menu' && this.state !== 'intro') {
       this.interact.drawPrompt(ctx, this);
       this.drawPoiArrows(ctx);
       this.enemies.drawIndicators(ctx, camera);

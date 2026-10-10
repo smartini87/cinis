@@ -200,6 +200,10 @@ export class SoundEngine {
         this.tone(784, 0.1, { type: 'triangle', vol: v(0.08) });
         this.tone(1046, 0.18, { type: 'triangle', vol: v(0.08), delay: 0.08 });
         break;
+      case 'gust':
+        // Windböe
+        this.noise(2.2, { vol: v(0.14), freq: 300, type: 'bandpass', q: 0.7, slide: 700, attack: 0.8 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });
