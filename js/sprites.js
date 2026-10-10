@@ -361,6 +361,45 @@ function makeSack() {
   return c;
 }
 
+function makeHerb(full) {
+  // Kräuterbusch: Rosmarin/Salbei mit hellen Blüten
+  const [c, g] = canvas(14, 12);
+  for (let i = 0; i < 5; i++) px(g, 2 + i * 2, 4 + (i % 2), 1, 7 - (i % 2), '#4a7a3a');
+  blob(g, 7, 7, 5, 3, '#5a8a44', 11, 1);
+  if (full) for (const [x, y] of [[3, 4], [7, 3], [10, 5], [5, 6]]) px(g, x, y, 1, 1, '#d8c8f0');
+  px(g, 2, 11, 10, 1, 'rgba(0,0,0,0.25)');
+  return c;
+}
+
+function makeAshpile() {
+  // Aschehaufen mit verkohlten Resten und Glutpunkten
+  const [c, g] = canvas(16, 10);
+  blob(g, 8, 6, 7, 3, '#3b3634', 13, 1);
+  blob(g, 7, 5, 5, 2, '#5a5450', 14, 1);
+  px(g, 4, 6, 3, 1, '#1d1712');
+  px(g, 10, 5, 2, 1, '#1d1712');
+  px(g, 6, 4, 1, 1, '#e8742a');
+  px(g, 11, 6, 1, 1, '#b8401c');
+  return c;
+}
+
+function makeWorkbench() {
+  // Werkbank: Tisch mit Säge und Hammer (18 x 18)
+  const [c, g] = canvas(18, 18);
+  px(g, 1, 7, 16, 3, '#8a6240');
+  px(g, 1, 7, 16, 1, '#b08458');
+  px(g, 2, 10, 2, 7, '#5b3f2a');
+  px(g, 14, 10, 2, 7, '#5b3f2a');
+  px(g, 2, 13, 14, 1, '#6b4a2a');
+  px(g, 4, 4, 6, 1, '#c8ccd0');
+  px(g, 4, 5, 6, 1, '#9aa0a6');
+  px(g, 3, 3, 2, 3, '#6b4a2a');
+  px(g, 12, 3, 1, 4, '#6b4a2a');
+  px(g, 11, 2, 3, 2, '#8e8a80');
+  px(g, 1, 17, 16, 1, 'rgba(0,0,0,0.3)');
+  return c;
+}
+
 // ------------------------------------------------------------------ Icons (HUD)
 function makeIcon(kind) {
   const [c, g] = canvas(12, 12);
@@ -391,6 +430,52 @@ function makeIcon(kind) {
     px(g, 9, 2, 2, 2, '#8a6a46');
     px(g, 1, 9, 2, 2, '#8a6a46');
     px(g, 9, 9, 2, 2, '#8a6a46');
+  } else if (kind === 'iron') {
+    px(g, 2, 5, 8, 4, '#8a9096');
+    px(g, 2, 5, 8, 1, '#c8ccd0');
+    px(g, 4, 3, 5, 2, '#a8b0b8');
+    px(g, 3, 8, 2, 1, '#8a5a32');
+    px(g, 8, 7, 1, 2, '#8a5a32');
+  } else if (kind === 'cloth') {
+    px(g, 2, 3, 8, 7, '#d8c8a8');
+    for (let y = 4; y < 10; y += 2) px(g, 2, y, 8, 1, '#b8a888');
+    px(g, 8, 3, 2, 7, '#c0b090');
+  } else if (kind === 'coal') {
+    blob(g, 6, 7, 4, 3, '#3b3634', 21);
+    px(g, 3, 6, 2, 1, '#5a5450');
+    px(g, 7, 5, 2, 1, '#6a6460');
+  } else if (kind === 'herbs') {
+    for (let i = 0; i < 4; i++) px(g, 3 + i * 2, 3 + (i % 2), 1, 7, '#5a8a44');
+    px(g, 4, 2, 1, 1, '#d8c8f0');
+    px(g, 8, 3, 1, 1, '#d8c8f0');
+    px(g, 3, 9, 7, 2, '#7a5233');
+  } else if (kind === 'resin') {
+    blob(g, 6, 7, 3, 4, '#e0a040', 3);
+    px(g, 5, 5, 1, 2, '#ffe08a');
+  } else if (kind === 'bolts') {
+    for (let i = 0; i < 3; i++) {
+      px(g, 2 + i * 3, 2, 1, 8, '#8d6240');
+      px(g, 1 + i * 3, 1, 3, 2, '#d8d4ca');
+    }
+  } else if (kind === 'oil') {
+    px(g, 4, 3, 4, 2, '#7a5233');
+    px(g, 3, 5, 6, 6, '#c8d060');
+    px(g, 4, 6, 1, 3, '#f0f0a0');
+  } else if (kind === 'armor') {
+    px(g, 2, 2, 8, 8, '#8a7a4a');
+    px(g, 3, 3, 6, 1, '#c0aa60');
+    px(g, 5, 2, 2, 8, '#6a5a30');
+  } else if (kind === 'boots') {
+    px(g, 3, 2, 3, 7, '#7a5233');
+    px(g, 3, 8, 6, 3, '#7a5233');
+    px(g, 3, 2, 3, 1, '#a07c52');
+  } else if (kind === 'bandage') {
+    px(g, 2, 4, 8, 4, '#e8e2d4');
+    px(g, 5, 3, 2, 6, '#c0392b');
+    px(g, 4, 5, 4, 2, '#c0392b');
+  } else if (kind === 'bag') {
+    blob(g, 6, 7, 5, 4, '#8a6a46', 2);
+    px(g, 4, 2, 4, 2, '#5b3f2a');
   } else if (kind === 'energy') {
     // Blitz
     px(g, 6, 0, 3, 2, '#ffe08a');
@@ -615,7 +700,17 @@ export function buildSprites() {
   Sprites.chestOpen = inkSprite(makeChest(true));
   Sprites.milestone = inkSprite(makeMilestone(), { edge: 0.35 });
   Sprites.icons = {};
-  for (const k of ['wood', 'stone', 'food', 'water', 'hide', 'people', 'heart', 'flame', 'energy']) Sprites.icons[k] = makeIcon(k);
+  for (const k of ['wood', 'stone', 'food', 'water', 'hide', 'iron', 'cloth', 'coal', 'herbs', 'resin', 'bolts', 'oil', 'armor', 'boots', 'bandage', 'bag', 'people', 'heart', 'flame', 'energy']) Sprites.icons[k] = makeIcon(k);
+  // Werkzeug-Symbole aus den Hand-Zeichnern
+  for (const [k, item, a] of [['axe', 'axe', -0.8], ['pick', 'pick', -0.8], ['ironSword', 'sword', -0.8], ['sword', 'sword', -0.8], ['torch', 'torch', -1.2]]) {
+    const [c, g] = canvas(12, 12);
+    drawItem(g, 2, 10, a, item);
+    Sprites.icons[k] = c;
+  }
+  Sprites.herb = inkSprite(makeHerb(true));
+  Sprites.herbEmpty = inkSprite(makeHerb(false));
+  Sprites.ashpile = inkSprite(makeAshpile());
+  Sprites.workbench = inkSprite(makeWorkbench());
 }
 
 /** Data-URL eines Icons für das DOM-HUD. */
@@ -635,6 +730,8 @@ export function nodeSprite(node) {
   }
   if (node.type === 'rock') return [Sprites.rock[node.variant], x - 1 + sh, y];
   if (node.type === 'bush') return [node.amount > 0 ? Sprites.bush : Sprites.bushEmpty, x + sh, y + 2];
+  if (node.type === 'herb') return [node.amount > 0 ? Sprites.herb : Sprites.herbEmpty, x + 1 + sh, y + 3];
+  if (node.type === 'ashpile') return [Sprites.ashpile, x + sh, y + 5];
   return null;
 }
 
@@ -873,7 +970,7 @@ export function drawBallista(ctx, x, y, angle, recoil) {
 
 /** Kleines Vorschaubild eines Gebäudes für die Bauleiste. */
 export function buildingPreviewURL(type) {
-  let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower }[type];
+  let spr = { hut: Sprites.hut, farm: Sprites.farm, well: Sprites.well, wall: Sprites.wall, tower: Sprites.tower, workbench: Sprites.workbench }[type];
   if (type === 'gate') {
     const [gc, gg] = canvas(16, 24);
     drawGate(gg, 0, 24, 0, 0);

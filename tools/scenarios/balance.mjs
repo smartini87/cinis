@@ -4,8 +4,10 @@
 // Ausgabe: Verlauf pro Nacht. Aufruf: node tools/smoke-test.mjs tools/scenarios/balance.mjs
 export const query = 'skiptut';
 export default async function (page) {
-  const log = await page.evaluate(() => {
+  const log = await page.evaluate(async () => {
+    const { RECIPES, craft } = await import('/js/recipes.js');
     const g = window.__game, w = g.world, B = g.buildings, p = g.player, TILE = 16;
+    const recipe = (id) => RECIPES.find((r) => r.id === id);
     const cx = w.cx, cy = w.cy;
     const ring = (r0, r1) => {
       const out = [];
@@ -35,7 +37,13 @@ export default async function (page) {
     const wallSpots = ring(9, 9).map(([x, y]) => [x, y, Math.abs(x - cx) === 9 && Math.abs(y - cy) < 9 ? 1 : 0]);
     const gateSpots = wallSpots.filter(([x, y]) => x === cx || y === cy);
     const homeSpots = ring(2, 4);
+    // Bolzen an der Flamme nachproduzieren (Türme verbrauchen pro Schuss einen)
+    const ammo = () => {
+      const want = 30 + B.count('tower') * 12;
+      for (let i = 0; i < 20 && g.stock.bolts < want && free('wood') > 25 && free('stone') > 15; i++) craft(g, recipe('bolts'));
+    };
     const build = () => {
+      ammo();
       const pop = g.settlers.colony.length;
       // Baustellen, die seit mehr als einem Tag stocken (z. B. unerreichbar), wieder abreißen
       for (const b of B.sites) if (g.time - (b.site.since || 0) > 225) B.demolish(g, b);
@@ -135,7 +143,7 @@ export default async function (page) {
     const rows = [];
     let minCenter = 1e9;
     g.onDawn = (day) => {
-      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), sites: B.sites.length, towers: B.count('tower'), walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
+      rows.push({ night: day - 1, center: Math.round(minCenter), pop: g.settlers.colony.length, rescued: g.stats.rescued || 0, huts: B.count('hut'), sites: B.sites.length, towers: B.count('tower'), bolts: g.stock.bolts, walls: B.count('wall'), gates: B.count('gate'), wood: Math.round(g.stock.wood), stone: Math.round(g.stock.stone), food: Math.round(g.stock.food), water: Math.round(g.stock.water), hide: Math.round(g.stock.hide), kills: g.stats.kills, lost: g.stats.lost, hunted: g.stats.hunted || 0, camps: g.stats.camps || 0 });
       minCenter = 1e9;
       origDawn(day);
       build();

@@ -17,6 +17,7 @@ export const UNLOCKS = {
   'hud.clock': { label: 'Tag und Nacht', text: 'Die Zeit läuft. Nachts kriechen die Aschgänger aus den Ruinen.' },
   combat: { label: 'Kampf', text: 'Leertaste oder Klick in der Nähe von Gegnern schlägt mit dem Gladius zu.' },
   demolish: { label: 'Abriss', text: 'X: Gebäude abreißen, die Hälfte der Kosten kommt zurück.' },
+  'hud.inventory': { label: 'Inventar', text: 'I öffnet dein Gepäck. Werkzeug und Ausrüstung wirken, solange du sie trägst.' },
 };
 for (const [type, def] of Object.entries(BUILDING_DEFS)) if (type !== 'center') UNLOCKS['b:' + type] = { label: def.name, text: def.desc };
 
@@ -101,6 +102,19 @@ export const QUESTS = [
     text: () => 'Sichere die Flamme: Baue einen Turm',
     done: (g) => g.buildings.count('tower') > 0,
     target: (g) => g.buildings.center,
+  },
+  {
+    id: 'workbench',
+    start: ['b:workbench', 'hud.inventory'],
+    text: () => 'Baue eine Werkbank',
+    done: (g) => g.buildings.count('workbench') > 0,
+    target: (g) => g.buildings.list.find((b) => b.type === 'workbench') || g.buildings.center,
+  },
+  {
+    id: 'craft',
+    text: () => 'Stelle an der Werkbank oder Flamme etwas her (E)',
+    done: (g) => (g.stats.crafted || 0) > 0,
+    target: (g) => g.buildings.list.find((b) => b.type === 'workbench' && !b.site) || g.buildings.center,
   },
 ];
 

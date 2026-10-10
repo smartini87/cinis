@@ -1,9 +1,9 @@
 // save.js – Spielstand in localStorage: Serialisieren/Wiederherstellen des kompletten Zustands.
 // Die Welt wird aus dem Seed neu generiert; gespeichert werden nur veränderliche Daten.
 
-const KEY = 'cinis.save.v2';
-const VERSION = 2;
-const OLD_KEYS = ['cinis.save.v1'];   // ältere Formate: nicht kompatibel, werden sauber verworfen
+const KEY = 'cinis.save.v3';
+const VERSION = 3;
+const OLD_KEYS = ['cinis.save.v1', 'cinis.save.v2'];   // ältere Formate: nicht kompatibel, werden sauber verworfen
 
 /** Sicherer Zugriff auf localStorage (privater Modus, Speicher voll …). */
 function storage() {
@@ -85,7 +85,7 @@ export function saveGame(game) {
     stats: game.stats,
     focus: game.settlers.focus,
     nameIdx: game.settlers.nameIdx,
-    player: { x: game.player.x, y: game.player.y, hp: game.player.hp, inv: game.player.inv, dead: game.player.dead, respawnT: game.player.respawnT },
+    player: { x: game.player.x, y: game.player.y, hp: game.player.hp, inv: game.player.inv.serialize(), dead: game.player.dead, respawnT: game.player.respawnT, torchT: game.player.torchT },
     // Knoten kompakt: [Menge, Timer, entfernt]
     nodes: game.world.nodes.map((n) => [n.amount, Math.round(n.timer * 10) / 10, n.removed ? 1 : 0]),
     buildings: game.buildings.list.map((b) => ({ type: b.type, tx: b.tx, ty: b.ty, hp: b.hp, timer: b.timer, growth: b.growth, rot: b.rot, site: b.site ? { need: b.site.need, got: b.site.got } : null })),
@@ -97,6 +97,7 @@ export function saveGame(game) {
     })),
     enemies: game.enemies.list.map((e) => ({ type: e.type, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, dmg: e.dmg, speed: e.speed, guard: e.guard || null, elite: !!e.elite, raider: !!e.raider })),
     pois: game.pois.serialize(),
+    trader: game.pois.serializeTrader(game),
     explored: packBits(game.world.explored),
     loot: game.loot.serialize(),
     progress: game.progress.serialize(),
@@ -156,6 +157,7 @@ export function loadGame(game) {
   const st = game.settlers;
   st.focus = d.focus || 'auto';
   game.pois.restore(game, d.pois);
+  game.pois.restoreTrader(game, d.trader);
   unpackBits(d.explored, game.world.explored);
   game.world.exploredVersion++;
   for (const sd of d.settlers) {
@@ -180,7 +182,8 @@ export function loadGame(game) {
   // Spieler
   const pl = game.player;
   Object.assign(pl, { x: d.player.x, y: d.player.y, hp: d.player.hp, dead: !!d.player.dead, respawnT: d.player.respawnT || 0 });
-  Object.assign(pl.inv, d.player.inv);
+  pl.inv.restore(d.player.inv);
+  pl.torchT = d.player.torchT || 0;
   game.camera.snap(pl.x, pl.y);
 
   // Gegner und Wellenplan

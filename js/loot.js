@@ -12,8 +12,15 @@ export class Loot {
     this.piles.length = 0;
   }
 
+  /** Haufen ablegen; nahe Haufen werden zusammengelegt, höchstens 80 liegen herum (die ältesten verfallen). */
   drop(x, y, items) {
+    const near = this.piles.find((p) => Math.abs(p.x - x) < 14 && Math.abs(p.y - y) < 14);
+    if (near) {
+      for (const [k, n] of Object.entries(items)) near.items[k] = (near.items[k] || 0) + n;
+      return;
+    }
     this.piles.push({ x, y, items: { ...items } });
+    if (this.piles.length > 80) this.piles.shift();
   }
 
   /** Interaktions-Provider: Haufen in Reichweite. */
@@ -34,16 +41,16 @@ export class Loot {
     const p = game.player;
     let got = 0, off = 0;
     for (const k of RES_KEYS) {
-      const n = Math.min(pile.items[k] || 0, p.capacity - p.carried);
+      const n = Math.min(pile.items[k] || 0, p.inv.room(k));
       if (n <= 0) continue;
-      p.inv[k] += n;
+      p.inv.add(k, n);
       pile.items[k] -= n;
       got += n;
       game.effects.text(pile.x, pile.y - 12 - off, `+${n} ${RES[k].name}`, RES[k].color);
       off += 7;
     }
     if (RES_KEYS.every((k) => !(pile.items[k] > 0))) this.piles.splice(this.piles.indexOf(pile), 1);
-    else if (!got) game.ui.toast('Voll beladen! Erst an der Flamme abliefern.', 'warn', 'full');
+    else if (!got) game.ui.toast('Dein Gepäck ist voll! Erst an der Flamme abliefern.', 'warn', 'full');
     if (got) game.audio.play('pick');
   }
 

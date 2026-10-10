@@ -58,7 +58,9 @@ export default async function (page) {
       for (const s of g.settlers.list) {
         if (s.hidden) continue;
         const b = w.buildingAt[w.idx(Math.floor(s.x / TILE), Math.floor(s.y / TILE))];
-        if ((b && b.type !== 'gate') || overlaps(w, s.x, s.y, s.r, 'friendly', 0.75)) inside++;
+        if ((b && b.type !== 'gate') || overlaps(w, s.x, s.y, s.r, 'friendly', 0.75)) {
+          inside++;
+        }
       }
     };
     sim(45, checkSettlers);

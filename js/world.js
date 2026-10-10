@@ -24,6 +24,8 @@ export const NODE_DEFS = {
   tree: { res: 'wood', max: 12, regrow: 420, label: 'Pinie' },     // Stumpf wächst nach regrow s nach
   rock: { res: 'stone', max: 16, regrow: 0, label: 'Säulentrümmer' }, // verschwindet beim Leeren
   bush: { res: 'food', max: 5, regrow: 16, label: 'Feigenstrauch' },  // 1 Frucht pro regrow s
+  herb: { res: 'herbs', max: 3, regrow: 45, label: 'Kräuter' },        // wachsen langsam nach
+  ashpile: { res: 'coal', max: 6, regrow: 0, label: 'Aschehaufen' },  // verschwindet beim Leeren
 };
 
 export class World {
@@ -180,6 +182,8 @@ export class World {
         else if (t !== T.PAVE && r < 0.012) this.addNode('tree', x, y);
         else if ((t === T.DIRT || t === T.DRY || t === T.ASH) && r < 0.024) this.addNode('rock', x, y);
         else if (t === T.GRASS && r < 0.045) this.addNode('bush', x, y);
+        else if (t === T.ASH && r < 0.075) this.addNode('ashpile', x, y);
+        else if ((t === T.GRASS || t === T.DRY) && r < 0.058) this.addNode('herb', x, y);
       }
     }
 
@@ -250,6 +254,20 @@ export class World {
     return this.inBounds(tx, ty) && this.explored[ty * this.w + tx] === 1;
   }
 
+  /** Neue Aschehaufen (Kohle) auf verbrannter Erde – jeden Morgen ein paar. */
+  spawnAshPiles(count) {
+    let made = 0;
+    for (let tries = 0; tries < count * 60 && made < count; tries++) {
+      const x = 1 + Math.floor(Math.random() * (this.w - 2)), y = 1 + Math.floor(Math.random() * (this.h - 2));
+      if (this.tileAt(x, y) !== T.ASH || this.buildingAt[this.idx(x, y)] || this.props[this.idx(x, y)]) continue;
+      const old = this.nodeAtTile(x, y);
+      if (old && !old.removed) continue;
+      this.addNode('ashpile', x, y);
+      made++;
+    }
+    return made;
+  }
+
   nodeAtTile(tx, ty) {
     if (!this.inBounds(tx, ty)) return null;
     const id = this.nodeAt[ty * this.w + tx];
@@ -271,7 +289,7 @@ export class World {
     node.shake = 0.2;
     if (node.amount <= 0) {
       node.timer = 0;
-      if (node.type === 'rock') this.removeNode(node);
+      if (node.type === 'rock' || node.type === 'ashpile') this.removeNode(node);
       else if (node.type === 'tree') this.nodesChanged = this.navDirty = true; // Stumpf blockiert nicht mehr
     }
     return take;
@@ -290,7 +308,7 @@ export class World {
           n.timer = 0;
           this.nodesChanged = this.navDirty = true;
         }
-      } else if (n.type === 'bush' && n.amount < n.max) {
+      } else if ((n.type === 'bush' || n.type === 'herb') && n.amount < n.max) {
         n.timer += dt;
         if (n.timer >= def.regrow) {
           n.amount++;

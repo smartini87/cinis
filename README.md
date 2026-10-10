@@ -34,6 +34,10 @@ URL-Parameter: `?seed=123` erzeugt eine bestimmte Welt, `?play` überspringt das
 | Spieltempo 1× / 2× / 3× | F | Knopf oben rechts |
 | Pause | P oder Esc | Knopf oben rechts |
 | Ton an/aus | M | Knopf oben rechts |
+| Gepäck (Inventar) | I | Knopf „Inventar“ |
+| Fackel an/aus | T | Fackel-Feld antippen |
+| Verband anlegen | Q | Verband-Feld antippen |
+| Herstellen / Handeln | E an Flamme, Werkbank oder Händler | antippen |
 | Hilfe | H | Knopf „?“ |
 | Zoom | Mausrad | – |
 | FPS-Anzeige | F3 | – |
@@ -66,10 +70,36 @@ HUD-Teile, Gebäude und Mechaniken erscheinen erst, wenn sie gebraucht werden, j
 |---|---|
 | **Holz** | Pinien und Zypressen fällen. Stümpfe wachsen nach einiger Zeit nach. |
 | **Stein** | Säulentrümmer in Ruinen brechen. Die Ruinen zerfallen weiter: jeden Morgen entstehen neue Trümmer. |
-| **Nahrung** | Feigensträucher (wachsen nach) und Farmen. |
+| **Nahrung** | Feigensträucher (wachsen nach), Farmen, Jagd |
 | **Wasser** | Am Ufer von Fluss und Teich schöpfen; Brunnen fördern automatisch. |
+| **Fell** | Jagd (Hirsch, Ziege, Wildschwein, Wolf), Kisten, Händler |
+| **Eisenschrott** | Kisten in Ruinen und Lagern, Kolosse und Eliten, Händler |
+| **Stoff** | Kisten, Händler |
+| **Kohle** | Aschehaufen auf verbrannter Erde (jeden Morgen entstehen neue), Aschgänger, Kisten |
+| **Kräuter** | Kräuterbüsche auf Wiesen (wachsen nach), Kisten |
+| **Harz** | Beim Fällen von Pinien (gelegentlich), Kisten |
+| **Bolzen** | An der Flamme hergestellt; Türme verbrauchen einen pro Schuss |
+| **Kräuteröl** | An der Werkbank aus Kräutern und Harz |
 
-Du trägst bis zu 30 Einheiten. In der Nähe der Flamme wird automatisch ins Lager abgeliefert. Baukosten werden zuerst aus dem Lager und dann aus deinem Inventar bezahlt.
+**Gepäck:** Du hast 16 Plätze. Rohstoffe stapeln sich bis 20 pro Platz, Werkzeuge und Ausrüstung brauchen je einen. In der Nähe der Flamme lieferst du Rohstoffe automatisch ab, Gegenstände behältst du. Mit I öffnest du das Gepäck (pausiert das Spiel). Die Leiste unten links zeigt Waffe, Rüstung/Stiefel, Fackeln (T) und Verbände (Q). Baukosten werden zuerst aus dem Lager und dann aus deinem Gepäck bezahlt.
+
+### Herstellen
+An der Ewigen Flamme und an der Werkbank (Taste 7) stellst du mit **E** her. Bezahlt wird aus Lager und Gepäck.
+
+| Station | Rezept | Kosten | Wirkung |
+|---|---|---|---|
+| Flamme | Bolzen ×10 | 3 Holz, 1 Stein | Turm-Munition (ins Lager) |
+| Flamme | Verband ×2 | 1 Stoff, 1 Kräuter | Q: +40 LP |
+| Werkbank | Fackel ×2 | 2 Holz, 1 Stoff, 1 Harz | T: 3 Minuten Licht, Wölfe meiden dich |
+| Werkbank | Axt / Spitzhacke | Holz, Stein, 1 Eisen | Holz bzw. Stein 80 % schneller |
+| Werkbank | Stiefel | 3 Fell, 2 Stoff | +40 Energie, +30 % Erholung |
+| Werkbank | Eisenschwert | 6 Eisen, 2 Holz, 2 Kohle | Schaden 32 statt 20 |
+| Werkbank | Rüstung | 5 Eisen, 3 Fell, 2 Stoff | 30 % weniger Schaden |
+| Werkbank | Kräuteröl | 3 Kräuter, 1 Harz | Brennstoff hoher Flammenstufen |
+
+Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; das kostet anteilig Baumaterial aus dem Lager.
+
+**Händler:** Alle drei Tage schlägt eine Händler-Karawane für anderthalb Tage ihr Lager auf, bevorzugt in einem befreiten Aschgänger-Lager. Sie tauscht Rohstoffe und manchmal einen Bauplan (E zum Handeln, ⚖ auf der Karte).
 
 ### Gebäude
 | Taste | Gebäude | Kosten | Wirkung |
@@ -150,6 +180,8 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 - **Eigene Welt:** Name, Figuren, Gegner und Texte sind eigenständig. Die Karte wird per Seed prozedural erzeugt: Fluss mit Furten, Teich, Römerstraßen, Ruinenfelder und Aschefelder.
 - **Lager an der Flamme:** Die Ewige Flamme ist zugleich Zentrum und einziges Lager. Ressourcen zählen erst nach dem Abliefern.
 - **Einstieg statt Textwand:** Das frühere Tutorial mit mehreren Textseiten ist durch den Questpfad ersetzt. H zeigt nur noch die Tastenübersicht. Der Spielstand speichert den Questschritt und alle Freischaltungen (Format v2). Spielstände der Vorversion sind nicht kompatibel und werden mit einem Hinweis verworfen.
+- **Ausrüstung ohne Ausrüsten:** Werkzeuge, Schwert, Rüstung und Stiefel wirken, solange sie im Gepäck liegen. Fallen und Feuerschalen sind Gebäude (Phase 8), keine Gegenstände. Herstellungs-Stationen öffnen sich nur mit E, damit Leertaste oder Klick im Kampf kein Menü öffnen.
+- **Spielstand v3:** Neue Rohstoffknoten ändern die Weltgenerierung, deshalb werden ältere Spielstände verworfen.
 - **Wildlife:** Tiere entstehen in einem Ring um die Kamera, passend zum Boden und zur Tageszeit, und verschwinden weit außerhalb der Sicht wieder. Es sind höchstens 60 gleichzeitig, davon höchstens 30 dekorative. Deko-Tiere und Tiere außerhalb der Sicht werden vereinfacht aktualisiert. Tiere werden nicht gespeichert. Fell ist eine neue Ressource, für Rezepte ab Phase 7.
 - **Kampfgefühl:** Ein Schwerthieb holt aus, zieht mit Bogenspur durch und lässt die Figur nach vorn ausfallen. Bei Treffern hält das Bild für drei Frames an (Trefferpause), dazu ein leichtes Wackeln, Rückstoß und weißes Aufblitzen. Sammeln braucht gehaltene Taste und zeigt einen Fortschrittsbalken. Das Werkzeug passt zum Ziel (Axt, Spitzhacke, Eimer).
 - **Lesbarkeit:** Der Boden ist bewusst entsättigt und etwas dunkler. Gebäude, Bäume, Felsen und Sträucher haben kräftigere Farben und eine dunkle Kontur. Der Spieler trägt einen hellen Umriss, Siedler einen dunklen, Gegner einen dunkelroten, alle mit Bodenschatten. Das Ziel in Reichweite leuchtet golden und zeigt ein „E“. Liegt die Flamme außerhalb der Sicht, zeigt ein goldener Pfeil am Bildschirmrand dorthin.

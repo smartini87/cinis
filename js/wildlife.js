@@ -750,9 +750,8 @@ export class Wildlife {
     const p = game.player, rest = {};
     let off = 0, left = 0;
     for (const [k, n] of Object.entries(a.def.drop || {})) {
-      const fit = Math.max(0, Math.min(n, p.capacity - p.carried));
+      const fit = n - p.inv.add(k, n);
       if (fit > 0) {
-        p.inv[k] = (p.inv[k] || 0) + fit;
         game.effects.text(a.x, a.y - 14 - off, `+${fit} ${RES[k].name}`, RES[k].color);
         off += 7;
       }

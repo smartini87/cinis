@@ -10,6 +10,18 @@ import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
 import { peekSave } from './save.js';
 import { POI_TYPES } from './pois.js';
+import { Sprites } from './sprites.js';
+import { itemInfo } from './items.js';
+import { RECIPES, STATION_NAMES, recipeName, recipeDesc, recipeUnlocked, craft } from './recipes.js';
+
+/** Warum ein Rezept gesperrt ist (Flammenstufe/Bauplan). */
+function lockText(game, r) {
+  const u = r.unlock || {};
+  const parts = [];
+  if (u.level) parts.push(`Flammenstufe ${u.level}`);
+  if (u.blueprint && !game.progress.blueprints.has(u.blueprint)) parts.push('Bauplan nötig');
+  return 'Gesperrt: ' + parts.join(', ');
+}
 
 const HELP = `
 <table class="keys">
@@ -98,10 +110,14 @@ export class UI {
   buildHud() {
     const hud = (this.hud = el('div', 'hud', this.root));
     // Ressourcen (oben links)
-    const res = (this.resPanel = el('div', 'panel res-panel', hud));
+    // Linke Spalte: Lager und Arbeitsschwerpunkt untereinander (wächst mit der Zahl der Rohstoffe)
+    const leftCol = el('div', 'left-col', hud);
+    const res = (this.resPanel = el('div', 'panel res-panel', leftCol));
     this.resEls = {};
+    this.resRows = {};
+    this.seenRes = new Set(['wood', 'stone', 'food', 'water']);
     for (const k of RES_KEYS) {
-      const row = el('div', 'res-row', res);
+      const row = (this.resRows[k] = el('div', 'res-row', res));
       row.title = RES[k].name;
       const img = el('img', 'icon', row);
       img.src = iconURL(k);
@@ -118,7 +134,7 @@ export class UI {
     this.popLbl = el('span', 'lbl', pop, 'Siedler');
     pop.title = 'Siedler / Plätze. Überlebende findest du in Lagern in der Wildnis – jede Hütte bietet 4 Plätze.';
     // Arbeitsschwerpunkt der Sammler
-    const focus = (this.focusPanel = el('div', 'panel focus-panel', hud));
+    const focus = (this.focusPanel = el('div', 'panel focus-panel', leftCol));
     el('div', 'lbl', focus, 'Siedler sammeln');
     const fb = el('div', 'focus-btns', focus);
     this.focusBtns = {};
@@ -174,10 +190,27 @@ export class UI {
     this.dashBtn.addEventListener('pointerup', up);
     this.dashBtn.addEventListener('pointercancel', up);
     this.dashBtn.addEventListener('pointerleave', up);
-    // Traglast
+    // Gepäck: Belegung, Hotbar (Waffe, Rüstung, Fackel, Verband) und Knopf fürs Inventar
     const carry = (this.carryPanel = el('div', 'panel carry-panel', hud));
-    el('div', 'lbl', carry, 'Getragen');
+    const head = el('div', 'carry-head', carry);
+    this.carryLbl = el('span', 'lbl', head, 'Gepäck');
+    this.bagBtn = el('button', 'bag-btn', head, 'Inventar (I)');
+    this.bagBtn.type = 'button';
+    this.bagBtn.addEventListener('click', () => this.game.toggleInventory());
     this.carryBar = el('div', 'fill', el('div', 'bar', carry));
+    this.hotbar = el('div', 'hotbar', carry);
+    this.hotSlots = {};
+    for (const [key, label, title] of [['weapon', '', 'Waffe (das beste Schwert im Gepäck)'], ['armor', '', 'Rüstung und Stiefel wirken, solange du sie trägst'], ['torch', 'T', 'Fackel: T zündet an bzw. löscht'], ['bandage', 'Q', 'Verband: Q heilt 40 LP']]) {
+      const slot = el('div', 'hslot', this.hotbar);
+      slot.title = title;
+      const img = el('img', 'hicon', slot);
+      img.alt = '';
+      const n = el('span', 'hn', slot);
+      if (label) el('span', 'hk', slot, label);
+      this.hotSlots[key] = { slot, img, n };
+      if (key === 'torch') slot.addEventListener('click', () => this.game.player.toggleTorch(this.game));
+      if (key === 'bandage') slot.addEventListener('click', () => this.game.player.useBandage(this.game));
+    }
     this.carryTxt = el('div', 'carry-txt', carry);
     // Bauleiste (unten Mitte)
     this.buildBar = el('div', 'panel buildbar', hud);
@@ -310,6 +343,13 @@ export class UI {
       m.fillRect(ox - 4, oy - 4, 9, 9);
       m.fillStyle = live ? t.color : 'rgba(160,150,140,0.7)';
       m.fillText(t.icon, ox + 0.5, oy + 1);
+    }
+    if (g.pois.trader) {
+      const t = g.pois.trader;
+      m.fillStyle = 'rgba(0,0,0,0.7)';
+      m.fillRect((t.x / TILE) * k - 4, (t.y / TILE) * k - 4, 9, 9);
+      m.fillStyle = '#ffd36a';
+      m.fillText('⚖', (t.x / TILE) * k + 0.5, (t.y / TILE) * k + 1);
     }
     m.textAlign = 'left';
     m.fillStyle = '#ff4030';
@@ -472,11 +512,13 @@ export class UI {
     if (this.refreshT > 0) return;
     this.refreshT = 0.1;
     const g = this.game, p = g.player;
-    for (const k of RES_KEYS) this.set('res' + k, this.resEls[k], String(Math.floor(g.stock[k])));
-    const c = p.carried;
-    this.set('carryW', this.carryBar.style, `${(c / p.capacity) * 100}%`, 'width');
-    const parts = RES_KEYS.filter((k) => p.inv[k] > 0).map((k) => `${p.inv[k]} ${RES[k].name}`);
-    this.set('carryT', this.carryTxt, `${c}/${p.capacity}` + (parts.length ? ' · ' + parts.join(', ') : ''));
+    for (const k of RES_KEYS) {
+      if (g.stock[k] >= 1 || p.inv.count(k) > 0) this.seenRes.add(k);
+      this.set('res' + k, this.resEls[k], String(Math.floor(g.stock[k])));
+      this.set('resv' + k, this.resRows[k], !this.seenRes.has(k), 'hidden');
+    }
+    this.set('resCompact', this.resPanel, 'panel res-panel' + (this.seenRes.size > 5 ? ' compact' : ''), 'className');
+    this.updateCarry(g, p);
     this.set('hint', this.hint, this.contextHint());
     // Ziel-Banner
     const qb = g.progress && g.progress.banner();
@@ -527,6 +569,135 @@ export class UI {
     }
   }
 
+  /** Gepäck-Leiste: Belegung, Hotbar, Kurzliste der Rohstoffe. */
+  updateCarry(g, p) {
+    const inv = p.inv;
+    this.set('carryL', this.carryLbl, `Gepäck ${inv.used}/${inv.size}`);
+    this.set('carryW', this.carryBar.style, `${(inv.used / inv.size) * 100}%`, 'width');
+    const parts = RES_KEYS.filter((k) => inv.count(k) > 0).map((k) => `${inv.count(k)} ${RES[k].name}`);
+    this.set('carryT', this.carryTxt, parts.join(', '));
+    const hs = this.hotSlots;
+    const icon = (k) => (Sprites.icons[k] ? iconURL(k) : '');
+    this.set('hW', hs.weapon.img, icon(inv.has('ironSword') ? 'ironSword' : 'sword'), 'src');
+    this.set('hWt', hs.weapon.slot, inv.has('ironSword') ? 'Eisenschwert (Schaden 32)' : 'Gladius (Schaden 20)', 'title');
+    const gear = inv.has('armor') ? 'armor' : inv.has('boots') ? 'boots' : null;
+    this.set('hA', hs.armor.img, gear ? icon(gear) : '', 'src');
+    this.set('hAc', hs.armor.slot, 'hslot' + (gear ? '' : ' empty'), 'className');
+    this.set('hAn', hs.armor.n, inv.has('armor') && inv.has('boots') ? '+' : '');
+    this.set('hT', hs.torch.img, icon('torch'), 'src');
+    const torches = inv.count('torch');
+    this.set('hTn', hs.torch.n, p.torchOn ? `${Math.ceil(p.torchT)}s` : torches ? String(torches) : '');
+    this.set('hTc', hs.torch.slot, 'hslot' + (p.torchOn ? ' on' : torches || p.torchT ? '' : ' empty'), 'className');
+    this.set('hB', hs.bandage.img, icon('bandage'), 'src');
+    const band = inv.count('bandage');
+    this.set('hBn', hs.bandage.n, band ? String(band) : '');
+    this.set('hBc', hs.bandage.slot, 'hslot' + (band ? '' : ' empty'), 'className');
+    this.set('bagVis', this.bagBtn, !g.progress.has('hud.inventory'), 'hidden');
+  }
+
+  // ---------------------------------------------------------------- Inventar, Herstellung, Handel
+  /** Raster mit allen Slots; Klick auf Verband/Fackel benutzt sie. */
+  showInventory() {
+    const g = this.game, inv = g.player.inv;
+    const card = this.showOverlay('inventory', `<h2>Gepäck</h2><p class="sub">${inv.used} von ${inv.size} Plätzen belegt · Ausrüstung wirkt, solange du sie trägst · Rohstoffe lieferst du an der Flamme ab</p>`, [
+      { label: 'Schließen (I)', cls: 'primary', onClick: () => g.toggleInventory() },
+    ]);
+    const grid = el('div', 'inv-grid');
+    card.insertBefore(grid, card.querySelector('.btn-row'));
+    const tip = el('div', 'inv-tip', card, 'Fahre über einen Platz, um mehr zu erfahren.');
+    card.insertBefore(tip, card.querySelector('.btn-row'));
+    inv.slots.forEach((sl) => {
+      const cell = el('div', 'inv-slot' + (sl ? '' : ' empty'), grid);
+      if (!sl) return;
+      const info = itemInfo(sl.id);
+      const img = el('img', 'inv-icon', cell);
+      img.src = Sprites.icons[sl.id] ? iconURL(sl.id) : iconURL('bag');
+      img.alt = info.name;
+      if (sl.n > 1) el('span', 'inv-n', cell, String(sl.n));
+      cell.addEventListener('mouseenter', () => (tip.innerHTML = `<b>${info.name}</b>${sl.n > 1 ? ` ×${sl.n}` : ''} – ${info.desc}`));
+      if (sl.id === 'bandage' || sl.id === 'torch') {
+        cell.classList.add('usable');
+        cell.addEventListener('click', () => {
+          if (sl.id === 'bandage') g.player.useBandage(g);
+          else g.player.toggleTorch(g);
+          this.showInventory();
+        });
+      }
+    });
+  }
+
+  /** Herstellungs-Menü einer Station (Flamme, Werkbank, Schmiede). */
+  showCrafting(station) {
+    const g = this.game, B = g.buildings, p = g.player;
+    const card = this.showOverlay('crafting', `<h2>${STATION_NAMES[station]}</h2><p class="sub">Bezahlt wird aus dem Lager und deinem Gepäck.</p>`, [
+      { label: 'Schließen (Esc)', cls: 'primary', onClick: () => g.closePanel() },
+    ]);
+    const list = el('div', 'craft-list');
+    card.insertBefore(list, card.querySelector('.btn-row'));
+    for (const r of RECIPES.filter((x) => x.station === station)) {
+      const unlocked = recipeUnlocked(g, r);
+      const row = el('div', 'craft-row' + (unlocked ? '' : ' locked'), list);
+      const icon = el('img', 'inv-icon', row);
+      const outId = r.out.item || r.out.res;
+      icon.src = Sprites.icons[outId] ? iconURL(outId) : iconURL('bag');
+      const mid = el('div', 'craft-mid', row);
+      el('div', 'craft-name', mid, recipeName(r));
+      el('div', 'craft-desc', mid, unlocked ? recipeDesc(r) : lockText(g, r));
+      const cost = el('div', 'craft-cost', mid);
+      for (const [k, n] of Object.entries(r.cost)) {
+        const have = (g.stock[k] || 0) + p.inv.count(k);
+        const c = el('span', 'c' + (have >= n ? '' : ' miss'), cost);
+        const ci = el('img', 'ci', c);
+        ci.src = iconURL(k);
+        ci.alt = RES[k].name;
+        el('span', '', c, `${n}`);
+        c.title = `${RES[k].name}: ${Math.floor(have)} vorhanden`;
+      }
+      const owned = r.unique && p.inv.has(r.out.item);
+      const btn = el('button', 'mbtn small', row, owned ? 'Vorhanden' : 'Herstellen');
+      btn.type = 'button';
+      btn.disabled = !unlocked || owned || !B.canAfford(g, r.cost);
+      btn.addEventListener('click', () => {
+        const err = craft(g, r);
+        if (err) this.toast(err, 'warn', 'craft');
+        else this.toast(`Hergestellt: ${recipeName(r)}`, 'good');
+        this.showCrafting(station);
+      });
+    }
+  }
+
+  /** Händler: Tauschangebote (aus Lager und Gepäck, Ware ins Gepäck bzw. als Bauplan). */
+  showTrader(trader) {
+    const g = this.game, B = g.buildings;
+    const card = this.showOverlay('crafting', `<h2>Händler</h2><p class="sub">„Gute Ware für gute Ware, Hüter.“ Bezahlt wird aus Lager und Gepäck.</p>`, [
+      { label: 'Schließen (Esc)', cls: 'primary', onClick: () => g.closePanel() },
+    ]);
+    const list = el('div', 'craft-list');
+    card.insertBefore(list, card.querySelector('.btn-row'));
+    trader.offers.forEach((o) => {
+      const row = el('div', 'craft-row' + (o.sold ? ' locked' : ''), list);
+      const icon = el('img', 'inv-icon', row);
+      icon.src = o.blueprint ? iconURL('bag') : iconURL(o.give);
+      const mid = el('div', 'craft-mid', row);
+      el('div', 'craft-name', mid, o.blueprint ? `Bauplan: ${o.label}` : `${o.n} × ${RES[o.give].name}`);
+      const cost = el('div', 'craft-cost', mid);
+      for (const [k, n] of Object.entries(o.cost)) {
+        const have = (g.stock[k] || 0) + g.player.inv.count(k);
+        const c = el('span', 'c' + (have >= n ? '' : ' miss'), cost);
+        const ci = el('img', 'ci', c);
+        ci.src = iconURL(k);
+        el('span', '', c, `${n}`);
+      }
+      const btn = el('button', 'mbtn small', row, o.sold ? 'Verkauft' : 'Tauschen');
+      btn.type = 'button';
+      btn.disabled = o.sold || !B.canAfford(g, o.cost);
+      btn.addEventListener('click', () => {
+        g.pois.trade(g, trader, o);
+        this.showTrader(trader);
+      });
+    });
+  }
+
   /** Kontextabhängiger Steuerungshinweis am unteren Rand. */
   contextHint() {
     const g = this.game, p = g.player, touch = g.input.usingTouch;
@@ -542,7 +713,7 @@ export class UI {
       const rot = bs.selected === 'wall' || bs.selected === 'gate' ? ` · R/Mausrad: Ausrichtung (${bs.rotationLabel})` : '';
       return touch ? `${def.name} – zum Bauen tippen${tail}` : `${def.name} – Klick: Baustelle setzen${bs.selected === 'wall' ? ' (ziehen für Linien)' : ''}${rot}${tail} · Rechtsklick/Esc: abbrechen`;
     }
-    if (p.carried >= p.capacity) return 'Voll beladen – zurück zur Ewigen Flamme, um abzuliefern.';
+    if (p.inv.full) return 'Dein Gepäck ist voll – zurück zur Ewigen Flamme, um Rohstoffe abzuliefern.';
     if (g.enemies.list.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 40)) return `${key} Angreifen`;
     const t = p.target;
     if (t && t.label) return `${touch ? 'Tippen' : '[E/Leertaste]'} ${t.label}`;

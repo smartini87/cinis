@@ -2,13 +2,14 @@
 // Fortschritt, Inventar, Abliefern an der Flamme sowie Tod und Rückkehr an der Flamme.
 
 import {
-  TILE, RES, RES_KEYS, PLAYER_CAPACITY, DEPOSIT_RANGE, GATHER_TIME,
+  TILE, RES, RES_KEYS, DEPOSIT_RANGE, GATHER_TIME,
   PLAYER_HP, PLAYER_DAMAGE, PLAYER_ATTACK_RANGE, PLAYER_ATTACK_TIME, PLAYER_RESPAWN, PLAYER_ACCEL, PLAYER_DECEL,
   DASH, ENERGY,
 } from './config.js';
 import { NODE_DEFS } from './world.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
 import { dist, lerp } from './util.js';
+import { Inventory } from './inventory.js';
 
 /** Partikelfarben beim Abbauen */
 const CHIP_COLORS = {
@@ -16,9 +17,11 @@ const CHIP_COLORS = {
   rock: ['#d8d4ca', '#8e8a80', '#b9b4a8'],
   bush: ['#7a3266', '#3f7234', '#a8579a'],
   water: ['#7fc0ea', '#cfeaf8', '#3f86c0'],
+  herb: ['#6a9a4a', '#a8d080', '#e0e090'],
+  ashpile: ['#3b3634', '#5a5450', '#e8742a'],
 };
 /** Werkzeug in der Hand beim Sammeln */
-const GATHER_ITEM = { tree: 'axe', rock: 'pick', bush: null, water: 'bucket' };
+const GATHER_ITEM = { tree: 'axe', rock: 'pick', bush: null, water: 'bucket', herb: null, ashpile: 'pick' };
 
 /** Angriffs-Zeitleiste in Sekunden */
 const ATK = { windup: 0.09, strike: 0.1, recover: 0.15 };
@@ -42,8 +45,9 @@ export class Player {
     this.moving = false;
     this.aimX = 1;        // Blickrichtung (normiert)
     this.aimY = 0;
-    this.inv = { wood: 0, stone: 0, food: 0, water: 0, hide: 0 };
-    this.capacity = PLAYER_CAPACITY;
+    this.inv = new Inventory();
+    this.torchOn = false;
+    this.torchT = 0;      // Restbrenndauer der aktuellen Fackel
     this.actionT = 0;     // Abklingzeit bis zur nächsten Aktion
     this.atk = null;      // laufender Angriff { t, base, side, hit }
     this.trail = [];      // Klingenspitzen des Schlags (Bogen-Trail)
@@ -84,11 +88,60 @@ export class Player {
   get ty() {
     return Math.floor(this.y / TILE);
   }
+  /** Getragene Rohstoffe (zum Abliefern). */
   get carried() {
-    return RES_KEYS.reduce((s, k) => s + this.inv[k], 0);
+    return this.inv.resources;
   }
   get maxEnergy() {
-    return ENERGY.max + this.energyMods.max;
+    return ENERGY.max + this.energyMods.max + (this.inv.has('boots') ? 40 : 0);
+  }
+  get energyRegenMul() {
+    return this.energyMods.regen * (this.inv.has('boots') ? 1.3 : 1);
+  }
+  /** Schwertschaden (Eisenschwert im Gepäck: stärker). */
+  get damage() {
+    return this.inv.has('ironSword') ? 32 : PLAYER_DAMAGE;
+  }
+  /** Schadensfaktor durch Rüstung. */
+  get armorMul() {
+    return this.inv.has('armor') ? 0.7 : 1;
+  }
+
+  // ---------------------------------------------------------------- Verbrauchsgüter
+  /** Q: Verband anlegen. */
+  useBandage(game) {
+    if (this.dead) return;
+    if (!this.inv.has('bandage')) {
+      game.ui.toast('Kein Verband im Gepäck. Verbände stellst du an der Flamme her.', 'warn', 'bandage');
+      return;
+    }
+    if (this.hp >= this.maxHp) {
+      game.ui.toast('Du bist unverletzt.', 'info', 'bandage');
+      return;
+    }
+    this.inv.remove('bandage', 1);
+    this.hp = Math.min(this.maxHp, this.hp + 40);
+    game.effects.text(this.x, this.y - 22, '+40', '#6fbf5a');
+    game.effects.burst(this.x, this.y - 8, { n: 10, color: ['#e8e2d4', '#6fbf5a'], speed: 25, life: 0.6, up: 20 });
+    game.audio.play('heal');
+  }
+
+  /** T: Fackel anzünden bzw. löschen. */
+  toggleTorch(game) {
+    if (this.torchOn) {
+      this.torchOn = false;
+      return;
+    }
+    if (!this.torchT && !this.inv.has('torch')) {
+      game.ui.toast('Keine Fackel im Gepäck. Fackeln entstehen an der Werkbank.', 'warn', 'torch');
+      return;
+    }
+    if (!this.torchT) {
+      this.inv.remove('torch', 1);
+      this.torchT = 180;
+    }
+    this.torchOn = true;
+    game.audio.play('torch');
   }
 
   update(dt, game) {
@@ -109,6 +162,14 @@ export class Player {
     }
     if (this.invuln > 0) this.invuln -= dt;
     for (const k in this.buffs) if (this.buffs[k] > 0) this.buffs[k] -= dt;
+    if (this.torchOn) {
+      this.torchT -= dt;
+      if (this.torchT <= 0) {
+        this.torchT = 0;
+        this.torchOn = false;
+        game.ui.toast('Deine Fackel ist heruntergebrannt.', 'info', 'torch');
+      }
+    }
     // Langsame Heilung, wenn eine Weile kein Treffer kam
     if (game.time - this.lastHit > 5) this.hp = Math.min(this.maxHp, this.hp + 3 * dt);
 
@@ -172,7 +233,7 @@ export class Player {
     if (this.emptyFlash > 0) this.emptyFlash -= dt;
     this.dashCd -= dt;
     this.regenDelay -= dt;
-    if (this.regenDelay <= 0) this.energy = Math.min(this.maxEnergy, this.energy + ENERGY.regen * this.energyMods.regen * (this.buffs.regen > 0 ? 1.5 : 1) * dt);
+    if (this.regenDelay <= 0) this.energy = Math.min(this.maxEnergy, this.energy + ENERGY.regen * this.energyRegenMul * (this.buffs.regen > 0 ? 1.5 : 1) * dt);
     if (this.requestDash) {
       this.requestDash = false;
       this.tryDash(game, ax, steering);
@@ -288,6 +349,10 @@ export class Player {
       this.resetGather();
       return;
     }
+    if (t.eOnly && !input.isDown('KeyE')) {
+      this.resetGather();
+      return;
+    }
     this.faceTowards(t.x, t.y);
     if (t.act) {
       this.resetGather();
@@ -295,8 +360,9 @@ export class Player {
       this.actionT = 0.35;
       return;
     }
-    if (this.carried >= this.capacity) {
-      game.ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
+    const want = t.kind === 'node' ? NODE_DEFS[t.node.type].res : 'water';
+    if (this.inv.room(want) <= 0) {
+      game.ui.toast('Dein Gepäck ist voll! Bring die Rohstoffe zur Ewigen Flamme.', 'warn', 'full');
       this.actionT = 0.5;
       return;
     }
@@ -308,7 +374,7 @@ export class Player {
       this.gatherT = 0;
       this.gatherKind = kind;
       this.gatherTarget = t;
-      this.gatherDur = GATHER_TIME[kind];
+      this.gatherDur = GATHER_TIME[kind] / ((kind === 'tree' && this.inv.has('axe')) || (kind === 'rock' && this.inv.has('pick')) ? 1.8 : 1);
     }
     this.actionT = 0.01;
   }
@@ -337,24 +403,26 @@ export class Player {
   /** Ertrag einer abgeschlossenen Sammelaktion. */
   harvest(game, t) {
     const { world, effects } = game;
-    if (this.carried >= this.capacity) {
-      game.ui.toast('Voll beladen! Bring die Ressourcen zur Ewigen Flamme.', 'warn', 'full');
-      this.resetGather();
-      return;
-    }
     let res, kind;
     if (t.kind === 'node') {
       kind = t.node.type;
       res = NODE_DEFS[kind].res;
-      if (world.harvest(t.node, 1) <= 0) return;
     } else {
       kind = 'water';
       res = 'water';
     }
-    this.inv[res] += 1;
+    if (this.inv.room(res) <= 0) {
+      game.ui.toast('Dein Gepäck ist voll! Bring die Rohstoffe zur Ewigen Flamme.', 'warn', 'full');
+      this.resetGather();
+      return;
+    }
+    if (t.kind === 'node' && world.harvest(t.node, 1) <= 0) return;
+    this.inv.add(res, 1);
+    // Pinien geben manchmal Harz
+    if (kind === 'tree' && t.node.variant !== 2 && Math.random() < 0.18 && this.inv.add('resin', 1) === 0) effects.text(t.x, t.y - 22, `+1 ${RES.resin.name}`, RES.resin.color);
     game.stats.gathered++;
     game.progress.notify('gather', res, 1);
-    game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water' }[kind]);
+    game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water', herb: 'pick', ashpile: 'mine' }[kind]);
     effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 6, color: CHIP_COLORS[kind], speed: 50, life: 0.5, up: 35 });
     effects.text(t.x, t.y - 14, `+1 ${RES[res].name}`, RES[res].color);
   }
@@ -390,7 +458,7 @@ export class Player {
         const d = Math.max(1, dist(this.x, this.y, e.x, e.y));
         const dot = ((e.x - this.x) * this.aimX + (e.y - this.y) * this.aimY) / d;
         if (dot > 0.2 || d < 10) {
-          game.hitUnit(e, PLAYER_DAMAGE, this.aimX * 7, this.aimY * 7);
+          game.hitUnit(e, this.damage, this.aimX * 7, this.aimY * 7);
           hits++;
         }
       }
@@ -427,13 +495,14 @@ export class Player {
     const drop = {};
     let lost = 0;
     for (const k of RES_KEYS) {
-      const n = Math.ceil(this.inv[k] / 2);
+      const n = Math.ceil(this.inv.count(k) / 2);
       if (n > 0) {
         drop[k] = n;
-        this.inv[k] -= n;
+        this.inv.remove(k, n);
         lost += n;
       }
     }
+    this.torchOn = false;
     if (lost) game.loot.drop(this.x, this.y, drop);
     game.effects.burst(this.x, this.y - 8, { n: 26, color: ['#a8322c', '#b8a04a', '#7a1c18'], speed: 55, life: 0.9 });
     game.effects.burst(this.x, this.y - 6, { n: 30, color: ['#8a8580', '#5a5450', '#b9b4a8'], speed: 14, life: 2.2, up: 26, gravity: -6, drag: 0.4 });
@@ -480,11 +549,12 @@ export class Player {
     game.audio.play('deposit');
     game.progress.notify('deposit', 'all', this.carried);
     for (const k of RES_KEYS) {
-      if (this.inv[k] <= 0) continue;
-      game.stock[k] += this.inv[k];
-      game.effects.text(this.x, this.y - 22 - off, `+${this.inv[k]} ${RES[k].name}`, RES[k].color);
+      const n = this.inv.count(k);
+      if (n <= 0) continue;
+      game.stock[k] += n;
+      game.effects.text(this.x, this.y - 22 - off, `+${n} ${RES[k].name}`, RES[k].color);
       off += 7;
-      this.inv[k] = 0;
+      this.inv.remove(k, n);
     }
   }
 
@@ -517,6 +587,11 @@ export class Player {
       o.arm = o.item ? base + side * sw : base + side * (0.2 + Math.sin(k * Math.PI * 2) * 0.4);
       o.lean = k > 0.65 ? 1 : 0;
       o.dir = 'side';
+    }
+    if (this.torchOn && !o.arm && o.pose !== 'lie') {
+      // Fackel hochgehalten
+      o.item = 'torch';
+      o.arm = this.flip ? Math.PI + 0.9 : -0.9;
     }
     drawHumanoid(ctx, this.x, this.y, o);
     if (blink) ctx.globalAlpha = 1;

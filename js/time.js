@@ -124,7 +124,7 @@ export class Lighting {
     // Lagerfeuer und Signalfeuer der Orte in der Wildnis
     for (const l of game.pois.lights()) light(l.x, l.y, l.r * flick, l.k);
     const p = game.player;
-    if (!p.dead) light(p.x, p.y - 8, 64, 0.85);
+    if (!p.dead) light(p.x, p.y - 8, p.torchOn ? 120 * flick : 64, p.torchOn ? 1 : 0.85);
     for (const pr of game.combat.projectiles) light(pr.x, pr.y, 14, 0.6);
     // Glühende Augen der Gegner bleiben sichtbar
     for (const e of game.enemies.list) light(e.x, e.y - 8, 10, 0.35);

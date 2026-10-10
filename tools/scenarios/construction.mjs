@@ -7,7 +7,7 @@ export default async function (page) {
     const sim = (sec) => { for (let i = 0; i < sec * 60; i++) g.update(1 / 60); };
     for (const n of w.nodes) if (Math.hypot(n.tx - w.cx, n.ty - w.cy) < 12) w.removeNode(n);
     Object.assign(g.stock, { wood: 0, stone: 0, food: 50, water: 50 });
-    for (const k in p.inv) p.inv[k] = 0;
+    p.inv.clear();
     // 1) Ohne Material platzieren
     const hut = B.place(g, 'hut', w.cx + 4, w.cy + 3);
     out.placed = !!hut && !!hut.site;

@@ -6,6 +6,7 @@ import { NODE_DEFS, T } from './world.js';
 import { CENTER_BEDS, BUILDING_DEFS, TERRITORY_CENTER } from './buildings.js';
 import { drawHumanoid, OUTLINE } from './sprites.js';
 import { drawWanderer } from './pois.js';
+import { resolve } from './physics.js';
 import { dist, hash2 } from './util.js';
 
 const NAMES = ['Marcus', 'Livia', 'Gaius', 'Iulia', 'Titus', 'Octavia', 'Lucius', 'Cornelia', 'Quintus', 'Aurelia', 'Decimus', 'Flavia',
@@ -15,7 +16,7 @@ const TUNICS = ['#b8a074', '#8a6a4a', '#7a8a5a', '#6a7a8a', '#9a7a5a', '#a08a6a'
 const HAIR = ['#2a1d14', '#4a3020', '#6b4a2a', '#1d1712', '#8a6a3a', '#5a5048'];
 
 /** Ressource → Knotentyp für Sammelaufträge */
-const RES_NODE = { wood: 'tree', stone: 'rock', food: 'bush' };
+const RES_NODE = { wood: 'tree', stone: 'rock', food: 'bush', coal: 'ashpile', herbs: 'herb' };
 
 /** Eigenschaften gefundener Siedler (kleiner Bonus) */
 export const TRAITS = {
@@ -166,6 +167,11 @@ export class Settlers {
   /** Wartende warten am Lagerfeuer; Folgende laufen dem Spieler nach bis in die Siedlung. */
   updateVisitor(s, dt, game) {
     if (s.hurt > 0) s.hurt -= dt;
+    s.checkT = (s.checkT || 0) - dt;
+    if (s.checkT <= 0) {
+      s.checkT = 0.5;
+      this.unstick(s, game);
+    }
     if (s.mode === 'waiting' && s.wander) {
       // Wanderer: zieht langsam die Straße entlang; bleibt stehen, wenn der Spieler nahe ist und er sich anschließen will
       const p = game.player, cam = game.camera;
@@ -344,12 +350,15 @@ export class Settlers {
   wantedResource(game) {
     if (this.focus !== 'auto') return this.focus;
     const pop = this.colony.length;
-    const want = { wood: 60, stone: 60, food: 12 + pop * 4, water: 12 + pop * 4 };
+    // Kohle und Kräuter erst, wenn es Verwendung gibt (Werkbank bzw. Flammenstufe mit Kohlebedarf)
+    const crafting = game.buildings.count('workbench') > 0 || (game.flame && game.flame.level >= 3);
+    const want = { wood: 60, stone: 60, food: 12 + pop * 4, water: 12 + pop * 4, coal: crafting ? 14 + (game.flame ? game.flame.fuelNeed('coal') * 3 : 0) : 0, herbs: crafting ? 8 : 0 };
     // Mit Farmen/Brunnen übernehmen diese Gebäude die Versorgung größtenteils
     if (game.buildings.count('farm') > 0) want.food *= 0.5;
     if (game.buildings.count('well') > 0) want.water *= 0.5;
     let best = 'wood', bs = Infinity;
     for (const k of GATHER_KEYS) {
+      if (!want[k]) continue;
       const sc = game.stock[k] / want[k];
       if (sc < bs) {
         bs = sc;
@@ -567,6 +576,28 @@ export class Settlers {
     return false;
   }
 
+  /** Rettungsnetz: steckt ein Siedler in einem Hindernis fest, tritt er auf die nächste freie Kachel. */
+  unstick(s, game) {
+    const w = game.world;
+    if (w.passable(s.tx, s.ty, 'friendly')) return;
+    const probe = { x: s.x, y: s.y };
+    resolve(w, probe, s.r, 'friendly');
+    if (Math.hypot(probe.x - s.x, probe.y - s.y) < 0.75) return; // berührt nur den Rand
+    for (let r = 1; r <= 4; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !w.passable(s.tx + dx, s.ty + dy, 'friendly')) continue;
+          const nx = (s.tx + dx + 0.5) * TILE, ny = (s.ty + dy + 0.5) * TILE;
+          s.x = nx;
+          s.y = ny;
+          s.path = null;
+          if (!s.mode) s.task = null;
+          return;
+        }
+      }
+    }
+  }
+
   /** Nacht (bzw. kurz davor) oder Gegner in der Nähe? */
   shouldShelter(s, game) {
     const c = game.cycle;
@@ -635,6 +666,7 @@ export class Settlers {
     s.checkT = (s.checkT || 0) - dt;
     if (s.checkT <= 0) {
       s.checkT = 0.3;
+      this.unstick(s, game);
       if ((!s.task || s.task.type !== 'shelter') && this.shouldShelter(s, game)) {
         this.goShelter(s, game);
         return;
@@ -811,7 +843,7 @@ export class Settlers {
     const t = s.task;
     if (!t || s.moving) return null;
     let item;
-    if (t.type === 'gather') item = { tree: 'axe', rock: 'pick', bush: null }[t.node.type];
+    if (t.type === 'gather') item = { tree: 'axe', rock: 'pick', bush: null, herb: null, ashpile: 'pick' }[t.node.type];
     else if (t.type === 'farm') item = 'hoe';
     else if (t.type === 'water') item = 'bucket';
     else return null;

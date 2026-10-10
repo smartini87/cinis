@@ -395,7 +395,29 @@ export class Enemies {
       game.stats.kills++;
       game.audio.play('enemyDie', 0.6);
     }
+    this.drop(e, game, byPlayer);
     if (e.type === 'boss' && byPlayer) game.ui.toast('Der Prätor der Asche ist gefallen!', 'good');
+  }
+
+  /** Beute: Kolosse und Eliten lassen Eisen fallen, Aschgänger manchmal Kohle. Spieler bekommt sie direkt. */
+  drop(e, game, byPlayer) {
+    if (e.raider && !byPlayer) return;
+    const items = {};
+    const add = (k, n) => n > 0 && (items[k] = (items[k] || 0) + n);
+    if (e.type === 'walker' && Math.random() < 0.2) add('coal', 1);
+    if (e.type === 'dog' && Math.random() < 0.15) add('hide', 1);
+    if (e.type === 'brute') {
+      add('iron', 2);
+      add('coal', 1);
+    }
+    if (e.type === 'boss') {
+      add('iron', 6);
+      add('coal', 4);
+    }
+    if (e.elite) add('iron', 2);
+    if (!Object.keys(items).length) return;
+    if (byPlayer) game.pois.give(game, e.x, e.y, items);
+    else game.loot.drop(e.x, e.y, items);
   }
 
   // ---------------------------------------------------------------- Rendering

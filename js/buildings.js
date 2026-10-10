@@ -14,8 +14,9 @@ export const BUILDING_DEFS = {
   wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 4 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
   tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
   gate: { name: 'Tor', size: 1, hp: 420, cost: { wood: 8, stone: 6 }, key: '6', desc: 'Eigene Leute gehen hindurch, Gegner nicht. Lässt sich in Mauern setzen.' },
+  workbench: { name: 'Werkbank', size: 1, hp: 200, cost: { wood: 24, stone: 8 }, key: '7', desc: 'Hier stellst du Werkzeuge, Fackeln, Ausrüstung und Kräuteröl her (E).' },
 };
-export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate'];
+export const BUILDABLE = ['hut', 'farm', 'well', 'wall', 'tower', 'gate', 'workbench'];
 
 export const WELL_INTERVAL = 9;    // Sekunden pro Wasser
 export const SITE_HP = 0.25;       // Baustellen haben ein Viertel der Lebenspunkte (steigt mit dem Material)
@@ -161,7 +162,7 @@ export class Buildings {
   // ---------------------------------------------------------------- Kosten
   /** Verfügbar = Lager + Spielerinventar. */
   canAfford(game, cost) {
-    return RES_KEYS.every((k) => (cost[k] || 0) <= game.stock[k] + game.player.inv[k]);
+    return RES_KEYS.every((k) => (cost[k] || 0) <= game.stock[k] + game.player.inv.count(k));
   }
 
   pay(game, cost) {
@@ -170,7 +171,7 @@ export class Buildings {
       const fromStock = Math.min(need, game.stock[k]);
       game.stock[k] -= fromStock;
       need -= fromStock;
-      game.player.inv[k] -= need;
+      if (need > 0) game.player.inv.remove(k, need);
     }
   }
 
@@ -295,9 +296,9 @@ export class Buildings {
     const p = game.player;
     let total = 0;
     for (const [k, n] of this.siteMissing(b)) {
-      const fromInv = Math.min(n, p.inv[k] || 0);
+      const fromInv = Math.min(n, p.inv.count(k));
       if (fromInv > 0) {
-        p.inv[k] -= fromInv;
+        p.inv.remove(k, fromInv);
         total += this.deliverTo(game, b, k, fromInv);
       }
     }
@@ -476,8 +477,8 @@ export class Buildings {
       if (b.pulse > 0) b.pulse = Math.max(0, b.pulse - dt * 1.5);
       if (b.spawn > 0) b.spawn -= dt;
       if (b.site) continue; // Baustellen arbeiten nicht und werden nicht repariert
-      // Siedler reparieren tagsüber beschädigte Gebäude (abstrahiert als Regeneration)
-      if (sunny && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
+      // Siedler reparieren tagsüber beschädigte Gebäude – das kostet anteilig Baumaterial aus dem Lager
+      if (sunny && b.hp < b.maxHp) this.repair(b, dt, game);
       if (b.type === 'tower') this.updateTower(b, dt, game);
       if (b.type === 'gate') this.updateGate(b, dt, game);
       if (b.type === 'well') {
@@ -489,6 +490,30 @@ export class Buildings {
         }
       }
     }
+  }
+
+  /**
+   * Reparatur am Tag: je Prozent wiederhergestellter LP ein halbes Prozent der Baukosten (Flamme kostenlos).
+   * Fehlt Material im Lager, ruht die Reparatur.
+   */
+  repair(b, dt, game) {
+    const heal = Math.min(b.maxHp - b.hp, b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
+    if (b.type !== 'center') {
+      const cost = BUILDING_DEFS[b.type].cost, frac = (heal / b.maxHp) * 0.5;
+      b.repairDebt = b.repairDebt || {};
+      for (const [k, n] of Object.entries(cost)) {
+        b.repairDebt[k] = (b.repairDebt[k] || 0) + n * frac;
+        if (b.repairDebt[k] >= 1) {
+          if (game.stock[k] < 1) {
+            b.repairDebt[k] -= n * frac;
+            return; // kein Material: keine Reparatur
+          }
+          game.stock[k] -= 1;
+          b.repairDebt[k] -= 1;
+        }
+      }
+    }
+    b.hp += heal;
   }
 
   /** Tor öffnet sich, wenn eigene Leute in der Nähe sind (rein optisch – passierbar ist es für sie immer). */
@@ -519,6 +544,18 @@ export class Buildings {
       b.cooldown = 0.2;
       return;
     }
+    // Jeder Schuss kostet einen Bolzen aus dem Lager
+    if (game.stock.bolts < 1) {
+      b.noAmmo = true;
+      b.cooldown = 0.5;
+      if (game.time - (game.lastAmmoWarn || -99) > 30) {
+        game.lastAmmoWarn = game.time;
+        game.ui.toast('Den Türmen gehen die Bolzen aus! Stelle an der Flamme neue her (E).', 'danger', 'ammo');
+      }
+      return;
+    }
+    b.noAmmo = false;
+    game.stock.bolts -= 1;
     b.aim = Math.atan2(best.y - 6 - (b.y - 22), best.x - b.x);
     game.combat.fireBolt(b.x, b.y - 22, best, TOWER.damage, TOWER.boltSpeed);
     b.cooldown = TOWER.cooldown;
@@ -548,6 +585,7 @@ export class Buildings {
       case 'wall': return b.rot >= 2 ? Sprites.wallD[0].height : Sprites.wallV.height - 2;
       case 'tower': return Sprites.tower.height - 2;
       case 'gate': return 24;
+      case 'workbench': return Sprites.workbench.height;
       default: return b.size * TILE;
     }
   }
@@ -595,9 +633,20 @@ export class Buildings {
       case 'tower':
         ctx.drawImage(Sprites.tower, x - 2, bottom - Sprites.tower.height + 2);
         drawBallista(ctx, x + 8, bottom - 30, b.aim, b.recoil);
+        if (b.noAmmo && Math.sin(time * 6) > 0) {
+          // keine Munition: rotes Zeichen über dem Turm
+          ctx.fillStyle = '#1d1712';
+          ctx.fillRect(x + 5, bottom - 50, 6, 8);
+          ctx.fillStyle = '#e04030';
+          ctx.fillRect(x + 7, bottom - 49, 2, 4);
+          ctx.fillRect(x + 7, bottom - 44, 2, 1);
+        }
         break;
       case 'gate':
         drawGate(ctx, x, bottom, b.rot, b.open);
+        break;
+      case 'workbench':
+        ctx.drawImage(Sprites.workbench, x - 1, bottom - Sprites.workbench.height + 1);
         break;
     }
     if (b.spawn > 0) ctx.restore();

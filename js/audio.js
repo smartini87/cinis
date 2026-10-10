@@ -217,6 +217,21 @@ export class SoundEngine {
         this.noise(0.06, { vol: v(0.18), freq: 600, type: 'lowpass' });
         this.tone(160, 0.08, { type: 'triangle', vol: v(0.1), slide: 120 });
         break;
+      case 'heal':
+        this.tone(440, 0.2, { type: 'sine', vol: v(0.08), slide: 660 });
+        this.tone(660, 0.25, { type: 'sine', vol: v(0.06), delay: 0.1, slide: 880 });
+        break;
+      case 'torch':
+        this.noise(0.4, { vol: v(0.15), freq: 1200, type: 'bandpass', q: 0.6, attack: 0.05 });
+        break;
+      case 'craft':
+        this.tone(330, 0.07, { type: 'square', vol: v(0.06) });
+        this.noise(0.08, { vol: v(0.15), freq: 2500, type: 'bandpass', q: 2, delay: 0.06 });
+        this.tone(660, 0.15, { type: 'triangle', vol: v(0.08), delay: 0.12 });
+        break;
+      case 'trade':
+        for (let i = 0; i < 3; i++) this.tone(1200 + i * 300, 0.08, { type: 'triangle', vol: v(0.07), delay: i * 0.06 });
+        break;
       case 'gate':
         // knarrende Torflügel
         this.tone(140, 0.22, { type: 'sawtooth', vol: v(0.05), slide: 95 });

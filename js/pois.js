@@ -10,6 +10,18 @@ import { mulberry32 } from './util.js';
 import { Sprites, drawOutlinedImage, drawCampfire, drawHumanoid, OUTLINE } from './sprites.js';
 import { TRAIT_KEYS } from './settlers.js';
 
+/** Tauschangebote des Händlers: give = was er gibt, cost = was er verlangt */
+const TRADE_POOL = [
+  { give: 'iron', n: 3, cost: { food: 12 } },
+  { give: 'cloth', n: 4, cost: { hide: 4 } },
+  { give: 'resin', n: 3, cost: { wood: 15 } },
+  { give: 'coal', n: 5, cost: { stone: 15 } },
+  { give: 'herbs', n: 4, cost: { food: 8 } },
+  { give: 'iron', n: 2, cost: { stone: 12, wood: 6 } },
+  { give: 'hide', n: 3, cost: { food: 10 } },
+  { give: 'bolts', n: 20, cost: { wood: 8, iron: 1 } },
+];
+
 export const POI_TYPES = {
   camp: { name: 'Lager von Überlebenden', icon: '⌂', color: '#9fe0ff' },
   enemyCamp: { name: 'Aschgänger-Lager', icon: '☠', color: '#ff6a4a' },
@@ -40,9 +52,17 @@ let nextId = 1;
 export function ringLoot(ring, mult = 1) {
   const k = (1 + ring * 0.7) * mult;
   const r = (a, b) => Math.round((a + Math.random() * (b - a)) * k);
-  const out = { wood: r(3, 7), stone: r(2, 5), food: r(2, 5) };
-  const hide = Math.round(Math.random() * (ring + 1) * mult * 0.8);
-  if (hide > 0) out.hide = hide;
+  const out = { wood: r(2, 5), stone: r(1, 4), food: r(2, 4) };
+  // seltenere Funde: je weiter außen, desto mehr
+  const extra = (key, chance, a, b) => {
+    if (Math.random() < chance) out[key] = (out[key] || 0) + Math.max(1, r(a, b));
+  };
+  extra('cloth', 0.6, 1, 3);
+  extra('iron', 0.35 + ring * 0.2, 1, 2);
+  extra('coal', 0.4 + ring * 0.15, 1, 3);
+  extra('herbs', 0.4, 1, 2);
+  extra('resin', 0.25 + ring * 0.1, 1, 2);
+  extra('hide', 0.3, 1, 2);
   return out;
 }
 
@@ -53,6 +73,7 @@ export class Pois {
     this.wanderT = 30;
     this.scanT = 0;
     this.version = 0;      // ändert sich, wenn Lichtquellen an/aus gehen
+    this.trader = null;    // Händler-Karawane { x, y, home, until, offers }
   }
 
   byId(id) {
@@ -65,6 +86,7 @@ export class Pois {
     const w = game.world;
     this.list.length = 0;
     this.markers.length = 0;
+    this.trader = null;
     nextId = 1;
     const rng = mulberry32((w.seed ^ 0x9e3779b9) >>> 0);
     let bp = 0;
@@ -211,6 +233,7 @@ export class Pois {
 
   /** Morgen: neue Lager; befriedete Feindlager bekommen nach einem Tag einen Siedler. */
   onDawn(day, game) {
+    if (!this.trader && day >= 2 && day % 3 === 2) this.spawnTrader(game);
     for (const p of this.list) {
       if (p.type === 'enemyCamp' && p.state === 'cleared' && day > p.clearedDay) {
         p.state = 'safe';
@@ -231,6 +254,65 @@ export class Pois {
       const p = this.spawnDynamic(game, 'enemyCamp', ring, { level: lvl, extraGuards: Math.floor(day / 4), blueprint: BP_ORDER[(day / 3) % BP_ORDER.length] });
       if (p) game.ui.toast(`Späher melden ein neues Aschgänger-Lager im ${this.direction(game, p)}.`, 'warn');
     }
+  }
+
+  /** Händler-Karawane: alle drei Tage für anderthalb Tage, bevorzugt in einem befriedeten Feindlager. */
+  spawnTrader(game) {
+    const safe = this.list.filter((o) => o.type === 'enemyCamp' && (o.state === 'safe' || o.state === 'cleared'));
+    let x, y;
+    if (safe.length) {
+      const o = safe[Math.floor(Math.random() * safe.length)];
+      x = o.x + 24;
+      y = o.y + 20;
+    } else {
+      const spot = this.findSpot(game.world, 0);
+      if (!spot) return;
+      x = (spot[0] + 0.5) * TILE;
+      y = (spot[1] + 0.5) * TILE;
+    }
+    const pool = [...TRADE_POOL].sort(() => Math.random() - 0.5).slice(0, 4).map((o) => ({ ...o, cost: { ...o.cost } }));
+    const missing = Object.keys(BLUEPRINTS).filter((k) => !game.progress.blueprints.has(k));
+    if (missing.length) {
+      const bp = missing[Math.floor(Math.random() * missing.length)];
+      pool.push({ blueprint: bp, label: BLUEPRINTS[bp], cost: { wood: 20, stone: 12, hide: 4 } });
+    }
+    this.trader = { x, y, home: { x, y }, until: game.time + 225 * 1.5, offers: pool, t: 0, flip: false, walk: 0, moving: false, id: 9999 };
+    game.ui.toast(`Ein Händler hat im ${this.direction(game, this.trader)} sein Lager aufgeschlagen.`, 'good');
+    game.audio.play('trade');
+  }
+
+  /** Tauschen: bezahlen aus Lager und Gepäck, Ware ins Gepäck bzw. Bauplan. */
+  trade(game, t, o) {
+    if (o.sold) return;
+    if (!game.buildings.canAfford(game, o.cost)) {
+      game.ui.toast('Dafür fehlt dir etwas.', 'warn', 'trade');
+      return;
+    }
+    game.buildings.pay(game, o.cost);
+    o.sold = true;
+    if (o.blueprint) {
+      game.progress.addBlueprint(o.blueprint);
+      game.ui.toast(`<b>Bauplan erworben: ${o.label}</b>`, 'unlock');
+    } else this.give(game, t.x, t.y, { [o.give]: o.n });
+    game.audio.play('trade');
+  }
+
+  updateTrader(dt, game) {
+    const t = this.trader;
+    if (!t) return;
+    if (game.time > t.until) {
+      if (game.camera.visible(t.x, t.y, 1, 1, 40)) game.ui.toast('Der Händler zieht weiter.', 'info');
+      this.trader = null;
+      return;
+    }
+    // gemächlich um den Karren schlendern
+    t.t += dt;
+    const tx = t.home.x + Math.cos(t.t * 0.25) * 14, ty = t.home.y + 10 + Math.sin(t.t * 0.4) * 4;
+    t.moving = Math.hypot(tx - t.x, ty - t.y) > 0.5;
+    if (t.moving) t.flip = tx < t.x;
+    t.x += (tx - t.x) * Math.min(1, dt * 2);
+    t.y += (ty - t.y) * Math.min(1, dt * 2);
+    t.walk += dt * 6;
   }
 
   /** Abenddämmerung: bedrohte Lager werden von Aschgängern heimgesucht. */
@@ -269,6 +351,7 @@ export class Pois {
 
   // ---------------------------------------------------------------- Simulation
   update(dt, game) {
+    this.updateTrader(dt, game);
     this.scanT -= dt;
     if (this.scanT > 0) return;
     this.scanT = 0.25;
@@ -366,7 +449,11 @@ export class Pois {
 
   // ---------------------------------------------------------------- Interaktion
   provider = (game, out) => {
-    const p = game.player;
+    const p = game.player, tr = this.trader;
+    if (tr && Math.abs(tr.x - p.x) < 34 && Math.abs(tr.y - p.y) < 34) {
+      out.push({ kind: 'trader', obj: tr, x: tr.x, y: tr.y, label: 'Mit dem Händler handeln', promptH: 28, reach: 30, prio: -6, eOnly: true,
+        hit: (mx, my) => Math.abs(mx - tr.x) < 8 && my < tr.y + 2 && my > tr.y - 22, act: (g) => g.openTrader(tr) });
+    }
     for (const o of this.list) {
       if (Math.abs(o.x - p.x) > 5 * TILE || Math.abs(o.y - p.y) > 5 * TILE) continue;
       for (const c of o.crates) {
@@ -397,9 +484,8 @@ export class Pois {
     let off = 0, left = 0;
     for (const [k, n] of Object.entries(items)) {
       if (!n) continue;
-      const fit = Math.max(0, Math.min(n, p.capacity - p.carried));
+      const fit = n - p.inv.add(k, n);
       if (fit > 0) {
-        p.inv[k] = (p.inv[k] || 0) + fit;
         game.effects.text(x, y - 14 - off, `+${fit} ${RES[k].name}`, RES[k].color);
         off += 7;
       }
@@ -503,6 +589,12 @@ export class Pois {
     for (const m of this.markers) {
       if (cam.visible(m.x - 4, m.y - 14, 8, 14)) out.push({ y: m.y, draw: () => ctx.drawImage(Sprites.milestone, Math.round(m.x - 3), Math.round(m.y - 12)) });
     }
+    const tr = this.trader;
+    if (tr && cam.visible(tr.home.x - 30, tr.home.y - 40, 60, 60)) {
+      const spr = Sprites.tent;
+      out.push({ y: tr.home.y - 2, draw: () => ctx.drawImage(spr, Math.round(tr.home.x - spr.width / 2), Math.round(tr.home.y - spr.height)) });
+      out.push({ y: tr.y, draw: () => drawHumanoid(ctx, tr.x, tr.y, { flip: tr.flip, walk: tr.moving ? tr.walk : 0, breath: time, tunic: '#6a3a7a', skin: '#c99a6e', hair: '#2a1d14', belt: '#c9a24a', outline: glowFor(tr, time) > 0 ? '#ffd36a' : OUTLINE.settler, item: 'staff', arm: tr.flip ? Math.PI * 0.6 : Math.PI * 0.4 }) });
+    }
   }
 
   drawBox(ctx, spr, c, glow) {
@@ -518,6 +610,16 @@ export class Pois {
       discovered: o.discovered, state: o.state, lit: o.lit, lastPray: o.lastPray, clearedDay: o.clearedDay, ambushed: !!o.ambushed,
       threat: o.threat, fire: o.fire ? o.fire.lit : null, crates: o.crates.map((c) => (c.opened ? 1 : 0)), chest: o.chest ? (o.chest.opened ? 1 : 0) : -1,
     }));
+  }
+
+  serializeTrader(game) {
+    const t = this.trader;
+    return t ? { x: t.home.x, y: t.home.y, left: t.until - game.time, offers: t.offers } : null;
+  }
+
+  restoreTrader(game, d) {
+    if (!d) return;
+    this.trader = { x: d.x, y: d.y, home: { x: d.x, y: d.y }, until: game.time + d.left, offers: d.offers, t: 0, flip: false, walk: 0, moving: false, id: 9999 };
   }
 
   restore(game, data) {

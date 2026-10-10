@@ -16,15 +16,26 @@ export const RES = {
   food: { name: 'Nahrung', color: '#c27ab3' },
   water: { name: 'Wasser', color: '#7fc0ea' },
   hide: { name: 'Fell', color: '#c9a87a' },
+  iron: { name: 'Eisenschrott', color: '#a8b0b8' },
+  cloth: { name: 'Stoff', color: '#d8c8a8' },
+  coal: { name: 'Kohle', color: '#8a8580' },
+  herbs: { name: 'Kräuter', color: '#8ac070' },
+  resin: { name: 'Harz', color: '#e0a040' },
+  bolts: { name: 'Bolzen', color: '#c9a87a' },
+  oil: { name: 'Kräuteröl', color: '#c8d060' },
 };
-export const RES_KEYS = ['wood', 'stone', 'food', 'water', 'hide'];
+/** Alles, was im Lager an der Flamme liegen kann */
+export const RES_KEYS = ['wood', 'stone', 'food', 'water', 'hide', 'iron', 'cloth', 'coal', 'herbs', 'resin', 'bolts', 'oil'];
 /** Was Siedler selbst sammeln */
-export const GATHER_KEYS = ['wood', 'stone', 'food', 'water'];
+export const GATHER_KEYS = ['wood', 'stone', 'food', 'water', 'coal', 'herbs'];
 
-export const START_STOCK = { wood: 15, stone: 10, food: 20, water: 20, hide: 0 };
+export const START_STOCK = { wood: 15, stone: 10, food: 20, water: 20, hide: 0, iron: 0, cloth: 0, coal: 0, herbs: 0, resin: 0, bolts: 30, oil: 0 };
+/** Größe des Spieler-Inventars (Slots) und Stapelgröße für Rohstoffe */
+export const INV_SLOTS = 16;
+export const RES_STACK = 20;
 
 // Spieler
-export const PLAYER_CAPACITY = 30;   // maximale Traglast
+export const PLAYER_CAPACITY = 30;   // (veraltet) früher: maximale Traglast – heute begrenzen Inventar-Slots
 export const PLAYER_ACCEL = 700;     // Beschleunigung (Welteinheiten/s²)
 export const PLAYER_DECEL = 1000;    // Abbremsen ohne Eingabe
 export const PLAYER_REACH = 22;
@@ -34,7 +45,7 @@ export const DASH = { cost: 30, time: 0.2, speed: 270, cooldown: 0.35, iframes: 
 export const ENERGY = { max: 100, regen: 30, delay: 0.8, sprintCost: 18, sprintMul: 1.5, sprintAfter: 0.25 };      // Reichweite für Sammeln (Welteinheiten)
 export const DEPOSIT_RANGE = 20;     // Abstand zur Flamme, ab dem automatisch abgeliefert wird
 /** Sammelintervall pro Zieltyp in Sekunden */
-export const GATHER_TIME = { tree: 0.55, rock: 0.7, bush: 0.4, water: 0.45 };
+export const GATHER_TIME = { tree: 0.55, rock: 0.7, bush: 0.4, water: 0.45, herb: 0.5, ashpile: 0.65 };
 
 // Siedler
 export const SETTLER = {

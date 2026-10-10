@@ -90,7 +90,7 @@ export class Interact {
   }
 }
 
-const NODE_LABEL = { tree: 'Holz fällen', rock: 'Stein brechen', bush: 'Feigen pflücken' };
+const NODE_LABEL = { tree: 'Holz fällen', rock: 'Stein brechen', bush: 'Feigen pflücken', herb: 'Kräuter sammeln', ashpile: 'Kohle schürfen' };
 
 /** Ressourcenknoten im Umkreis von 2 Kacheln. */
 function nodeProvider(game, out) {

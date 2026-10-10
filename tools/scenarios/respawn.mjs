@@ -35,7 +35,7 @@ export default async function (page) {
     g.update(1 / 60);
     Object.assign(p.inv, { wood: 10, stone: 6, food: 0, water: 0 });
     p.die(g);
-    return { piles: g.loot.piles.length, pile: g.loot.piles[0] && g.loot.piles[0].items, inv: { ...p.inv }, x: p.x, y: p.y };
+    return { piles: g.loot.piles.length, pile: g.loot.piles[0] && g.loot.piles[0].items, inv: { wood: p.inv.wood, stone: p.inv.stone }, x: p.x, y: p.y };
   });
   await sim(4);
   await freeze(true);

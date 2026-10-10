@@ -302,3 +302,60 @@ html, body {
 }
 .intro-lines p.typing::after { content: '▌'; color: #f0a53a; animation: pulse 0.6s infinite; }
 .intro-skip { position: absolute; bottom: 18px; right: 22px; font-size: 13px; color: rgba(230, 220, 200, 0.55); letter-spacing: 1px; }
+
+/* ---------------------------------------------------------------- Gepäck, Hotbar, Inventar, Herstellung */
+.carry-head { display: flex; justify-content: space-between; align-items: center; }
+.bag-btn {
+  font: inherit; font-size: 11px; padding: 1px 6px; background: #2a231d; color: #efe6d2; border: 1px solid #4a3c28;
+  border-radius: 3px; cursor: pointer; pointer-events: auto;
+}
+.bag-btn:hover { border-color: #b08a4a; }
+.hotbar { display: flex; gap: 4px; margin-top: 2px; }
+.hslot {
+  position: relative; width: 30px; height: 30px; background: #221c17; border: 1px solid #4a3c28; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center; pointer-events: auto;
+}
+.hslot.empty .hicon { opacity: 0.25; }
+.hslot.on { border-color: #ffb040; box-shadow: 0 0 8px rgba(255, 176, 64, 0.7); }
+.hicon { width: 20px; height: 20px; image-rendering: pixelated; }
+.hicon[src=""] { visibility: hidden; }
+.hn { position: absolute; right: 1px; bottom: -1px; font-size: 10px; color: #fff3c4; text-shadow: 1px 1px 0 #000; }
+.hk { position: absolute; left: 2px; top: -1px; font-size: 9px; color: #b9a988; }
+.carry-txt { font-size: 11px; color: #d9cba8; margin-top: 3px; }
+.carry-txt:empty { display: none; }
+.card .sub { font-size: 13px; color: #b9a988; margin-top: -4px; }
+.inv-grid { display: grid; grid-template-columns: repeat(4, 54px); gap: 6px; justify-content: center; margin: 8px 0; }
+.inv-slot {
+  position: relative; width: 54px; height: 54px; background: #221c17; border: 1px solid #5a4630; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+}
+.inv-slot.empty { opacity: 0.45; }
+.inv-slot.usable { cursor: pointer; border-color: #8a6a3a; }
+.inv-slot:hover { border-color: #ffd36a; }
+.inv-icon { width: 30px; height: 30px; image-rendering: pixelated; }
+.inv-n { position: absolute; right: 4px; bottom: 2px; font-size: 13px; color: #fff3c4; text-shadow: 1px 1px 0 #000; }
+.inv-tip { min-height: 2.6em; font-size: 13px; color: #e6dcc6; }
+.craft-list { display: flex; flex-direction: column; gap: 6px; text-align: left; margin: 8px 0; max-height: 52vh; overflow: auto; }
+.craft-row { display: flex; align-items: center; gap: 10px; background: #221c17; border: 1px solid #4a3c28; border-radius: 4px; padding: 6px 8px; }
+.craft-row.locked { opacity: 0.5; }
+.craft-mid { flex: 1; }
+.craft-name { color: #ffd36a; font-size: 15px; }
+.craft-desc { font-size: 12px; color: #b9a988; }
+.craft-cost { display: flex; gap: 8px; font-size: 13px; margin-top: 2px; }
+.craft-cost .c { display: flex; align-items: center; gap: 2px; }
+.craft-cost .c.miss { color: #e07060; }
+.craft-cost .ci { width: 14px; height: 14px; image-rendering: pixelated; }
+.mbtn.small { width: auto; font-size: 14px; padding: 6px 12px; }
+.mbtn:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 640px) { .inv-grid { grid-template-columns: repeat(4, 46px); } .inv-slot { width: 46px; height: 46px; } }
+
+/* ---------------------------------------------------------------- Linke Spalte (Lager + Arbeitsschwerpunkt) */
+.left-col { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.left-col > .panel { position: static; }
+.left-col > .focus-panel { pointer-events: auto; }
+.res-panel.compact { display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 1px; }
+.res-panel.compact .res-row .lbl { display: none; }
+.res-panel.compact .res-row .val { font-size: 15px; min-width: 30px; }
+.res-panel.compact .pop-row { grid-column: 1 / span 2; }
+.res-panel.compact .pop-row .lbl { display: inline; }
+.res-panel.compact .icon { width: 18px; height: 18px; }

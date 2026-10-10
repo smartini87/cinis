@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
@@ -37,12 +37,15 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `enemies.js` | Gegnertypen, Wellenplanung `waveFor(n)`, Gegner-KI (Flussfeld → Flamme, Gebäude/Einheiten angreifen), Sonnenbrand, Randindikatoren |
 | `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
-| `save.js` | Spielstand in localStorage (`cinis.save.v2`, v1 wird verworfen): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
+| `save.js` | Spielstand in localStorage (`cinis.save.v3`, ältere werden verworfen): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
 | `particles.js` | Partikel, `converge` (Funken fliegen zu einem Punkt), `corpse` (zerfallende Figuren), schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
 | `wildlife.js` | Tiere: `ANIMAL_DEFS` (game/neutral/hostile/deco), Spawn im Ring nach Biom/Tageszeit, Statemachine (Flucht, Herde, Charge, Rudeljagd, Licht meiden), Deko vereinfacht, Beute ins Inventar, Klänge |
 | `progress.js` | Freischaltungen (`UNLOCKS`, `game.progress.has/unlock`) und Einstiegs-Questpfad (`QUESTS`: text/start/done/progress/target/finish), Ziel-Banner und Marker |
 | `intro.js` | Intro-Sequenz (Zustand `intro`): Schreibmaschinentext, Kamerafahrt mit Parallax, Ankunft mit Funken/Aufstehen; überspringbar |
 | `pois.js` | Orte in der Wildnis (deterministisch aus Seed, 3 Ringe): Lager (wartende Siedler), Feindlager (Wächter `e.guard`, Truhe + Bauplan), Verlies, Schrein, Signalfeuer, Wagen (Hinterhalt), Wanderer, Meilensteine; Entdecken, Lichter, Rauch, Krähen, Speichern |
+| `items.js` | Gegenstände (`ITEMS`) und `itemInfo(id)` für Rohstoffe und Gegenstände |
+| `inventory.js` | Slot-Inventar (`add/remove/count/room`, Kurzzugriffe `inv.wood`) |
+| `recipes.js` | Rezepte je Station (`RECIPES`, `craft`, `recipeUnlocked`) |
 | `loot.js` | Beutehaufen am Boden (`game.loot.drop`), Interaktions-Provider „Beute aufheben“, Speichern |
 | `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
@@ -66,6 +69,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - Mauern/Tore haben `rot` (0 waagerecht, 1 senkrecht, 2 ↘, 3 ↗; Tore nur 0/1). `buildings.place(game, type, tx, ty, rot)`; Linien über `lineTiles`/`placeTiles`.
 - `buildings.place` legt immer eine Baustelle an; `count()`/`ofType()` zählen nur fertige Gebäude (`countAll` inkl. Baustellen). Tests, die fertige Gebäude brauchen, rufen `buildings.finishAllSites(game)`.
 - Siedler mit `mode` ('waiting'/'follow') gehören nicht zur Kolonie – Kolonie immer über `settlers.colony`.
+- Spieler-Inventar nur über `player.inv` (Slots). Beute an den Spieler über `pois.give(game, x, y, items)` (Überschuss wird zum Beutehaufen).
+- Panels (Inventar, Herstellen, Handel) pausieren über `game.openPanel/closePanel`.
 - Neue Gebäude/HUD-Teile/Mechaniken immer über `progress` freischalten (`UNLOCKS`-Eintrag); gesperrte Gebäude erscheinen nicht in der Bauleiste und lassen sich nicht platzieren.
 - Treffbares: `game.forEachHittable` / `game.hittables()` (Gegner + Tiere), Treffer immer über `game.hitUnit`. Kampflärm `game.noise(x, y, r)`, Licht `game.lightAt(x, y)`.
 - Dash per Shift-Flanke in `handleFrameInput` → `player.requestDash`; Bewegung über `moveEntity` (Substeps), Tore passierbar.

@@ -59,6 +59,19 @@ class Game {
     this.interact.addProvider((g, out) => g.pois.provider(g, out));
     this.interact.addProvider((g, out) => g.buildings.provider(g, out));
     this.interact.addProvider((g, out) => {
+      // Herstellungs-Stationen (nur mit E, damit Leertaste/Klick beim Kämpfen nichts öffnet)
+      const p = g.player, c = g.buildings.center;
+      if (c && Math.abs(c.x - p.x) < 48 && Math.abs(c.y - p.y) < 48) {
+        out.push({ kind: 'station', obj: c, x: c.x, y: c.y + 20, label: 'Ewige Flamme: herstellen', promptH: 70, reach: 40, prio: 6, eOnly: true,
+          hit: (mx, my) => g.buildings.distTo(c, mx, my) === 0, act: (gg) => gg.openCrafting('flame') });
+      }
+      for (const b of g.buildings.list) {
+        if (b.type !== 'workbench' || b.site || Math.abs(b.x - p.x) > 30 || Math.abs(b.y - p.y) > 30) continue;
+        out.push({ kind: 'station', obj: b, x: b.x, y: b.y + 6, label: 'Werkbank: herstellen', promptH: 26, reach: 26, eOnly: true,
+          hit: (mx, my) => g.buildings.distTo(b, mx, my) === 0, act: (gg) => gg.openCrafting('workbench') });
+      }
+    });
+    this.interact.addProvider((g, out) => {
       // Jagdbare Tiere in Reichweite: Glow + „Jagen“
       const p = g.player;
       for (const a of g.wildlife.list) {
@@ -160,6 +173,36 @@ class Game {
     }
   }
 
+  /** Inventar öffnen/schließen (pausiert das Spiel). */
+  toggleInventory() {
+    if (this.panel === 'inventory') return this.closePanel();
+    if (this.state !== 'playing' || !this.progress.has('hud.inventory')) return;
+    this.openPanel('inventory', () => this.ui.showInventory());
+  }
+
+  openCrafting(station) {
+    this.openPanel('crafting', () => this.ui.showCrafting(station));
+  }
+
+  openTrader(trader) {
+    this.openPanel('trader', () => this.ui.showTrader(trader));
+  }
+
+  openPanel(name, show) {
+    if (this.state !== 'playing' && !this.panel) return;
+    this.buildings.select(null);
+    this.panel = name;
+    this.setState('paused');
+    show();
+    this.audio.play('click');
+  }
+
+  closePanel() {
+    if (!this.panel) return;
+    this.panel = null;
+    this.setState('playing');
+  }
+
   pause() {
     if (this.state !== 'playing') return;
     this.buildings.select(null);
@@ -168,7 +211,10 @@ class Game {
   }
 
   resume() {
-    if (this.state === 'paused') this.setState('playing');
+    if (this.state === 'paused') {
+      this.panel = null;
+      this.setState('playing');
+    }
   }
 
   showHelp() {
@@ -273,6 +319,10 @@ class Game {
       return;
     }
     if (inp.wasPressed('KeyM')) this.toggleSound();
+    if (this.panel) {
+      if (inp.wasPressed('Escape') || (this.panel === 'inventory' && inp.wasPressed('KeyI'))) this.closePanel();
+      return;
+    }
     if (this.state === 'paused' && inp.wasPressed('Escape', 'KeyP')) {
       this.resume();
       return;
@@ -284,6 +334,12 @@ class Game {
     }
     if (inp.wasPressed('KeyF')) this.cycleSpeed();
     if (inp.wasPressed('ShiftLeft', 'ShiftRight')) this.player.requestDash = true;
+    if (inp.wasPressed('KeyI')) {
+      this.toggleInventory();
+      return;
+    }
+    if (inp.wasPressed('KeyT')) this.player.toggleTorch(this);
+    if (inp.wasPressed('KeyQ')) this.player.useBandage(this);
     if (inp.wasPressed('KeyH')) {
       this.showHelp();
       return;
@@ -343,6 +399,11 @@ class Game {
    */
   lightAt(x, y) {
     let best = 0;
+    const p = this.player;
+    if (p.torchOn && !p.dead) {
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < 110) best = (1 - d / 110) * 1.6;
+    }
     for (const s of this.lightSources()) {
       const dx = x - s.x, dy = y - s.y;
       if (dx > s.r || dx < -s.r || dy > s.r || dy < -s.r) continue;
@@ -487,6 +548,7 @@ class Game {
     this.ui.toast(`Tag ${day} von ${WIN_NIGHTS}. Die Asche weicht dem Licht.`, 'good');
     this.audio.play('bell');
     this.world.crumbleRuins(RUBBLE_PER_DAY);
+    this.world.spawnAshPiles(4);
     this.pois.onDawn(day, this);
     if (saveGame(this)) this.ui.toast('Spielstand gesichert.', 'info', 'saved');
   }
@@ -663,6 +725,8 @@ class Game {
       const d = Math.hypot(o.x - p.x, o.y - p.y);
       if (d < 30 * TILE) near.push([d, o]);
     }
+    const tr = this.pois.trader;
+    if (tr) drawEdgeArrow(this.ctx, this.camera, tr.x, tr.y - 8, { color: '#ffd36a', outline: 'rgba(20,10,5,0.8)', size: 0.95, icon: '⚖' });
     near.sort((a, b) => a[0] - b[0]);
     for (const [, o] of near.slice(0, 4)) {
       const t = POI_TYPES[o.type];
