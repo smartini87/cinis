@@ -5,7 +5,7 @@ import { RES, RES_KEYS } from './config.js';
 import { iconURL, buildingPreviewURL } from './sprites.js';
 import { BUILDING_DEFS, BUILDABLE } from './buildings.js';
 import { FOCI } from './settlers.js';
-import { SETTLER, WIN_NIGHTS } from './config.js';
+import { SETTLER, WIN_NIGHTS, TILE } from './config.js';
 import { DAY_LEN, CYCLE } from './time.js';
 import { fmtTime } from './util.js';
 import { peekSave } from './save.js';
@@ -27,6 +27,7 @@ const HELP = `
 <tr><td>X</td><td>Abriss (50 % Rückerstattung)</td></tr>
 <tr><td>F</td><td>Tempo 1× / 2× / 3×</td></tr>
 <tr><td>P / Esc</td><td>Pause</td></tr>
+<tr><td>M</td><td>Ton an/aus</td></tr>
 <tr><td>Mausrad</td><td>Zoom</td></tr>
 <tr><td>H</td><td>Diese Hilfe</td></tr>
 <tr><td>Touch</td><td>Links ziehen = laufen, tippen = Aktion/Bauen</td></tr>
@@ -49,6 +50,11 @@ export class UI {
     this.toastKeys = {};     // Entprellung wiederholter Meldungen
     this.refreshT = 0;
     this.buildHud();
+    // HUD-Knöpfe nach dem Klick entfokussieren, sonst löst die Leertaste (Sammeln) sie erneut aus
+    this.root.addEventListener('click', (e) => {
+      const b = e.target.closest('.hud button');
+      if (b) b.blur();
+    });
   }
 
   buildHud() {
@@ -84,7 +90,7 @@ export class UI {
       b.title = f.id === 'auto' ? 'Siedler sammeln, was am knappsten ist' : `Freie Siedler sammeln vor allem ${f.name}`;
       b.addEventListener('click', () => {
         this.game.settlers.focus = f.id;
-        this.game.audio?.play('click');
+        this.game.audio.play('click');
       });
       this.focusBtns[f.id] = b;
     }
@@ -147,7 +153,7 @@ export class UI {
       }
       btn.addEventListener('click', () => {
         this.game.buildings.select(type);
-        this.game.audio?.play('click');
+        this.game.audio.play('click');
       });
       this.buildBtns[type] = btn;
     }
@@ -156,6 +162,9 @@ export class UI {
     this.speedBtn = el('button', 'cbtn', ctl, '1×');
     this.speedBtn.title = 'Spieltempo (F)';
     this.speedBtn.addEventListener('click', () => this.game.cycleSpeed());
+    this.soundBtn = el('button', 'cbtn', ctl, '♪');
+    this.soundBtn.title = 'Ton an/aus (M)';
+    this.soundBtn.addEventListener('click', () => this.game.toggleSound());
     const pauseBtn = el('button', 'cbtn', ctl, 'Ⅱ');
     pauseBtn.title = 'Pause (P)';
     pauseBtn.addEventListener('click', () => this.game.pause());
@@ -163,12 +172,62 @@ export class UI {
     helpBtn.title = 'Steuerung (H)';
     helpBtn.addEventListener('click', () => this.game.showHelp());
     for (const b of ctl.children) b.type = 'button';
+    // Minikarte (eigenes Canvas, damit Klicks darauf nicht im Spiel landen)
+    this.mini = el('canvas', 'panel minimap', hud);
+    this.mini.width = 192;
+    this.mini.height = 192;
+    this.mini.title = 'Übersichtskarte';
+    this.miniCtx = this.mini.getContext('2d');
+    this.miniBase = null;
+    this.miniWorld = null;
+    this.miniFrame = 0;
     // Hinweiszeile + Meldungen
     this.hint = el('div', 'hint', hud);
     this.toasts = el('div', 'toasts', this.root);
     // Overlay-Ebene für Menüs
     this.overlay = el('div', 'overlay', this.root);
     this.overlay.hidden = true;
+  }
+
+  /** Minikarte zeichnen: Gelände, Gebäude, Siedler, Gegner, Spieler und Sichtbereich. */
+  drawMinimap() {
+    if (this.hud.hidden || ++this.miniFrame % 3) return;
+    const g = this.game, w = g.world, m = this.miniCtx, S = this.mini.width;
+    const k = S / w.w;
+    if (this.miniWorld !== w) {
+      // Grundbild aus dem gerenderten Gelände verkleinern
+      this.miniWorld = w;
+      this.miniBase = document.createElement('canvas');
+      this.miniBase.width = S;
+      this.miniBase.height = S;
+      const bc = this.miniBase.getContext('2d');
+      bc.imageSmoothingEnabled = true;
+      bc.drawImage(w.terrain, 0, 0, S, S);
+    }
+    m.imageSmoothingEnabled = false;
+    m.drawImage(this.miniBase, 0, 0);
+    m.fillStyle = `rgba(6,8,26,${g.cycle.darkness * 0.45})`;
+    m.fillRect(0, 0, S, S);
+    for (const b of g.buildings.list) {
+      m.fillStyle = b.type === 'center' ? '#ffb040' : b.type === 'wall' ? '#d8d4ca' : b.type === 'tower' ? '#ffe08a' : '#c9a27a';
+      m.fillRect(Math.floor(b.tx * k), Math.floor(b.ty * k), Math.ceil(b.size * k), Math.ceil(b.size * k));
+    }
+    m.fillStyle = '#9fe0ff';
+    for (const s of g.settlers.list) if (!s.hidden) m.fillRect(Math.floor((s.x / TILE) * k) - 1, Math.floor((s.y / TILE) * k) - 1, 2, 2);
+    m.fillStyle = '#ff4030';
+    for (const e of g.enemies.list) {
+      const r = e.type === 'boss' ? 4 : 3;
+      m.fillRect(Math.floor((e.x / TILE) * k) - r / 2, Math.floor((e.y / TILE) * k) - r / 2, r, r);
+    }
+    const p = g.player;
+    if (!p.dead) {
+      m.fillStyle = '#fff';
+      m.fillRect(Math.floor((p.x / TILE) * k) - 2, Math.floor((p.y / TILE) * k) - 2, 4, 4);
+    }
+    const cam = g.camera;
+    m.strokeStyle = 'rgba(255,255,255,0.6)';
+    m.lineWidth = 1;
+    m.strokeRect(Math.floor((cam.left / TILE) * k) + 0.5, Math.floor((cam.top / TILE) * k) + 0.5, Math.round((cam.viewW / TILE) * k), Math.round((cam.viewH / TILE) * k));
   }
 
   setHudVisible(v) {
@@ -187,7 +246,7 @@ export class UI {
       const btn = el('button', 'mbtn ' + (b.cls || ''), row, b.label);
       btn.type = 'button';
       btn.addEventListener('click', () => {
-        this.game.audio?.play('click');
+        this.game.audio.play('click');
         b.onClick();
       });
     }
@@ -232,6 +291,7 @@ export class UI {
     this.showOverlay('pause', `<h2>Pause</h2><p>Tag ${g.cycle.day} · ${g.settlers.list.length} Siedler · ${g.stats.kills} Feinde besiegt</p>`, [
       { label: 'Weiter', cls: 'primary', onClick: () => g.resume() },
       { label: 'Steuerung', onClick: () => this.showHelp(() => this.showPause()) },
+      { label: `Ton: ${g.audio.muted ? 'aus' : 'an'}`, onClick: () => { g.toggleSound(); this.showPause(); } },
       { label: 'Speichern &amp; Hauptmenü', onClick: () => g.toMainMenu() },
     ]);
   }
@@ -307,6 +367,8 @@ export class UI {
     this.set('hpW', this.hpBar.style, `${(p.hp / p.maxHp) * 100}%`, 'width');
     this.set('hpT', this.hpTxt, p.dead ? 'gefallen' : `${Math.ceil(p.hp)}`);
     this.set('speed', this.speedBtn, `${g.speed}×`);
+    this.set('sound', this.soundBtn, g.audio.muted ? '✕' : '♪');
+    this.set('soundCls', this.soundBtn, g.audio.muted ? 'cbtn off' : 'cbtn', 'className');
     const st = g.settlers;
     this.set('pop', this.popEl, `${st.list.length}/${st.capacity(g)}`);
     const needy = st.list.filter((s) => s.hunger <= 0 || s.thirst <= 0).length;

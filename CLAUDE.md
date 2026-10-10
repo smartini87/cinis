@@ -10,6 +10,8 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `balance`.
+  Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt).
 - Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt 30 Nächte im Schnelldurchlauf (~15 s) und gibt den Verlauf pro Nacht aus.
 - `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
@@ -32,8 +34,12 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `combat.js` | Turmbolzen, `damageBuilding`, `damageUnit` |
 | `time.js` | Tag/Nacht-Zyklus (`DayCycle`, Ereignisse `onDusk/onNight/onDawn` an `Game`), Lichtkarte (`Lighting`) |
 | `save.js` | Spielstand in localStorage (`cinis.save.v1`): Seed + veränderliche Daten; Autosave alle 30 s, morgens, beim Verlassen |
-| `particles.js` | Partikel + schwebende Texte (`game.effects`) |
-| `ui.js` | DOM-HUD (`#ui`), Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
+| `particles.js` | Partikel + schwebende Texte (`game.effects`); Atmosphäre-Emitter in `Game.ambientEffects` |
+| `audio.js` | `SoundEngine`: alle Klänge per WebAudio synthetisiert (`game.audio.play(name, vol)`), Wind-Ambience, Stummschalten (M) |
+| `ui.js` | DOM-HUD (`#ui`), Minikarte, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü, Pause, Tutorial, Hilfe, Sieg/Niederlage |
+
+## Balancing-Stellschrauben
+- `js/config.js` (Spieler, Siedler, Turm, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP) in `buildings.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.
 
 ## Konventionen
 - Welteinheiten: 1 Kachel = `TILE` (16) Weltpixel; Entitäten haben `x,y` = Fußpunkt in Welteinheiten.

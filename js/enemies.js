@@ -266,7 +266,7 @@ export class Enemies {
     e.cd = def.cd;
     e.attack = 1;
     fn();
-    game.audio?.play(e.type === 'brute' || e.type === 'boss' ? 'smash' : 'claw', 0.5);
+    game.audio.play(e.type === 'brute' || e.type === 'boss' ? 'smash' : 'claw', 0.5);
   }
 
   /** Treffer durch Spieler oder Turm. */
@@ -288,7 +288,7 @@ export class Enemies {
     game.effects.burst(e.x, e.y - 8, { n: big ? 40 : 18, color: ['#5a5450', '#3b3634', '#8a8580', '#e8742a', '#b8401c'], speed: big ? 70 : 45, life: 0.9, up: 25 });
     if (byPlayer) {
       game.stats.kills++;
-      game.audio?.play('enemyDie', 0.6);
+      game.audio.play('enemyDie', 0.6);
     }
     if (e.type === 'boss' && byPlayer) game.ui.toast('Der Prätor der Asche ist gefallen!', 'good');
   }

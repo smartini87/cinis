@@ -13,6 +13,7 @@ import { Enemies } from './enemies.js';
 import { Combat } from './combat.js';
 import { DayCycle, Lighting } from './time.js';
 import { UI } from './ui.js';
+import { SoundEngine } from './audio.js';
 import { saveGame, loadGame, deleteSave } from './save.js';
 import { buildSprites, drawNode } from './sprites.js';
 
@@ -32,6 +33,7 @@ class Game {
     this.speed = 1;       // Spieltempo (1×, 2×, 3×)
     this.saveT = 0;
     buildSprites();
+    this.audio = new SoundEngine();
     this.effects = new Effects();
     this.combat = new Combat();
     this.enemies = new Enemies();
@@ -136,6 +138,12 @@ class Game {
 
   cycleSpeed() {
     this.speed = this.speed >= 3 ? 1 : this.speed + 1;
+    this.audio.play('click');
+  }
+
+  toggleSound() {
+    this.audio.toggle();
+    if (!this.audio.muted) this.audio.play('click');
   }
 
   resize() {
@@ -205,6 +213,7 @@ class Game {
   /** Eingaben mit Flanken (Tastendruck/Klick) – genau einmal pro Frame ausgewertet. */
   handleFrameInput() {
     const inp = this.input;
+    if (inp.wasPressed('KeyM')) this.toggleSound();
     if (this.state === 'paused' && inp.wasPressed('Escape', 'KeyP')) {
       this.resume();
       return;
@@ -251,6 +260,7 @@ class Game {
     this.settlers.update(dt, this);
     this.enemies.update(dt, this);
     this.combat.update(dt, this);
+    this.ambientEffects(dt);
     this.effects.update(dt);
     this.camera.follow(this.player.x, this.player.y - 8, dt);
     // Autospeichern alle 30 Spielsekunden
@@ -261,11 +271,32 @@ class Game {
     }
   }
 
+  /** Atmosphäre: Glut über der Flamme, treibende Ascheflocken, Staub beim Laufen. */
+  ambientEffects(dt) {
+    const fx = this.effects, cam = this.camera, c = this.buildings.center;
+    if (c && c.hp > 0 && cam.visible(c.x, c.y, 1, 1, 64) && Math.random() < dt * 14) {
+      fx.burst(c.x + (Math.random() - 0.5) * 8, c.y - 22, { n: 1, color: ['#ffd36a', '#f0a53a', '#e8742a'], speed: 12, life: 1.4, up: 28, gravity: -12, drag: 0.6 });
+    }
+    // Ascheflocken (nachts dichter)
+    if (Math.random() < dt * (3 + this.cycle.darkness * 6)) {
+      fx.burst(cam.left + Math.random() * cam.viewW, cam.top - 4, { n: 1, color: ['#8a8580', '#b9b4a8', '#5a5450'], speed: 8, life: 6, up: -10, gravity: 4, drag: 0.1 });
+    }
+    const p = this.player;
+    if (p.moving && !p.dead) {
+      p.dustT = (p.dustT || 0) - dt;
+      if (p.dustT <= 0) {
+        p.dustT = 0.22;
+        fx.burst(p.x, p.y, { n: 2, color: ['rgba(160,140,110,0.7)'], speed: 10, life: 0.4, up: 6, gravity: 10 });
+      }
+    }
+    this.audio.setAmbience(this.cycle.darkness);
+  }
+
   // ---------------------------------------------------------------- Spielereignisse
   onDusk(day) {
     this.enemies.planNight(day, this);
     this.ui.toast(`Die Dämmerung naht. Nacht ${day}: ${this.enemies.describePlan()}`, 'warn');
-    this.audio?.play('horn');
+    this.audio.play('horn');
   }
 
   onNight(day) {
@@ -279,7 +310,7 @@ class Game {
       return;
     }
     this.ui.toast(`Tag ${day} von ${WIN_NIGHTS}. Die Asche weicht dem Licht.`, 'good');
-    this.audio?.play('bell');
+    this.audio.play('bell');
     this.settlers.tryArrival(this, 1);
     this.world.crumbleRuins(RUBBLE_PER_DAY);
     if (saveGame(this)) this.ui.toast('Spielstand gesichert.', 'info', 'saved');
@@ -295,7 +326,7 @@ class Game {
     this.buildings.select(null);
     deleteSave();
     this.setState('over');
-    this.audio?.play(result === 'victory' ? 'victory' : 'defeat');
+    this.audio.play(result === 'victory' ? 'victory' : 'defeat');
     // Kurz verzögert, damit der Einsturz bzw. der Morgen noch sichtbar ist
     setTimeout(() => this.ui.showEnd(result), 1200);
   }
@@ -337,13 +368,34 @@ class Game {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawTexts(ctx, camera);
-    if (this.state !== 'menu') this.enemies.drawIndicators(ctx, camera);
+    if (this.state !== 'menu') {
+      this.enemies.drawIndicators(ctx, camera);
+      this.ui.drawMinimap();
+      this.drawJoystick(ctx);
+    }
     this.ui.update(1 / 60);
     if (this.showFps) {
       ctx.fillStyle = '#fff';
       ctx.font = '14px monospace';
       ctx.fillText(`${this.fps.toFixed(0)} FPS`, 10, this.canvas.height - 10);
     }
+  }
+
+  /** Virtueller Joystick bei Touch-Bedienung. */
+  drawJoystick(ctx) {
+    const st = this.input.stick;
+    if (!st.active) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.strokeStyle = 'rgba(255,230,160,0.5)';
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    ctx.arc(st.ox, st.oy, 60 * dpr, 0, Math.PI * 2);
+    ctx.stroke();
+    const dx = st.x - st.ox, dy = st.y - st.oy, l = Math.hypot(dx, dy), k = l > 60 * dpr ? (60 * dpr) / l : 1;
+    ctx.fillStyle = 'rgba(255,230,160,0.45)';
+    ctx.beginPath();
+    ctx.arc(st.ox + dx * k, st.oy + dy * k, 24 * dpr, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   /** Pulsierende Eckklammern um das aktuelle Sammelziel. */

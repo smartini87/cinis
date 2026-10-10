@@ -162,6 +162,8 @@ export class Player {
     }
     this.inv[res] += 1;
     this.actionT = GATHER_TIME[kind];
+    game.stats.gathered++;
+    game.audio.play({ tree: 'chop', rock: 'mine', bush: 'pick', water: 'water' }[kind]);
     effects.burst(t.x, t.y - (kind === 'tree' ? 6 : 2), { n: 5, color: CHIP_COLORS[kind], speed: 45, life: 0.5, up: 35 });
     effects.text(t.x, t.y - 14, `+1 ${RES[res].name}`, RES[res].color);
   }
@@ -184,7 +186,7 @@ export class Player {
       }
     }
     this.actionT = PLAYER_ATTACK_TIME;
-    game.audio?.play(hits ? 'hit' : 'swing');
+    game.audio.play(hits ? 'hit' : 'swing');
     return true;
   }
 
@@ -196,7 +198,7 @@ export class Player {
     for (const k of RES_KEYS) this.inv[k] = 0;
     game.effects.burst(this.x, this.y - 8, { n: 24, color: ['#a8322c', '#b8a04a', '#7a1c18'], speed: 60, life: 0.9 });
     game.ui.toast(`Du bist gefallen!${lost ? ` ${lost} getragene Ressourcen sind verloren.` : ''}`, 'danger');
-    game.audio?.play('death');
+    game.audio.play('death');
   }
 
   respawn(game) {
@@ -221,6 +223,7 @@ export class Player {
   /** Gesamtes Inventar ins Lager der Siedlung legen. */
   deposit(game) {
     let off = 0;
+    game.audio.play('deposit');
     for (const k of RES_KEYS) {
       if (this.inv[k] <= 0) continue;
       game.stock[k] += this.inv[k];

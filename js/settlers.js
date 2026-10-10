@@ -91,6 +91,7 @@ export class Settlers {
       const s = this.spawn(c.x + (Math.random() - 0.5) * 20, c.y + 26);
       game.ui.toast(`${s.name} schließt sich der Siedlung an (−${SETTLER_ARRIVAL_COST} ${RES.food.name}).`, 'good');
       game.effects.burst(s.x, s.y - 8, { n: 10, color: ['#ffd36a', '#fff3c4'], speed: 30, life: 0.8, up: 30 });
+      game.audio.play('arrive');
       n++;
     }
     return n;
@@ -143,7 +144,7 @@ export class Settlers {
     }
     game.effects.burst(s.x, s.y - 6, { n: 16, color: ['#8a1c1c', '#5a5048', '#3b3634'], speed: 50, life: 0.8 });
     game.ui.toast(`${s.name} ist ${how}.`, 'danger');
-    game.audio?.play('death');
+    game.audio.play('death');
     game.stats.lost = (game.stats.lost || 0) + 1;
   }
 
@@ -473,8 +474,8 @@ export class Settlers {
       s.carry = { res, n: (s.carry && s.carry.res === res ? s.carry.n : 0) + got };
       if (game.camera.visible(n.x, n.y, 1, 1, 0)) {
         game.effects.burst(n.x, n.y - 4, { n: 3, color: n.type === 'tree' ? ['#8d6240', '#c49a6a'] : n.type === 'rock' ? ['#d8d4ca', '#8e8a80'] : ['#7a3266', '#3f7234'], speed: 35, life: 0.4, up: 25 });
-        if (n.type === 'tree') game.audio?.play('chop', 0.3);
-        else if (n.type === 'rock') game.audio?.play('mine', 0.3);
+        if (n.type === 'tree') game.audio.play('chop', 0.3);
+        else if (n.type === 'rock') game.audio.play('mine', 0.3);
       }
     }
     if (!s.carry || s.carry.n >= SETTLER.carry || n.amount <= 0 || n.removed) {

@@ -127,12 +127,12 @@ export class Buildings {
     const chk = this.canPlace(type, tx, ty);
     if (!chk.ok) {
       game.ui.toast(chk.reason, 'warn', 'place');
-      game.audio?.play('error');
+      game.audio.play('error');
       return null;
     }
     if (!this.canAfford(game, def.cost)) {
       game.ui.toast(`Nicht genug Ressourcen für ${def.name}.`, 'warn', 'afford');
-      game.audio?.play('error');
+      game.audio.play('error');
       return null;
     }
     this.pay(game, def.cost);
@@ -146,7 +146,7 @@ export class Buildings {
     const b = this.add(type, tx, ty);
     b.spawn = 0.35;
     game.effects.burst(b.x, b.y + (def.size * TILE) / 2 - 2, { n: 14, color: ['#b9a98a', '#8e8a80', '#d8d4ca'], speed: 50, life: 0.6, up: 20 });
-    game.audio?.play('build');
+    game.audio.play('build');
     game.stats.built++;
     return b;
   }
@@ -161,7 +161,7 @@ export class Buildings {
     for (const k of RES_KEYS) game.stock[k] += Math.floor((def.cost[k] || 0) / 2);
     game.effects.burst(b.x, b.y, { n: 18, color: ['#8e8a80', '#6b4a2a', '#b9b4a8'], speed: 60, life: 0.7 });
     game.ui.toast(`${def.name} abgerissen (50 % erstattet).`, 'info');
-    game.audio?.play('demolish');
+    game.audio.play('demolish');
     this.remove(b);
   }
 
@@ -248,7 +248,7 @@ export class Buildings {
     game.combat.fireBolt(b.x, b.y - 22, best, TOWER.damage, TOWER.boltSpeed);
     b.cooldown = TOWER.cooldown;
     b.recoil = 3;
-    if (game.camera.visible(b.x, b.y, 1, 1, 64)) game.audio?.play('bolt', 0.4);
+    if (game.camera.visible(b.x, b.y, 1, 1, 64)) game.audio.play('bolt', 0.4);
   }
 
   // ---------------------------------------------------------------- Rendering

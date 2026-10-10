@@ -53,14 +53,14 @@ export function damageBuilding(game, b, dmg) {
     if (game.time - (game.lastCenterWarn || -99) > 6) {
       game.lastCenterWarn = game.time;
       game.ui.toast('Die Ewige Flamme wird angegriffen!', 'danger');
-      game.audio?.play('alarm');
+      game.audio.play('alarm');
     }
   }
   if (b.hp > 0) return;
   b.hp = 0;
   game.effects.burst(b.x, b.y, { n: 30, color: ['#8e8a80', '#6b4a2a', '#3b3634', '#e8742a'], speed: 70, life: 0.9 });
   game.camera.addShake(4, 0.35);
-  game.audio?.play('collapse');
+  game.audio.play('collapse');
   if (b.type === 'center') {
     game.onCenterDestroyed();
     return;
@@ -82,7 +82,7 @@ export function damageUnit(game, u, dmg, kx = 0, ky = 0) {
   game.effects.burst(u.x, u.y - 8, { n: 5, color: ['#a8322c', '#7a1c18'], speed: 35, life: 0.4 });
   if (u === game.player) {
     game.camera.addShake(3, 0.2);
-    game.audio?.play('hurt');
+    game.audio.play('hurt');
     if (u.hp <= 0) u.die(game);
   }
 }
