@@ -15,7 +15,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`
 - `?play` überspringt das Hauptmenü (vom Smoke-Test genutzt), `?skiptut` schaltet alles frei (ohne Questpfad). Szenarien, die bauen, setzen `export const query = 'skiptut'`.
-- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt den Questpfad und dann endlos (höchstens 60 Nächte) im Schnelldurchlauf (~20–40 s) und gibt den Verlauf pro Nacht aus. `SEED=…` wählt die Welt, `BOT=towers` die Vergleichsstrategie „nur Türme“. Ziel: im Mittel 12–18 Nächte.
+- Balancing: `node tools/smoke-test.mjs tools/scenarios/balance.mjs` – ein Bot spielt den Questpfad und dann endlos (höchstens 60 Nächte) im Schnelldurchlauf (~20–40 s) und gibt den Verlauf pro Nacht aus. `SEED=…` wählt die Welt, `BOT=towers` die Vergleichsstrategie „nur Türme“. Ziel (Mittel über 10 Seeds): gemischt 12–18 Nächte, nur Türme mindestens 3 Nächte weniger.
 - `?intro` erzwingt das Intro.
 - `window.__game` ist die Spielinstanz (für Tests/Debug). `?seed=123` erzwingt eine Welt; der Smoke-Test nutzt `SEED` (Standard 4242).
 - Eingabe-Flanken (`wasPressed`, `mouse.clicked`) nur in `Game.handleFrameInput()` auswerten – sie gelten genau einen Frame.
@@ -54,7 +54,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 | `ui.js` | `drawEdgeArrow` (Randpfeile für Gegner/POIs), DOM-HUD (`#ui`) mit Freischalt-Sichtbarkeit, Ziel-Banner, Bauleiste mit Kategorien, Flammen-/Glut-Anzeige, Gepäck-Hotbar, Minikarte mit Nebel und Orten, Hinweise, Toasts (`game.ui.toast(msg, kind, key)`), Overlays: Hauptmenü (Bestenliste), Pause, Hilfe, Inventar, Herstellen, Flamme, Händler, Game Over |
 
 ## Balancing-Stellschrauben
-- `js/config.js` (Spieler, Siedler, Turm, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP/Freischaltung) in `buildings.js`, `FLAME_LEVELS` in `flame.js`, `RECIPES` in `recipes.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.
+- `js/config.js` (Spieler, Siedler, Turm inkl. steigender Turmkosten `TOWER_COST_FREE/STEP`, Falle `TRAP`, Feuerschale `FIREBOWL_DPS/RADIUS`, Farm, Reparatur, Trümmer pro Tag), `BUILDING_DEFS` (Kosten/LP/Freischaltung) in `buildings.js`, `FLAME_LEVELS` in `flame.js`, `RECIPES` in `recipes.js`, `ENEMY_DEFS` + `waveFor(n)` in `enemies.js`, Tageslängen in `time.js`.
 
 ## Konventionen
 - Welteinheiten: 1 Kachel = `TILE` (16) Weltpixel; Entitäten haben `x,y` = Fußpunkt in Welteinheiten.
