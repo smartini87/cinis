@@ -10,7 +10,7 @@ Single-Player Survival-/Colony-Builder im post-apokalyptischen Rom. HTML5 Canvas
 - `npm install` (einmalig, nur Dev-Abhängigkeit Playwright)
 - `CHROMIUM_PATH=/usr/bin/chromium npm test` → lädt das Spiel headless, läuft kurz herum, bricht bei Konsolenfehlern/Exceptions/404 ab, Screenshot in `tools/out/`.
 - Optionales Szenario: `node tools/smoke-test.mjs tools/scenarios/<name>.mjs` (exportiert `default async (page, ctx)`).
-  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `endless`, `stress` (15 Spielminuten Kollisions-Stresstest), `balance`.
+  Vorhanden: `gather`, `build`, `settlers`, `night`, `menu-save`, `polish` (Audio), `mobile` (390 px + Touch), `collision`, `respawn`, `wildlife`, `progression`, `intro`, `pois`, `construction`, `walls`, `crafting`, `flame`, `endless`, `stress` (15 Spielminuten Kollisions-Stresstest), `tour` (Screenshots für den Spielgefühl-Check: Menü, Intro, erste Minuten, Nacht 1/5, Feindlager, Mauerring – `tools/out/tour-*.png`), `balance`.
   `export const noWalk = true` schaltet das Herumlaufen vor dem Szenario ab.
   Ein Szenario kann mit `export const query = '…'` zusätzliche URL-Parameter verlangen.
   Alle auf einmal: `for s in tools/scenarios/*.mjs; do node tools/smoke-test.mjs $s; done`

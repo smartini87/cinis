@@ -198,6 +198,8 @@ export class Enemies {
   findUnitTarget(e, game, range = null) {
     const def = ENEMY_DEFS[e.type];
     let best = null, bd = range ?? def.aggro;
+    // Lagerwächter lassen wartende Überlebende in Ruhe (nur nächtliche Plünderer überfallen sie)
+    const skipWaiting = e.guard && !e.raider;
     const p = game.player;
     if (!p.dead) {
       const d = dist(e.x, e.y, p.x, p.y);
@@ -207,7 +209,7 @@ export class Enemies {
       }
     }
     for (const s of game.settlers.list) {
-      if (s.hidden) continue;
+      if (s.hidden || (skipWaiting && s.mode === 'waiting')) continue;
       const d = dist(e.x, e.y, s.x, s.y);
       if (d < bd) {
         bd = d;

@@ -361,8 +361,11 @@ export class Pois {
       // Entdecken: in Sichtweite oder auf aufgedeckter Karte
       if (!o.discovered && ((!p.dead && Math.hypot(o.x - p.x, o.y - p.y) < 10 * TILE) || w.isExplored(o.tx, o.ty))) {
         o.discovered = true;
-        game.ui.toast(`Entdeckt: ${POI_TYPES[o.type].name}`, 'info');
-        game.audio.play('discover', 0.6);
+        // Nur wichtige Funde melden; die übrigen erscheinen still auf der Minikarte
+        if (o.type === 'camp' || o.type === 'enemyCamp') {
+          game.ui.toast(`Entdeckt: ${POI_TYPES[o.type].name}`, 'info', 'disc' + o.type);
+          game.audio.play('discover', 0.6);
+        }
       }
       if ((o.type === 'enemyCamp' || o.type === 'vault') && o.state === 'active') {
         const alive = game.enemies.list.some((e) => !e.dead && e.guard && e.guard.poi === o.id && !e.raider);
@@ -382,7 +385,7 @@ export class Pois {
     if (o.fire) o.fire.lit = false;
     this.version++;
     game.stats.camps = (game.stats.camps || 0) + 1;
-    game.ui.toast('Das Aschgänger-Lager ist befreit! Eine Truhe wartet auf dich.', 'good');
+    game.ui.toast('Das Aschgänger-Lager ist befreit! Eine Truhe wartet auf dich.', 'good', 'campCleared');
     game.audio.play('questDone');
     game.effects.burst(o.x, o.y - 6, { n: 30, color: ['#ffd36a', '#fff3c4', '#e8742a'], speed: 50, life: 1, up: 30 });
   }

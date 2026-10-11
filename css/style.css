@@ -56,7 +56,7 @@ html, body {
 .carry-txt { font-size: 13px; }
 
 .hint {
-  position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: 142px; transform: translateX(-50%);
   color: #f5e7c6; font-size: 15px; text-shadow: 0 1px 2px #000, 0 0 6px #000; white-space: nowrap;
 }
 
@@ -254,7 +254,7 @@ html, body {
   .ctl-panel { top: 124px; bottom: auto; right: 10px; }
   .day-panel { bottom: 108px; }
   .hint { bottom: 176px; }
-  .toasts { top: 260px; }
+  .toasts, .toasts.low { top: 260px; }
   .toast { font-size: 13px; }
 }
 
@@ -277,6 +277,7 @@ html, body {
   text-align: center; padding: 6px 16px 7px; border-color: #c08a4a;
 }
 .quest-banner.below { top: 92px; }
+.toasts.low { top: 168px; }
 .quest-lbl { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #ffd36a; }
 .quest-txt { font-size: 16px; color: #fff3c4; }
 .quest-prog { font-size: 13px; color: #d9cba8; }

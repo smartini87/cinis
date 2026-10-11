@@ -297,6 +297,14 @@ export class World {
   }
 
   /** Nachwachsen von Bäumen (aus Stümpfen) und Früchten. */
+  nextToGate(tx, ty) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const b = this.inBounds(tx + dx, ty + dy) && this.buildingAt[this.idx(tx + dx, ty + dy)];
+      if (b && b.type === 'gate') return true;
+    }
+    return false;
+  }
+
   updateNodes(dt) {
     for (const n of this.nodes) {
       if (n.removed) continue;
@@ -304,7 +312,9 @@ export class World {
       const def = NODE_DEFS[n.type];
       if (n.type === 'tree' && n.amount <= 0) {
         n.timer += dt;
-        if (n.timer >= def.regrow) {
+        // Kein Nachwachsen direkt vor Toren (der Durchgang bliebe sonst zugewachsen)
+        if (n.timer >= def.regrow && this.nextToGate(n.tx, n.ty)) n.timer = def.regrow * 0.5;
+        else if (n.timer >= def.regrow) {
           n.amount = n.max;
           n.timer = 0;
           this.nodesChanged = this.navDirty = this.solidAdded = true;

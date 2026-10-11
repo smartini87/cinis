@@ -65,7 +65,9 @@ class Game {
     this.interact.addProvider((g, out) => {
       // Herstellungs-Stationen (nur mit E, damit Leertaste/Klick beim Kämpfen nichts öffnet)
       const p = g.player, c = g.buildings.center;
-      if (c && Math.abs(c.x - p.x) < 48 && Math.abs(c.y - p.y) < 48) {
+      // Die Flamme als Station erst, wenn es dort etwas zu tun gibt (Türme brauchen Bolzen, Entfachen)
+      const flameUseful = g.progress.done || g.progress.has('b:tower');
+      if (c && flameUseful && Math.abs(c.x - p.x) < 48 && Math.abs(c.y - p.y) < 48) {
         out.push({ kind: 'station', obj: c, x: c.x, y: c.y + 20, label: 'Ewige Flamme: Stufe, Brennstoff, Herstellen', promptH: 70, reach: 40, prio: 6, eOnly: true,
           hit: (mx, my) => g.buildings.distTo(c, mx, my) === 0, act: (gg) => gg.openPanel('flame', () => gg.ui.showFlame()) });
       }

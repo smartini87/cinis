@@ -431,7 +431,7 @@ export class Wildlife {
         const blocked = this.move(a, a.cdx, a.cdy, def.run, dt, game);
         if (!a.hitDone) {
           for (const u of [game.player, ...game.settlers.list]) {
-            if (u.dead || u.hidden) continue;
+            if (u.dead || u.hidden || (u.mode === 'waiting' && u !== a.target)) continue;
             if (dist(a.x, a.y, u.x, u.y) < a.r + (u.r || 3) + 3) {
               damageUnit(game, u, def.dmg, a.cdx * 8, a.cdy * 8);
               a.hitDone = true;
@@ -463,7 +463,8 @@ export class Wildlife {
       const p = game.player;
       let tg = null;
       if (!p.dead && dist(a.x, a.y, p.x, p.y) < 2 * TILE) tg = p;
-      for (const s of game.settlers.list) if (!tg && !s.hidden && dist(a.x, a.y, s.x, s.y) < 1.6 * TILE) tg = s;
+      // Wartende Überlebende an ihrem Lagerfeuer reizen das Tier nicht (sie sollen gefunden, nicht überrannt werden)
+      for (const s of game.settlers.list) if (!tg && !s.hidden && s.mode !== 'waiting' && dist(a.x, a.y, s.x, s.y) < 1.6 * TILE) tg = s;
       if (tg) this.provoke(a, tg, game);
     }
     if (a.state === 'idle' || a.state === 'prep' || a.state === 'recover' || a.state === 'charge') {

@@ -298,7 +298,8 @@ export class Settlers {
     if (s.wander) return; // fremde Wanderer zählen nicht als Verlust
     if (s.mode) {
       if (s.poi) game.pois.onRecruit(s.poi, s, game);
-      game.ui.toast(`${s.name} wurde in der Wildnis getötet.`, 'danger');
+      // Nur melden, wen der Spieler schon kennt (gefolgt oder Lager entdeckt)
+      if (s.mode !== 'waiting' || (s.poi && s.poi.discovered)) game.ui.toast(`${s.name} wurde in der Wildnis getötet.`, 'danger');
       return;
     }
     game.ui.toast(`${s.name} ist ${how}.`, 'danger');

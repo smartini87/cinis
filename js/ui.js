@@ -594,6 +594,8 @@ export class UI {
     // Ziel-Banner
     const qb = g.progress && g.progress.banner();
     this.set('qVis', this.quest, !qb, 'hidden');
+    // Meldungen rutschen unter das Ziel-Banner, wenn es unter der Tagesanzeige steht
+    this.set('tLow', this.toasts, 'toasts' + (qb && g.progress.has('hud.clock') ? ' low' : ''), 'className');
     if (qb) {
       this.set('qTxt', this.questTxt, qb.text);
       this.set('qProg', this.questProg, qb.progress);
@@ -858,7 +860,7 @@ export class UI {
     if (p.inv.full) return 'Dein Gepäck ist voll – zurück zur Ewigen Flamme, um Rohstoffe abzuliefern.';
     if (g.enemies.list.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 40)) return `${key} Angreifen`;
     const t = p.target;
-    if (t && t.label) return `${touch ? 'Tippen' : '[E/Leertaste]'} ${t.label}`;
+    if (t && t.label) return `${touch ? 'Tippen' : t.eOnly ? '[E]' : '[E/Leertaste]'} ${t.label}`;
     return '';
   }
 
@@ -873,7 +875,7 @@ export class UI {
       this.toastKeys[key] = now;
     }
     const t = el('div', `toast ${kind}`, this.toasts, msg);
-    while (this.toasts.children.length > 4) this.toasts.firstChild.remove();
+    while (this.toasts.children.length > 3) this.toasts.firstChild.remove();
     setTimeout(() => t.classList.add('out'), 3200);
     setTimeout(() => t.remove(), 3800);
   }
