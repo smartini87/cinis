@@ -1068,25 +1068,56 @@ export function buildingPreviewURL(type) {
  * e: { type, flip, walk, hurt, attack (0..1 Ausholbewegung), burn }
  */
 export function drawEnemy(ctx, e, time, sil = null, outline = null) {
+  // Zustand, der das Aussehen bestimmt, auf wenige ganzzahlige Werte verdichten (Schlüssel für den Sprite-Cache)
+  const x = Math.round(e.x), y = Math.round(e.y);
+  const look = {
+    type: e.type, flip: !!e.flip, white: e.hurt > 0, burn: !!e.burn,
+    step: Math.round(Math.sin(e.walk) * 1.5),
+    lunge: e.attack > 0 ? Math.round(Math.sin(e.attack * Math.PI) * 3) : e.prep ? -Math.round(e.prep * 2) : 0,
+    up: e.type === 'swarm' && Math.sin(time * 26 + x) > 0,
+    h: e.type === 'swarm' ? -6 + Math.round(Math.sin(time * 5 + y) * 1.5) : 0,
+    throwUp: e.type === 'archer' && e.attack > 0.5,
+    blink: (e.type === 'archer' ? (time * 8) % 2 : (time * 4) % 2) < 1,
+    summon: e.ability === 'summon',
+  };
   if (outline && !sil) {
     const big = e.type === 'brute' || e.type === 'boss';
     drawShadow(ctx, e.x, e.y, e.type === 'boss' ? 9 : big ? 7 : e.type === 'dog' || e.type === 'breaker' ? 6 : e.type === 'swarm' ? 2 : 5, 0.36);
-    for (const [dx, dy] of OUTLINE_OFFSETS) drawEnemy(ctx, { ...e, x: e.x + dx, y: e.y + dy }, time, outline);
-    drawEnemy(ctx, e, time, '');
-    return;
   }
-  const x = Math.round(e.x), y = Math.round(e.y);
-  const f = e.flip ? -1 : 1;
-  const white = e.hurt > 0;
+  const key = `${look.type}|${+look.flip}${+look.white}${+look.burn}${+look.up}${+look.throwUp}${+look.blink}${+look.summon}|${look.step}|${look.lunge}|${look.h}|${sil ?? '-'}|${outline && !sil ? outline : '-'}`;
+  let spr = ENEMY_CACHE.get(key);
+  if (!spr) {
+    if (ENEMY_CACHE.size > 3000) ENEMY_CACHE.clear();
+    spr = document.createElement('canvas');
+    spr.width = ENEMY_BOX.w;
+    spr.height = ENEMY_BOX.h;
+    const g = spr.getContext('2d');
+    if (outline && !sil) {
+      for (const [dx, dy] of OUTLINE_OFFSETS) drawEnemyRaw(g, look, ENEMY_BOX.ox + dx, ENEMY_BOX.oy + dy, outline);
+      drawEnemyRaw(g, look, ENEMY_BOX.ox, ENEMY_BOX.oy, '');
+    } else drawEnemyRaw(g, look, ENEMY_BOX.ox, ENEMY_BOX.oy, sil);
+    ENEMY_CACHE.set(key, spr);
+  }
+  ctx.drawImage(spr, x - ENEMY_BOX.ox, y - ENEMY_BOX.oy);
+}
+
+// Zwischenspeicher fertig gezeichneter Gegner-Posen (Offscreen-Canvases); Ursprung = Fußpunkt bei (ox, oy)
+const ENEMY_CACHE = new Map();
+const ENEMY_BOX = { w: 56, h: 52, ox: 28, oy: 44 };
+
+/** Zeichnet die Gegner-Pose `look` mit Fußpunkt (x, y) aus Rechtecken (nur für den Sprite-Cache). */
+function drawEnemyRaw(ctx, look, x, y, sil) {
+  const e = look;
+  const f = look.flip ? -1 : 1;
+  const white = look.white;
   const R = (rx, ry, w, h, c) => {
     if (sil !== null && c.startsWith('rgba(0,0,0')) return; // Schatten nicht in Silhouette/Umriss-Durchgang
     ctx.fillStyle = sil || (white ? '#ffffff' : c);
     ctx.fillRect(f === 1 ? x + rx : x - rx - w, y + ry, w, h);
   };
-  const step = Math.round(Math.sin(e.walk) * 1.5);
-  const lunge = e.attack > 0 ? Math.round(Math.sin(e.attack * Math.PI) * 3) : e.prep ? -Math.round(e.prep * 2) : 0;
-  const eye = e.burn ? '#ffe08a' : '#ff7a2a';
-  switch (e.type) {
+  const { step, lunge } = look;
+  const eye = look.burn ? '#ffe08a' : '#ff7a2a';
+  switch (look.type) {
     case 'walker': {
       // Aschgänger: gebückte, aschgraue Gestalt mit glühenden Augen
       R(-4, -1, 8, 2, 'rgba(0,0,0,0.3)');
@@ -1137,8 +1168,7 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
     }
     case 'swarm': {
       // Aschfalter: flatternde Glutmotte, schwebt über dem Boden
-      const up = Math.sin(time * 26 + x) > 0;
-      const h = -6 + Math.round(Math.sin(time * 5 + y) * 1.5);
+      const { up } = look, h = look.h;
       R(-1, -1, 3, 1, 'rgba(0,0,0,0.25)');
       R(-1, h, 3, 2, '#2a2420');
       R(1, h, 1, 1, eye);
@@ -1170,9 +1200,9 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
       R(-3, -12, 6, 1, '#5a5450');
       R(-2, -16, 5, 4, '#6a6460');
       R(1, -15, 1, 1, eye);
-      const throwUp = e.attack > 0.5;
+      const { throwUp } = look;
       R(3, throwUp ? -17 : -11, 1, throwUp ? 6 : 4, '#6a6460');
-      R(3, throwUp ? -19 : -8, 2, 2, (time * 8) % 2 < 1 ? '#ffd36a' : '#e8742a');
+      R(3, throwUp ? -19 : -8, 2, 2, look.blink ? '#ffd36a' : '#e8742a');
       break;
     }
     case 'boss': {
@@ -1190,7 +1220,7 @@ export function drawEnemy(ctx, e, time, sil = null, outline = null) {
       R(8 + lunge * 2, -30 + lunge, 2, 18, '#9aa0a6');
       R(6 + lunge * 2, -13 + lunge, 6, 2, '#8a7a4a');
       R(-4 + lunge, -29, 9, 7, '#6a6460');
-      R(-5 + lunge, -31, 11, 2, e.ability === 'summon' ? ((time * 4) % 2 < 1 ? '#b060d0' : '#8a3aa0') : (time * 4) % 2 < 1 ? '#f0a53a' : '#e8742a');
+      R(-5 + lunge, -31, 11, 2, look.summon ? (look.blink ? '#b060d0' : '#8a3aa0') : look.blink ? '#f0a53a' : '#e8742a');
       R(1 + lunge, -27, 1, 1, '#ffe08a');
       R(3 + lunge, -27, 1, 1, '#ffe08a');
       break;

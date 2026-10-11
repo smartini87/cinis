@@ -259,4 +259,11 @@ Architektur, Konventionen und Testablauf stehen in [`CLAUDE.md`](CLAUDE.md). Kur
 npm install                                   # nur Dev-Abhängigkeit: Playwright
 CHROMIUM_PATH=/usr/bin/chromium npm test      # Headless-Smoke-Test (Konsole muss fehlerfrei sein)
 node tools/smoke-test.mjs tools/scenarios/balance.mjs   # Balancing-Bot (endlos, höchstens 60 Nächte)
+node tools/smoke-test.mjs tools/scenarios/stress.mjs    # Kollisions-Stresstest (15 Spielminuten)
+node tools/smoke-test.mjs tools/scenarios/perf.mjs      # Bildrate in Nacht 15 (≈110 Gegner, 50 Tiere, 100 Gebäude)
+node tools/smoke-test.mjs tools/scenarios/tour.mjs      # Screenshots für den Spielgefühl-Check (tools/out/tour-*.png)
 ```
+
+### Qualität
+- **Kollision:** `stress.mjs` lässt 15 Spielminuten (5 Minuten bei 3×) mit dashendem Spieler, Siedlern, Mauerring mit Toren, Wölfen und Nachtwellen laufen und prüft in jedem Schritt, dass keine Einheit in einem Collider steckt und keine länger als 3 s festhängt. Neue Einheiten erscheinen auf freien Kacheln, eingeklemmte Teilschritte werden zurückgenommen, Tiere und Lagerwächter weichen aus, wenn sie nicht vorankommen.
+- **Performance:** In Nacht 15 mit rund 110 Gegnern, 50 Tieren und 100 Gebäuden braucht ein Bild im Schnitt etwa 6 ms (95 % unter 10 ms, auch bei 3×; headless mit Software-Rendering). Gegner-Posen werden einmal in Offscreen-Canvases gezeichnet und danach nur kopiert; Gelände, Gebäude und Knoten sind ohnehin vorgerenderte Sprites, gezeichnet wird nur, was im Bild ist, und Nachbarschaftsabfragen laufen über einen Spatial Hash.
