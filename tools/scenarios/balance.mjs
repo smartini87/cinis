@@ -46,10 +46,12 @@ export default async function (page) {
     const ammo = () => {
       const want = 30 + (B.count('tower') + B.count('tower2') * 2) * 10;
       for (let i = 0; i < 20 && g.stock.bolts < want; i++) {
-        if (B.count('forge') && canAfford(recipe('boltsIron').cost) && free('wood') > 15) craft(g, recipe('boltsIron'));
+        if (B.count('forge') && canAfford(recipe('boltsIron').cost) && free('wood') > 8) craft(g, recipe('boltsIron'));
         else if (free('wood') > 24 && free('stone') > 12) craft(g, recipe('bolts'));
         else break;
       }
+      // Holzkohle, wenn Kohle knapp und Holz reichlich ist
+      for (let i = 0; i < 10 && B.count('workbench') && g.stock.coal < 12 + B.count('firebowl') * 2 && free('wood') > 60; i++) craft(g, recipe('charcoal'));
       // Verbände für den Spieler
       if (p.inv.count('bandage') < 2 && canAfford(recipe('bandage').cost)) craft(g, recipe('bandage'));
     };
@@ -92,7 +94,7 @@ export default async function (page) {
       tryPlace('workbench', B.countAll('workbench') ? [] : ring(3, 6));
       if (!B.countAll('storehouse')) tryPlace('storehouse', ring(6, 8));
       if (!B.countAll('forge')) tryPlace('forge', ring(4, 8));
-      const maxTowers = towersOnly ? 200 : 4 + g.flame.level * 2;
+      const maxTowers = towersOnly ? 200 : 4 + g.flame.level;
       while (B.countAll('tower') + B.countAll('tower2') < maxTowers && free('wood') > 40 && free('stone') > 30 && tryPlace('tower', towerSpots)) {}
       if (towersOnly) return;
       while (free('stone') > 20 && tryPlace('gate', gateSpots)) {}

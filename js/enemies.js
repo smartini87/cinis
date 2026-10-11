@@ -1,7 +1,7 @@
 // enemies.js – Gegnertypen, Wellenplanung pro Nacht (steigende Schwierigkeit), Gegner-KI
 // (Flussfeld zur Flamme, Angriff auf Gebäude/Einheiten), Sonnenbrand am Morgen, Zeichnen.
 
-import { TILE, SUN_BURN } from './config.js';
+import { TILE, SUN_BURN, TRAP } from './config.js';
 import { NIGHT_LEN } from './time.js';
 import { drawEnemy, OUTLINE } from './sprites.js';
 import { drawEdgeArrow } from './ui.js';
@@ -219,7 +219,7 @@ export class Enemies {
     return best;
   }
 
-  /** Falle unter dem Gegner auslösen: Schaden und Verlangsamung, nach 3 Auslösungen kaputt. */
+  /** Falle unter dem Gegner auslösen: Schaden und Verlangsamung, nach TRAP.uses Auslösungen kaputt. */
   checkTrap(e, game) {
     const w = game.world, tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
     if (!w.inBounds(tx, ty)) return;
@@ -227,10 +227,10 @@ export class Enemies {
     if (!b || b.type !== 'trap' || b.site || b.dead || (b.cd || 0) > game.time) return;
     b.cd = game.time + 0.8;
     b.uses--;
-    e.slowT = 3;
+    e.slowT = TRAP.slow;
     game.effects.burst(e.x, e.y - 4, { n: 8, color: ['#9aa0a6', '#8a1c1c'], speed: 40, life: 0.4 });
     game.audio.play('trap', 0.6);
-    this.hit(e, 50, game);
+    this.hit(e, TRAP.damage, game);
     if (b.uses <= 0) {
       b.flash = 0.2;
       game.buildings.remove(b);

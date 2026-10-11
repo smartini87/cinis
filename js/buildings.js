@@ -1,7 +1,7 @@
 // buildings.js – Gebäudedefinitionen, Bausystem (Vorschau, Platzierung, Abriss), Belegungsraster,
 // Produktion (Brunnen) und Zeichnen. Das Zentrum (Ewige Flamme) ist das Lager der Siedlung.
 
-import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE, REPAIR_COST } from './config.js';
+import { TILE, RES, RES_KEYS, TOWER, REPAIR_RATE, REPAIR_COST, TOWER_COST_FREE, TOWER_COST_STEP, TRAP, FIREBOWL_DPS, FIREBOWL_RADIUS } from './config.js';
 import { dist } from './util.js';
 import { T } from './world.js';
 import { Sprites, drawFlame, drawCrops, drawBallista, drawGate, drawWall, drawCampfire } from './sprites.js';
@@ -11,15 +11,15 @@ export const BUILDING_DEFS = {
   hut: { name: 'Hütte', size: 2, hp: 180, cost: { wood: 20, stone: 5 }, key: '1', beds: 4, desc: '+4 Siedlerplätze. Siedler schlafen hier geschützt.' },
   farm: { name: 'Farm', size: 2, hp: 120, cost: { wood: 14, water: 6 }, key: '2', desc: 'Ein Siedler baut hier tagsüber Nahrung an.' },
   well: { name: 'Brunnen', size: 1, hp: 150, cost: { stone: 12, wood: 4 }, key: '3', desc: 'Fördert stetig Wasser ins Lager.' },
-  wall: { name: 'Mauer', size: 1, hp: 320, cost: { stone: 3 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
-  tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis.' },
+  wall: { name: 'Mauer', size: 1, hp: 400, cost: { stone: 3 }, key: '4', desc: 'Hält Gegner auf. Eigene Leute passieren das Tor.' },
+  tower: { name: 'Turm', size: 1, hp: 260, cost: { wood: 20, stone: 18 }, key: '5', repairMul: 2, desc: 'Ballista: beschießt Gegner in 6 Feldern Umkreis, verbraucht Bolzen. Ab dem 5. Turm wird jeder weitere teurer.' },
   gate: { name: 'Tor', size: 1, hp: 420, cost: { wood: 8, stone: 6 }, key: '6', desc: 'Eigene Leute gehen hindurch, Gegner nicht. Lässt sich in Mauern setzen.' },
   workbench: { name: 'Werkbank', size: 1, hp: 200, cost: { wood: 24, stone: 8 }, unlock: { level: 2 }, desc: 'Hier stellst du Werkzeuge, Fackeln, Stiefel und Kräuteröl her (E).' },
   storehouse: { name: 'Lagerhaus', size: 2, hp: 260, cost: { wood: 40, stone: 30 }, unlock: { level: 3 }, desc: 'Zweites Lager: Du und deine Siedler liefern auch hier ab – kürzere Wege.' },
-  trap: { name: 'Falle', size: 1, hp: 60, cost: { wood: 6, iron: 2 }, unlock: { blueprint: 'trap' }, desc: 'Gegner, die darüber laufen, nehmen Schaden und werden langsamer. Hält 3 Auslösungen.' },
+  trap: { name: 'Falle', size: 1, hp: 60, cost: { wood: 2, iron: 3 }, unlock: { level: 3, blueprint: 'trap', any: true }, desc: 'Gegner, die darüber laufen, nehmen Schaden und werden langsamer. Hält 5 Auslösungen.' },
   firebowl: { name: 'Feuerschale', size: 1, hp: 150, cost: { stone: 8, iron: 1, coal: 2 }, unlock: { level: 3, blueprint: 'firebowl', any: true }, desc: 'Licht und Brennschaden an Gegnern ringsum. Verbrennt jede Nacht 1 Kohle.' },
   forge: { name: 'Schmiede', size: 2, hp: 320, cost: { wood: 20, stone: 40, iron: 10 }, unlock: { level: 4, blueprint: 'forge' }, desc: 'Eisenschwert und Rüstung schmieden (E).' },
-  tower2: { name: 'Wachturm II', size: 1, hp: 420, cost: { wood: 20, stone: 30, iron: 6 }, unlock: { level: 5 }, upgradeOf: 'tower', desc: '8 Felder Reichweite, Doppelschuss. Auf einen Turm gesetzt kostet er nur die Differenz.' },
+  tower2: { name: 'Wachturm II', size: 1, hp: 420, cost: { wood: 20, stone: 30, iron: 6 }, unlock: { level: 5 }, upgradeOf: 'tower', repairMul: 2, desc: '8 Felder Reichweite, Doppelschuss. Auf einen Turm gesetzt kostet er nur die Differenz.' },
 };
 /** Reihenfolge aller baubaren Gebäude */
 export const BUILDABLE = ['hut', 'farm', 'well', 'storehouse', 'wall', 'gate', 'tower', 'tower2', 'trap', 'firebowl', 'workbench', 'forge'];
@@ -73,7 +73,7 @@ export class Buildings {
       flash: 0, timer: 0, growth: 0, worker: null, aim: -Math.PI / 2, cooldown: 0, recoil: 0,
       sleepers: [], rot: 0, open: 0,
     };
-    if (type === 'trap') b.uses = 3;
+    if (type === 'trap') b.uses = TRAP.uses;
     if (type === 'gate') b.rot = rot ?? this.gateRotation(tx, ty);
     if (type === 'wall') b.rot = rot ?? this.wallRotation(tx, ty);
     this.setTiles(b, b);
@@ -235,9 +235,22 @@ export class Buildings {
   costAt(type, tx, ty) {
     const def = BUILDING_DEFS[type], cost = def.cost;
     const occ = this.world.inBounds(tx, ty) ? this.world.buildingAt[this.world.idx(tx, ty)] : null;
+    if (type === 'tower') return this.towerCost();
     if (!def.upgradeOf || !occ || occ.type !== def.upgradeOf) return cost;
     const out = {};
     for (const k of RES_KEYS) if (cost[k]) out[k] = Math.max(0, cost[k] - (BUILDING_DEFS[def.upgradeOf].cost[k] || 0));
+    return out;
+  }
+
+  /**
+   * Türme werden teurer, je mehr schon stehen: ab dem 5. Turm +60 % der Grundkosten pro weiterem Turm
+   * (Wartung und Bedienung der Ballisten binden Material) – reiner Turm-Spam lohnt sich nicht.
+   */
+  towerCost() {
+    const n = this.countAll('tower') + this.countAll('tower2');
+    const mul = 1 + TOWER_COST_STEP * Math.max(0, n - TOWER_COST_FREE);
+    const out = {};
+    for (const [k, v] of Object.entries(BUILDING_DEFS.tower.cost)) out[k] = Math.round(v * mul);
     return out;
   }
 
@@ -546,7 +559,7 @@ export class Buildings {
   repair(b, dt, game) {
     const heal = Math.min(b.maxHp - b.hp, b.maxHp * REPAIR_RATE * (b.type === 'center' ? 0.5 : 1) * dt);
     if (b.type !== 'center') {
-      const cost = BUILDING_DEFS[b.type].cost, frac = (heal / b.maxHp) * REPAIR_COST;
+      const def = BUILDING_DEFS[b.type], cost = def.cost, frac = (heal / b.maxHp) * REPAIR_COST * (def.repairMul || 1);
       b.repairDebt = b.repairDebt || {};
       for (const [k, n] of Object.entries(cost)) {
         b.repairDebt[k] = (b.repairDebt[k] || 0) + n * frac;
@@ -575,10 +588,10 @@ export class Buildings {
 
   /** Feuerschale: Gegner in der Nähe nehmen Brennschaden. */
   updateFirebowl(b, dt, game) {
-    const r = 3 * TILE;
+    const r = FIREBOWL_RADIUS;
     for (const e of game.enemies.list) {
       if (e.dead || Math.abs(e.x - b.x) > r || Math.abs(e.y - b.y) > r || Math.hypot(e.x - b.x, e.y - b.y) > r) continue;
-      e.hp -= 9 * dt;
+      e.hp -= FIREBOWL_DPS * dt;
       if (Math.random() < dt * 5) game.effects.burst(e.x, e.y - 8, { n: 1, color: ['#ffb040', '#e8742a'], speed: 10, life: 0.5, up: 20, gravity: -20 });
       if (e.hp <= 0) game.enemies.kill(e, game, false);
     }

@@ -243,6 +243,7 @@ export class UI {
     this.buildRow = el('div', 'build-row', this.buildBar);
     this.buildKeys = {};
     this.buildBtns = {};
+    this.costEls = {};
     for (const type of [...BUILDABLE, 'demolish']) {
       const btn = el('button', 'bslot', this.buildRow);
       btn.type = 'button';
@@ -259,13 +260,14 @@ export class UI {
         img.alt = def.name;
         el('div', 'bname', btn, def.name);
         const cost = el('div', 'bcost', btn);
+        this.costEls[type] = {};
         for (const k of RES_KEYS) {
           if (!def.cost[k]) continue;
           const c = el('span', 'c', cost);
           const ic = el('img', 'ci', c);
           ic.src = iconURL(k);
           ic.alt = RES[k].name;
-          el('span', '', c, String(def.cost[k]));
+          this.costEls[type][k] = el('span', '', c, String(def.cost[k]));
         }
         this.buildKeys[type] = el('span', 'bkey', btn, '');
         btn.title = `${def.name}: ${def.desc}`;
@@ -640,8 +642,11 @@ export class UI {
     const bs = g.buildings;
     for (const type of [...BUILDABLE, 'demolish']) {
       const btn = this.buildBtns[type];
-      const cls = 'bslot' + (bs.selected === type ? ' active' : '') + (type !== 'demolish' && !bs.canAfford(g, BUILDING_DEFS[type].cost) ? ' poor' : '');
+      const cost = type === 'demolish' ? null : bs.costAt(type, -1, -1);
+      const cls = 'bslot' + (bs.selected === type ? ' active' : '') + (cost && !bs.canAfford(g, cost) ? ' poor' : '');
       this.set('b' + type, btn, cls, 'className');
+      // Steigende Turmkosten anzeigen
+      if (type === 'tower') for (const [k, n] of Object.entries(cost)) if (this.costEls.tower && this.costEls.tower[k]) this.set('tc' + k, this.costEls.tower[k], String(n));
     }
   }
 

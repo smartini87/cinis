@@ -91,17 +91,18 @@ An der Ewigen Flamme, der Werkbank (ab Flammenstufe 2) und der Schmiede stellst 
 
 | Station | Rezept | Kosten | Wirkung |
 |---|---|---|---|
-| Flamme | Bolzen ×10 | 4 Holz, 2 Stein | Turm-Munition (ins Lager) |
+| Flamme | Bolzen ×6 | 6 Holz, 3 Stein | Turm-Munition (ins Lager) |
 | Flamme | Verband ×2 | 1 Stoff, 1 Kräuter | Q: +40 LP |
 | Werkbank | Fackel ×2 | 2 Holz, 1 Stoff, 1 Harz | T: 3 Minuten Licht, Wölfe meiden dich |
 | Werkbank | Axt / Spitzhacke | Holz, Stein, 1 Eisen | Holz bzw. Stein 80 % schneller |
 | Werkbank (ab Stufe 3) | Stiefel | 3 Fell, 2 Stoff | +40 Energie, +30 % Erholung |
 | Schmiede | Eisenschwert | 6 Eisen, 2 Holz, 2 Kohle | Schaden 32 statt 20 |
 | Schmiede | Rüstung | 5 Eisen, 3 Fell, 2 Stoff | 30 % weniger Schaden |
-| Schmiede | Bolzen ×25 | 1 Eisen, 3 Holz, 1 Kohle | Turm-Munition (ins Lager) |
+| Werkbank | Holzkohle ×2 | 6 Holz | Kohle für Flamme und Feuerschalen (ins Lager) |
+| Schmiede | Bolzen ×15 | 1 Eisen, 3 Holz, 1 Kohle | Turm-Munition (ins Lager) |
 | Werkbank | Kräuteröl | 3 Kräuter, 1 Harz | Brennstoff hoher Flammenstufen |
 
-Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; eine volle Reparatur kostet 35 % der Baukosten aus dem Lager.
+Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme brauchen Bolzen**, ohne Munition schweigen sie (rotes Zeichen). Tagsüber reparieren Siedler beschädigte Gebäude; eine volle Reparatur kostet 35 % der Baukosten aus dem Lager, bei Türmen 70 %.
 
 **Händler:** Alle drei Tage schlägt eine Händler-Karawane für anderthalb Tage ihr Lager auf, bevorzugt in einem befreiten Aschgänger-Lager. Sie tauscht Rohstoffe und manchmal einen Bauplan (E zum Handeln, ⚖ auf der Karte).
 
@@ -115,12 +116,12 @@ Werkzeug und Ausrüstung wirken, solange du sie im Gepäck trägst. **Türme bra
 | Siedlung | Lagerhaus (2×2, Stufe 3) | 40 Holz, 30 Stein | zweite Annahmestelle |
 | Wehr | Mauer | 3 Stein | 320 LP, blockiert alle – Gegner, Siedler und dich |
 | Wehr | Tor | 8 Holz, 6 Stein | 420 LP, nur eigene Leute gehen hindurch; in eine Mauer gesetzt zahlst du nur die Differenz |
-| Wehr | Turm | 20 Holz, 18 Stein | Ballista, 6 Felder Reichweite, 1 Bolzen pro Schuss |
+| Wehr | Turm | 20 Holz, 18 Stein (ab dem 5. Turm +60 % je weiterem) | Ballista, 6 Felder Reichweite, 11 Schaden, 1 Bolzen pro Schuss |
 | Wehr | Wachturm II (Stufe 5) | 20 Holz, 30 Stein, 6 Eisen | 8 Felder, Doppelschuss |
-| Wehr | Falle (Bauplan) | 6 Holz, 2 Eisen | 50 Schaden + Verlangsamung, 3 Auslösungen |
-| Wehr | Feuerschale (Stufe 3 oder Bauplan) | 8 Stein, 1 Eisen, 2 Kohle | Licht, 9 Brennschaden/s im Umkreis von 3 Feldern, 1 Kohle pro Nacht |
+| Wehr | Falle (Stufe 3 oder Bauplan) | 2 Holz, 3 Eisen | 100 Schaden + Verlangsamung, 5 Auslösungen |
+| Wehr | Feuerschale (Stufe 3 oder Bauplan) | 8 Stein, 1 Eisen, 2 Kohle | Licht, 24 Brennschaden/s im Umkreis von 3,5 Feldern, 1 Kohle pro Nacht |
 | Handwerk | Werkbank (Stufe 2) | 24 Holz, 8 Stein | Werkzeug, Fackeln, Stiefel, Kräuteröl |
-| Handwerk | Schmiede (2×2, Stufe 4 + Bauplan) | 20 Holz, 40 Stein, 10 Eisen | Eisenschwert, Rüstung, Bolzen ×25 |
+| Handwerk | Schmiede (2×2, Stufe 4 + Bauplan) | 20 Holz, 40 Stein, 10 Eisen | Eisenschwert, Rüstung, Bolzen ×15 |
 
 Gebaut werden kann im Umkreis der Flamme (12 Felder auf Stufe 1, wächst mit jeder Stufe) und 6 Feldern um jedes andere Gebäude.
 
@@ -160,14 +161,14 @@ Die Flamme hat 8 Stufen. Mit **E an der Flamme** öffnest du ihr Fenster: Stufe,
 
 Fehlt Brennstoff, verliert die Flamme Glut (bis zu 40 % pro Nacht). Licht, Bauradius und Schutzaura schrumpfen mit. Ist der Brennstoff voll bezahlt, erholt sie sich um 15 %. **Bei Glut 0 erlischt die Flamme, das Spiel ist verloren.** Das HUD zeigt Stufe, Glut und den Bedarf pro Nacht: grün heißt drei Nächte gedeckt, gelb nur die nächste, rot fehlt. Höher entfachen macht dich stärker, kostet aber mehr Unterhalt.
 
-**Baupläne:** Die Falle gibt es nur mit Bauplan. Die Schmiede braucht Stufe 4 **und** einen Bauplan. Die Feuerschale kommt mit Stufe 3 oder früher mit Bauplan. Baupläne liegen in den Truhen befreiter Aschgänger-Lager oder sind beim Händler zu haben. Gebäude erscheinen erst in der Bauleiste, wenn sie freigeschaltet sind. Die Bauleiste ist in Kategorien geteilt (Siedlung, Wehr, Handwerk); **B** wechselt die Kategorie, **1–9** wählt.
+**Baupläne:** Die Falle kommt mit Stufe 3 oder früher mit Bauplan. Die Schmiede braucht Stufe 4 **und** einen Bauplan. Die Feuerschale kommt mit Stufe 3 oder früher mit Bauplan. Baupläne liegen in den Truhen befreiter Aschgänger-Lager oder sind beim Händler zu haben. Gebäude erscheinen erst in der Bauleiste, wenn sie freigeschaltet sind. Die Bauleiste ist in Kategorien geteilt (Siedlung, Wehr, Handwerk); **B** wechselt die Kategorie, **1–9** wählt.
 
 | Gebäude | Wirkung |
 |---|---|
 | Lagerhaus | Zweite Annahmestelle für Rohstoffe, kürzere Wege für dich und die Siedler |
-| Falle | Flach am Boden: Gegner nehmen 50 Schaden und werden 3 s langsamer. Hält 3 Auslösungen. |
-| Feuerschale | Licht und Brennschaden ringsum (3 Felder); verbrennt jede Nacht 1 Kohle |
-| Schmiede | Eisenschwert, Rüstung, Bolzen ×25 |
+| Falle | Flach am Boden: Gegner nehmen 100 Schaden und werden 3 s langsamer. Hält 5 Auslösungen. |
+| Feuerschale | Licht und Brennschaden ringsum (3,5 Felder); verbrennt jede Nacht 1 Kohle |
+| Schmiede | Eisenschwert, Rüstung, Bolzen ×15 |
 | Wachturm II | 8 Felder Reichweite, Doppelschuss; auf einen Turm gesetzt zahlst du nur die Differenz |
 
 ### Orte in der Wildnis
@@ -212,7 +213,7 @@ Gegner laufen auf dem kürzesten Weg zur Flamme. Ist der Umweg um eine Mauer zu 
 - Rette früh möglichst viele Überlebende – sie sammeln, bauen und tragen Material.
 - Brunnen und Farm früh bauen – Siedler ohne Versorgung arbeiten nicht lange.
 - Behalte den Brennstoffbedarf im Auge (HUD) und entfache die Flamme erst, wenn der Vorrat für mehrere Nächte reicht.
-- Türme allein reichen nicht: Sie fressen Bolzen. Mauerring mit Toren, Fallen vor der Mauer und Feuerschalen dahinter verteilen die Last.
+- Türme allein reichen nicht: Sie fressen Bolzen, jeder Turm ab dem fünften kostet mehr, und ihre Reparatur ist doppelt so teuer. Mauerring mit Toren, Fallen vor der Mauer und Feuerschalen dahinter verteilen die Last.
 - Ein leichtes Aschgänger-Lager zu räumen lohnt sich: Die Truhe enthält einen Bauplan.
 - In den Bossnächten (alle 5 Nächte) lohnt es sich, selbst an der Flamme zu kämpfen. Beim Stampfer aus dem roten Ring springen (Dash)!
 - Brecher gehen gezielt auf Mauern los: Fallen und Feuerschalen hinter der Mauer halten sie auf.
@@ -244,7 +245,7 @@ Das Spiel speichert automatisch im Browser (localStorage): alle 30 Spielsekunden
 ## Balancing
 Ein Bot spielt das Spiel im Schnelldurchlauf (`tools/scenarios/balance.mjs`). Er läuft den Questpfad (ohne Intro), sammelt per Autopilot (A*) selbst Holz und Stein, baut die erste Hütte, rettet Überlebende, jagt unterwegs, entfacht die Flamme, wenn danach Brennstoff für zwei Nächte da ist, räumt ein leichtes Aschgänger-Lager, kauft Baupläne beim Händler und verteidigt sich mit Mauerring und Toren, Feuerschalen, Fallen und einigen Türmen. Nachts kämpft er an der Flamme. Hängt ein Ausflug zehn Sekunden fest (etwa wegen eines Wolfsrudels), kehrt er zur Flamme zurück.
 
-Ergebnis (sechs Seeds, Stand Phase 10): **10–15 Nächte, im Mittel etwa 13**. Den Questpfad schafft der Bot an Tag 2–3, er erreicht Flammenstufe 3–4. Eine reine Turm-Strategie (`BOT=towers`) landet im selben Bereich (10–15 Nächte), ist aber auf viel Holz und Stein für Bolzen angewiesen und nicht überlegen. Das Spiel streut deutlich (Lager, Wildlife, Wellenrichtungen sind zufällig). Die gefährlichsten Momente sind die ersten Brecher-Nächte (ab 7) und die Bossnächte.
+Ergebnis (zehn Seeds 1, 7, 42, 99, 777, 2024, 4242, 9001, 31337, 123456; Stand Qualitätsdurchlauf): **gemischte Strategie im Mittel 16–17 Nächte** (10–21), **reine Turm-Strategie (`BOT=towers`) im Mittel etwa 12** (9–14). Türme werden ab dem fünften teurer, verbrauchen teure Bolzen und kosten doppelt so viel Reparatur; Fallen, Feuerschalen und Mauern tragen dafür ohne Munition. Holzkohle an der Werkbank verhindert, dass Feuerschalen mangels Kohle dunkel bleiben. Das Spiel streut deutlich (Lager, Wildlife, Steinvorkommen und Wellenrichtungen sind zufällig). Die gefährlichsten Momente sind die ersten Brecher-Nächte (ab 7) und die Bossnächte.
 
 ```bash
 SEED=777 CHROMIUM_PATH=/usr/bin/chromium node tools/smoke-test.mjs tools/scenarios/balance.mjs

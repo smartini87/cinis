@@ -9,16 +9,17 @@ import { ITEMS, itemInfo } from './items.js';
  * out: { item, n } → Gepäck, { res, n } → Lager. unique: nur einmal nötig (Werkzeug/Ausrüstung).
  */
 export const RECIPES = [
-  { id: 'bolts', station: 'flame', cost: { wood: 4, stone: 2 }, out: { res: 'bolts', n: 10 }, desc: 'Munition für die Türme (ins Lager).' },
+  { id: 'bolts', station: 'flame', cost: { wood: 6, stone: 3 }, out: { res: 'bolts', n: 6 }, desc: 'Munition für die Türme (ins Lager).' },
   { id: 'bandage', station: 'flame', cost: { cloth: 1, herbs: 1 }, out: { item: 'bandage', n: 2 }, desc: 'Q: heilt 40 Lebenspunkte.' },
   { id: 'torch', station: 'workbench', cost: { wood: 2, cloth: 1, resin: 1 }, out: { item: 'torch', n: 2 }, desc: 'Licht in der Nacht, hält Wölfe fern.' },
   { id: 'axe', station: 'workbench', cost: { wood: 4, stone: 2, iron: 1 }, out: { item: 'axe', n: 1 }, unique: true },
   { id: 'pick', station: 'workbench', cost: { wood: 4, stone: 3, iron: 1 }, out: { item: 'pick', n: 1 }, unique: true },
   { id: 'boots', station: 'workbench', cost: { hide: 3, cloth: 2 }, out: { item: 'boots', n: 1 }, unique: true, unlock: { level: 3 } },
+  { id: 'charcoal', station: 'workbench', cost: { wood: 6 }, out: { res: 'coal', n: 2 }, desc: 'Holzkohle für Flamme und Feuerschalen (ins Lager).' },
   { id: 'oil', station: 'workbench', cost: { herbs: 3, resin: 1 }, out: { res: 'oil', n: 1 }, desc: 'Brennstoff der höchsten Flammenstufen (ins Lager).' },
   { id: 'ironSword', station: 'forge', cost: { iron: 6, wood: 2, coal: 2 }, out: { item: 'ironSword', n: 1 }, unique: true },
   { id: 'armor', station: 'forge', cost: { iron: 5, hide: 3, cloth: 2 }, out: { item: 'armor', n: 1 }, unique: true },
-  { id: 'boltsIron', station: 'forge', cost: { iron: 1, wood: 3, coal: 1 }, out: { res: 'bolts', n: 25 }, desc: 'Viele Bolzen auf einmal (ins Lager).' },
+  { id: 'boltsIron', station: 'forge', cost: { iron: 1, wood: 3, coal: 1 }, out: { res: 'bolts', n: 15 }, desc: 'Viele Bolzen auf einmal (ins Lager).' },
 ];
 
 export const STATION_NAMES = { flame: 'Ewige Flamme', workbench: 'Werkbank', forge: 'Schmiede' };
